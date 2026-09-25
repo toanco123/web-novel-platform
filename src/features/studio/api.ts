@@ -12,6 +12,7 @@ import {
   ratingsOf,
   recentViews,
   saveReports,
+  saveUserComments,
   totalViews,
 } from '@/mocks/activity'
 import { takenStorySlugs } from '@/mocks/catalog'
@@ -27,13 +28,21 @@ import type { Chapter, ChapterStatus } from '@/types/chapter'
 import type { ChapterReport } from '@/types/report'
 import type { StoryStatus } from '@/types/story'
 
-type StudioErrorCode = 'not_found' | 'no_published_chapters' | 'last_published_chapter'
+type StudioErrorCode =
+  | 'not_found'
+  | 'no_published_chapters'
+  | 'last_published_chapter'
+  | 'chapter_exists'
+  | 'chapter_number_locked'
 
 const messages: Record<StudioErrorCode, string> = {
   not_found: 'Không tìm thấy truyện này trong khu Sáng tác của bạn.',
   no_published_chapters: 'Cần xuất bản ít nhất 1 chương trước khi xuất bản truyện.',
   last_published_chapter:
     'Đây là chương công khai cuối cùng. Ẩn truyện trước rồi mới ẩn hoặc xóa chương này.',
+  chapter_exists: 'Truyện đã có chương mang số này. Chọn số khác.',
+  chapter_number_locked:
+    'Chương đã xuất bản giữ nguyên số để link và lịch sử đọc của người đọc không bị hỏng.',
 }
 
 export class StudioError extends Error {
@@ -242,23 +251,36 @@ function newChapter(
 }
 
 /**
- * Tạo chương mới (không truyền number) hoặc sửa chương có sẵn.
+ * Tạo chương mới (không truyền `number`) hoặc sửa chương có sẵn (`number` là số hiện tại).
+ * `newNumber`: số chương muốn lưu, được bỏ trống số ở giữa (có chương 1 thì viết luôn chương 3).
+ * Chương mới mặc định lấy số tiếp theo. Chỉ đổi số được với chương chưa xuất bản lần nào,
+ * vì link, lịch sử đọc và bình luận của người đọc đều theo số chương.
  * publish = true thì xuất bản; false thì giữ nguyên trạng thái hiện tại (chương mới là nháp).
  */
 export async function saveChapter(
   storyId: string,
-  input: ChapterInput & { number?: number },
+  input: ChapterInput & { number?: number; newNumber?: number },
   { publish = false } = {},
 ): Promise<Chapter> {
   await delay(400)
   const { story, stories } = await ownStory(storyId)
   const chapters = loadChapters(storyId)
-  const existing = input.number ? chapters.find((c) => c.number === input.number) : undefined
+  const existing =
+    input.number === undefined ? undefined : chapters.find((c) => c.number === input.number)
+  if (input.number !== undefined && !existing) throw new StudioError('not_found')
+  const number = input.newNumber ?? existing?.number ?? (chapters.at(-1)?.number ?? 0) + 1
+  if (chapters.some((c) => c.number === number && c.id !== existing?.id)) {
+    throw new StudioError('chapter_exists')
+  }
+  if (existing && number !== existing.number && existing.publishedAt) {
+    throw new StudioError('chapter_number_locked')
+  }
 
   let saved: Chapter
   if (existing) {
     saved = {
       ...existing,
+      number,
       title: input.title.trim(),
       content: input.content.trim(),
       updatedAt: now(),
@@ -271,7 +293,6 @@ export async function saveChapter(
       chapters.map((c) => (c.id === existing.id ? saved : c)),
     )
   } else {
-    const number = (chapters.at(-1)?.number ?? 0) + 1
     saved = newChapter(storyId, number, input, publish)
     saveChapters(storyId, [...chapters, saved])
   }
@@ -319,6 +340,12 @@ export async function deleteChapter(storyId: string, number: number) {
     storyId,
     chapters.filter((c) => c.id !== chapter.id),
   )
+  // Bình luận và báo lỗi gắn theo số chương: xóa cùng chương, để chương viết lại sau với số này
+  // không nhận nhầm của chương cũ
+  const ofChapter = (c: { storySlug: string; chapterNumber: number | null }) =>
+    c.storySlug === story.slug && c.chapterNumber === number
+  saveUserComments(loadUserComments().filter((c) => !ofChapter(c)))
+  saveReports(loadReports().filter((r) => !ofChapter(r)))
   touch(stories, story)
 }
 

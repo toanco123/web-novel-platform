@@ -219,3 +219,69 @@ test('danh sách Sáng tác: menu ⋯ mở tab sửa thông tin và xóa truyệ
   expect(screen.getByText('Đã xóa truyện “Truyện trong menu”.')).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/sang-tac')
 })
+
+test('chọn số chương: bỏ trống chương 2 để viết chương 3, rồi viết bù từ dòng "chưa viết"', async () => {
+  signIn()
+  const { createStory, saveChapter } = await import('./api')
+  const story = await createStory({
+    title: 'Truyện nhảy chương',
+    description: 'Mô tả đủ dài cho truyện thử nghiệm trong test.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  await saveChapter(story.id, { title: 'Một', content }, { publish: true })
+  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}/chuong-moi`)
+
+  const number = await screen.findByLabelText('Số chương', {}, slow)
+  expect(number).toHaveValue(2)
+  // Trùng số chương đã có thì báo ngay
+  await user.clear(number)
+  await user.type(number, '1')
+  await user.tab()
+  expect(await screen.findByText('Chương 1 đã có, chọn số khác')).toBeInTheDocument()
+
+  await user.clear(number)
+  await user.type(number, '3')
+  expect(await screen.findByText(/Chương 2 chưa xuất bản/)).toBeInTheDocument()
+  await user.type(screen.getByLabelText('Nội dung'), content)
+  await user.click(screen.getByRole('button', { name: 'Xuất bản chương' }))
+
+  // Trang quản lý: chương 2 hiện là chỗ trống, bấm để viết bù
+  const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
+  await user.click(await within(list).findByRole('link', { name: 'Viết chương 2' }, slow))
+  await expect.poll(() => router.state.location.search, slow).toBe('?so=2')
+  expect(await screen.findByLabelText('Số chương', {}, slow)).toHaveValue(2)
+})
+
+test('đổi số chương nháp rồi lưu thì quay về trang quản lý với số mới', async () => {
+  signIn()
+  const { createStory, saveChapter } = await import('./api')
+  const story = await createStory({
+    title: 'Truyện đổi số',
+    description: 'Mô tả đủ dài cho truyện thử nghiệm trong test.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  await saveChapter(story.id, { title: 'Nháp', content }) // chương 1, nháp
+  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}/chuong/1`)
+
+  const number = await screen.findByLabelText('Số chương', {}, slow)
+  await user.clear(number)
+  await user.type(number, '4')
+  // Lưu xong, chương theo số cũ không còn: không được thoáng hiện trang "không tìm thấy"
+  let notFoundShown = false
+  const observer = new MutationObserver(() => {
+    notFoundShown ||= !!document.body.textContent?.includes('Không tìm thấy chương này')
+  })
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true })
+  await user.click(screen.getByRole('button', { name: 'Lưu nháp' }))
+
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`/sang-tac/truyen/${story.id}`)
+  const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
+  observer.disconnect()
+  expect(notFoundShown).toBe(false)
+  expect(within(list).getByText('Chưa viết 3 chương')).toBeInTheDocument()
+  expect(within(list).getByRole('link', { name: 'Sửa chương 4' })).toBeInTheDocument()
+})

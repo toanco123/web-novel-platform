@@ -1,15 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { History } from 'lucide-react'
+import { History, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { FormAlert } from '@/features/auth/components/FormAlert'
+import { authInputClass, FormField } from '@/features/auth/components/FormField'
 import { paths } from '@/lib/routes'
+import { cn } from '@/lib/utils'
 import type { Chapter } from '@/types/chapter'
 import type { MyStory } from '../api'
 import { studioErrorMessage } from '../errors'
 import { useSaveChapter } from '../hooks'
-import { chapterSchema, type ChapterValues } from '../schemas'
+import { CHAPTER_NUMBER_MAX, chapterFormSchema, type ChapterFormValues } from '../schemas'
 import { useEditorAutosave } from '../useEditorAutosave'
 import { useUnsavedChangesPrompt } from '../useUnsavedChangesPrompt'
 import { ChapterFields } from './ChapterFields'
@@ -22,25 +26,61 @@ type Props = {
   story: MyStory
   /** null: chương mới */
   chapter: Chapter | null
-  nextNumber: number
+  /** Mọi chương của truyện: chặn trùng số và nhắc khi xuất bản bỏ qua chương */
+  chapters: Chapter[]
+  /** Số điền sẵn cho chương mới */
+  defaultNumber: number
 }
 
-export function ChapterEditor({ story, chapter, nextNumber }: Props) {
+type Skipped = { prev: number; from: number; to: number }
+
+/**
+ * Người đọc đi theo thứ tự các chương đã xuất bản, nên xuất bản chương `number` thì họ đọc từ
+ * chương đã xuất bản liền trước sang thẳng chương này. Trả về khoảng số bị bỏ qua (chưa viết
+ * hoặc còn nháp), null nếu không bỏ qua chương nào.
+ */
+function skippedBefore(chapters: Chapter[], number: number, selfId?: string): Skipped | null {
+  const prev = chapters.reduce(
+    (max, c) =>
+      c.id !== selfId && c.status === 'published' && c.number < number
+        ? Math.max(max, c.number)
+        : max,
+    0,
+  )
+  return prev + 1 < number ? { prev, from: prev + 1, to: number - 1 } : null
+}
+
+function skippedMessage({ prev, from, to }: Skipped, number: number) {
+  const missing = from === to ? `Chương ${from}` : `Các chương ${from}–${to}`
+  const reader = prev
+    ? `đọc từ chương ${prev} sang chương ${number}`
+    : `bắt đầu từ chương ${number}`
+  return `${missing} chưa xuất bản, nên khi xuất bản chương này người đọc sẽ ${reader}.`
+}
+
+export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props) {
   const navigate = useNavigate()
   const save = useSaveChapter(story.id)
-  const loaded = { title: chapter?.title ?? '', content: chapter?.content ?? '' }
+  const [schema] = useState(() =>
+    chapterFormSchema(chapters.filter((c) => c.id !== chapter?.id).map((c) => c.number)),
+  )
+  const loaded = {
+    number: chapter?.number ?? defaultNumber,
+    title: chapter?.title ?? '',
+    content: chapter?.content ?? '',
+  }
   const {
     register,
     control,
     handleSubmit,
     reset,
     formState: { errors, isDirty },
-  } = useForm<ChapterValues>({
-    resolver: zodResolver(chapterSchema),
+  } = useForm<ChapterFormValues>({
+    resolver: zodResolver(schema),
     mode: 'onTouched',
     defaultValues: loaded,
   })
-  const values = useWatch({ control }) as ChapterValues
+  const values = useWatch({ control }) as ChapterFormValues
   const autosave = useEditorAutosave(
     `editor-draft:${story.id}:${chapter?.number ?? 'new'}`,
     values,
@@ -50,12 +90,23 @@ export function ChapterEditor({ story, chapter, nextNumber }: Props) {
   const leave = useUnsavedChangesPrompt(isDirty && !save.isPending)
 
   const isPublished = chapter?.status === 'published'
-  const title = chapter ? `Chương ${chapter.number}` : `Chương mới (số ${nextNumber})`
+  // Đã từng xuất bản thì giữ số: link, lịch sử đọc, bình luận của người đọc đều theo số chương
+  const numberLocked = !!chapter?.publishedAt
+  const skipped =
+    !isPublished && Number.isInteger(values.number) && values.number >= 1
+      ? skippedBefore(chapters, values.number, chapter?.id)
+      : null
+  const numberNote = numberLocked
+    ? 'Chương đã xuất bản giữ nguyên số để link và lịch sử đọc của người đọc không bị hỏng.'
+    : !chapter && !skipped
+      ? 'Mặc định là số tiếp theo. Đổi số nếu muốn viết trước một chương phía sau.'
+      : null
+  const title = chapter ? `Chương ${chapter.number}` : 'Chương mới'
 
   const submit = (publish: boolean) =>
-    handleSubmit((v) =>
+    handleSubmit(({ number, ...v }) =>
       save.mutate(
-        { ...v, number: chapter?.number, publish },
+        { ...v, number: chapter?.number, newNumber: number, publish },
         {
           onSuccess: () => {
             autosave.clear()
@@ -85,8 +136,11 @@ export function ChapterEditor({ story, chapter, nextNumber }: Props) {
             type="button"
             size="sm"
             onClick={() => {
-              const { title, content } = autosave.restorable!
-              reset({ title, content }, { keepDefaultValues: true })
+              const { number, title, content } = autosave.restorable!
+              reset(
+                { number: number ?? values.number, title, content },
+                { keepDefaultValues: true },
+              )
               autosave.dismiss()
             }}
           >
@@ -100,6 +154,55 @@ export function ChapterEditor({ story, chapter, nextNumber }: Props) {
 
       <div className="max-w-3xl space-y-6">
         {save.isError && <FormAlert>{studioErrorMessage(save.error)}</FormAlert>}
+        <FormField
+          id="chapter-number"
+          label="Số chương"
+          error={errors.number?.message}
+          below={
+            <>
+              {numberNote && (
+                <p id="chapter-number-note" className="text-xs text-muted-foreground">
+                  {numberNote}
+                </p>
+              )}
+              {skipped && (
+                <p
+                  id="chapter-number-skipped"
+                  className="flex gap-2.5 rounded-lg border border-rose-gold/40 bg-rose-gold/10 px-3.5 py-2.5 text-sm"
+                >
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-rose-gold" aria-hidden />
+                  {skippedMessage(skipped, values.number)}
+                </p>
+              )}
+            </>
+          }
+        >
+          {(c) => (
+            <Input
+              {...c}
+              aria-describedby={
+                [
+                  c['aria-describedby'],
+                  numberNote && 'chapter-number-note',
+                  skipped && 'chapter-number-skipped',
+                ]
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
+              {...register('number', { valueAsNumber: true })}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={CHAPTER_NUMBER_MAX}
+              step={1}
+              readOnly={numberLocked}
+              className={cn(
+                authInputClass,
+                'w-32 tabular-nums read-only:bg-muted/50 read-only:text-muted-foreground',
+              )}
+            />
+          )}
+        </FormField>
         <ChapterFields
           idPrefix="chapter"
           titleField={register('title')}

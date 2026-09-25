@@ -25,6 +25,9 @@ Khác với plan:
   - Form tạo truyện có phần **Chương 1** (không bắt buộc) và 2 nút **"Lưu nháp"** / **"Đăng truyện"** (xem mục 1.3).
   - Danh sách `/sang-tac` có menu **⋯** cho từng truyện (xem mục 1.2).
   - Tab trang quản lý nằm trên URL (`?muc=`) để link mở đúng tab (xem mục 1.4).
+- Bổ sung sau (25/09/2026), theo phản hồi "viết xong chương 1, chưa biết viết gì cho chương 2, muốn viết chương 3":
+  - Tác giả **chọn được số chương**, được bỏ trống số ở giữa (xem mục 1.5).
+  - Danh sách chương hiện chỗ trống "Chưa viết" kèm nút viết bù (xem mục 1.4).
 
 **Chia 3 giai đoạn**, mỗi giai đoạn xong là dùng được:
 - **A. Thể loại:** trang `/the-loai` và tạo thể loại.
@@ -114,6 +117,7 @@ Thông tin | Chương (12)                                  (tabs)
 ```
 - **Tab "Thông tin":** `StoryForm` để sửa. **Tab "Chương":** danh sách chương kèm trạng thái.
 - Tab đang mở nằm trên URL: `?muc=thong-ke|bao-loi|thong-tin` (tab Chương thì không có tham số), đổi tab dùng `replace`.
+- **Số chương còn trống:** giữa hai chương không liền số có dòng "2 · Chưa viết" (hoặc "4–6 · Chưa viết 3 chương") với nút "Viết chương N", mở trình soạn điền sẵn số đó (`paths.studioNewChapter(id, n)` → `?so=n`).
 - **Quy tắc xuất bản:**
   - Truyện chỉ xuất bản được khi có **≥ 1 chương đã xuất bản**; nút bị khóa kèm lý do.
   - Truyện đang công khai thì không được ẩn hoặc xóa chương đã xuất bản cuối cùng, phải ẩn truyện trước.
@@ -125,7 +129,13 @@ Thông tin | Chương (12)                                  (tabs)
 - Nội dung phải có ≥ 100 ký tự và ≤ 100.000 ký tự; hiện số chữ và số ký tự.
 - **Tự lưu nháp soạn thảo** vào trình duyệt mỗi 5 giây ("Đã lưu nháp lúc 10:42"). Mở lại trang thì hỏi "Khôi phục bản đang viết dở?".
 - Nút "Lưu nháp", "Xuất bản chương", "Hủy". Rời trang khi còn thay đổi chưa lưu thì hỏi lại (`useBlocker` của React Router + `beforeunload`).
-- Số chương tự gán là số tiếp theo; sửa chương giữ nguyên số.
+- **Số chương** (ô "Số chương" trong trình soạn):
+  - Chương mới mặc định là số tiếp theo (số lớn nhất + 1), đổi được sang số khác còn trống, vd có chương 1 thì viết luôn chương 3. Trùng số thì báo "Chương 3 đã có, chọn số khác" (api cũng chặn: `chapter_exists`).
+  - Chương chưa xuất bản lần nào thì đổi số được. Chương đã từng xuất bản giữ nguyên số (`chapter_number_locked`) vì link, lịch sử đọc, bình luận, báo lỗi, lượt đọc đều theo số chương.
+  - Người đọc đi theo thứ tự các chương đã xuất bản (chương trước/sau không phải ±1), nên xuất bản chương 3 khi chưa có chương 2 thì đọc từ 1 sang 3. Trình soạn nhắc: "Chương 2 chưa xuất bản, nên khi xuất bản chương này người đọc sẽ đọc từ chương 1 sang chương 3."
+  - Xóa chương thì xóa luôn bình luận và báo lỗi của chương, để chương viết lại với số đó không nhận nhầm. Lượt đọc giữ nguyên trong tổng của truyện.
+  - Nhập file `.txt` vẫn đánh số tiếp nối sau chương lớn nhất.
+  - Giới hạn đã biết: "chương mới" trong tủ truyện tính theo số chương lớn hơn mốc đã đọc, nên chương viết bù phía trước (vd chương 2 xuất bản sau chương 3) không được đếm là chương mới.
 - Nội dung luôn hiển thị dạng **văn bản thuần** (không render HTML) nên không có nguy cơ chèn mã.
 
 ### 1.6 Nhập file `.txt` (giai đoạn C)
@@ -231,6 +241,8 @@ Thông tin | Chương (12)                                  (tabs)
   - Đăng truyện → viết chương → xuất bản chương → xuất bản truyện → truyện hiện ở "Mới cập nhật" và mở được `/truyen/:slug`.
   - Tạo truyện kèm chương 1 rồi "Đăng truyện" → công khai ngay; bấm khi chưa viết chương 1 thì báo lỗi.
   - Menu ⋯ ở `/sang-tac`: "Sửa thông tin" mở đúng tab, "Xóa truyện" ngay từ danh sách.
+  - Chọn số chương: trùng số thì báo lỗi, bỏ trống chương 2 để viết chương 3 rồi viết bù từ dòng "Chưa viết"; đổi số chương nháp rồi lưu thì về trang quản lý (không thoáng hiện trang "không tìm thấy").
+- **Test api số chương:** chọn số và viết bù, chặn trùng số, chương đã từng xuất bản không đổi số được, xóa chương thì xóa bình luận/báo lỗi của chương.
   - Nhập file `.txt` → bảng xem trước đúng số chương → "Thêm N chương".
   - Xóa truyện phải gõ đúng tên.
 - `npm run build`, `npm run lint` sạch.

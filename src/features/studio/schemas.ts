@@ -36,6 +36,28 @@ export const chapterSchema = z.object({
 
 export type ChapterValues = z.infer<typeof chapterSchema>
 
+export const CHAPTER_NUMBER_MAX = 99_999
+
+/**
+ * Form soạn chương: thêm số chương do người viết chọn (được bỏ trống số ở giữa),
+ * không trùng số của chương khác trong truyện (`takenNumbers`).
+ */
+export const chapterFormSchema = (takenNumbers: number[]) =>
+  chapterSchema.extend({
+    number: z
+      .number({ error: 'Nhập số chương' })
+      .int('Số chương phải là số nguyên')
+      .min(1, 'Số chương từ 1 trở lên')
+      .max(CHAPTER_NUMBER_MAX, `Số chương tối đa ${CHAPTER_NUMBER_MAX.toLocaleString('vi-VN')}`)
+      .superRefine((n, ctx) => {
+        if (takenNumbers.includes(n)) {
+          ctx.addIssue({ code: 'custom', message: `Chương ${n} đã có, chọn số khác` })
+        }
+      }),
+  })
+
+export type ChapterFormValues = z.infer<ReturnType<typeof chapterFormSchema>>
+
 /** Chương 1 viết ngay trong form tạo truyện: để trống nội dung thì chỉ tạo truyện */
 export const firstChapterSchema = z
   .object({

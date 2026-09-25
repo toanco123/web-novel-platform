@@ -1,5 +1,7 @@
 import { getLatestUpdated, getNewReleases, getStory } from '@/features/stories/api'
 import { getChapterList } from '@/features/chapters/api'
+import { addComment, getComments } from '@/features/comments/api'
+import { reportChapter } from '@/features/feedback/api'
 import { getGenres } from '@/features/genres/api'
 import * as studio from './api'
 
@@ -158,4 +160,56 @@ test('thống kê đếm lượt đọc của người khác, không tính lư�
   expect(stats.viewsByDay).toHaveLength(studio.STATS_DAYS)
   expect(stats.viewsByDay.at(-1)!.views).toBe(2)
   expect(await getStory(story.slug)).toMatchObject({ viewCount: 2 })
+})
+
+test('chọn số chương: bỏ trống chương 2 để viết chương 3, rồi viết bù', async () => {
+  signInAs('demo')
+  const story = await studio.createStory(input)
+  await studio.saveChapter(story.id, chapter, { publish: true }) // chương 1
+  await studio.saveChapter(story.id, { ...chapter, title: 'Ba', newNumber: 3 }, { publish: true })
+  await studio.saveChapter(story.id, { ...chapter, title: 'Bốn' }) // mặc định: số tiếp theo
+  await studio.saveChapter(story.id, { ...chapter, title: 'Hai', newNumber: 2 })
+
+  expect((await studio.getMyChapters(story.id)).map((c) => `${c.number} ${c.title}`)).toEqual([
+    '1 Gặp lại',
+    '2 Hai',
+    '3 Ba',
+    '4 Bốn',
+  ])
+  await expect(studio.saveChapter(story.id, { ...chapter, newNumber: 3 })).rejects.toMatchObject({
+    code: 'chapter_exists',
+  })
+})
+
+test('chỉ đổi số được với chương chưa xuất bản lần nào', async () => {
+  signInAs('demo')
+  const story = await studio.createStory(input)
+  await studio.saveChapter(story.id, chapter) // chương 1, nháp
+  await studio.saveChapter(story.id, { ...chapter, number: 1, newNumber: 5 })
+  expect((await studio.getMyChapters(story.id)).map((c) => c.number)).toEqual([5])
+
+  // Đã xuất bản rồi chuyển về nháp vẫn giữ số (người đọc có thể đã lưu link, lịch sử đọc)
+  await studio.setChapterStatus(story.id, 5, 'published')
+  await studio.setChapterStatus(story.id, 5, 'draft')
+  await expect(
+    studio.saveChapter(story.id, { ...chapter, number: 5, newNumber: 6 }),
+  ).rejects.toMatchObject({ code: 'chapter_number_locked' })
+})
+
+test('xóa chương thì xóa luôn bình luận và báo lỗi của chương, viết lại số đó không nhận nhầm', async () => {
+  signInAs('demo')
+  const story = await studio.createStory(input)
+  await studio.saveChapter(story.id, chapter, { publish: true })
+  await studio.saveChapter(story.id, chapter, { publish: true })
+  await studio.publishStory(story.id)
+  await addComment(story.slug, 'Chương 1 hay', 1)
+  await addComment(story.slug, 'Chương 2 hay', 2)
+  await reportChapter({ slug: story.slug, chapter: 2, reason: 'typo', note: 'Sai chính tả' })
+
+  await studio.deleteChapter(story.id, 2)
+  await studio.saveChapter(story.id, { ...chapter, newNumber: 2 }, { publish: true })
+
+  expect((await getComments(story.slug, { chapter: 2 })).total).toBe(0)
+  expect((await getComments(story.slug, { chapter: 1 })).total).toBe(1)
+  expect(await studio.getStoryReports(story.id)).toEqual([])
 })

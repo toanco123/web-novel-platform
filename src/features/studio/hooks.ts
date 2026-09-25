@@ -95,7 +95,10 @@ export function useDeleteStory(id: string) {
 export function useSaveChapter(storyId: string) {
   const invalidate = useInvalidateAll()
   return useMutation({
-    mutationFn: ({ publish, ...input }: api.ChapterInput & { number?: number; publish: boolean }) =>
+    mutationFn: ({
+      publish,
+      ...input
+    }: api.ChapterInput & { number?: number; newNumber?: number; publish: boolean }) =>
       api.saveChapter(storyId, input, { publish }),
     onSuccess: invalidate,
   })

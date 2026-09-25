@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { readMock, writeMock } from '@/lib/mockStorage'
 
-type Draft = { title: string; content: string; savedAt: string }
+/** `number`: số chương đang chọn (bản lưu từ trước khi chọn được số chương thì không có) */
+type EditorValues = { number?: number | null; title: string; content: string }
+type Draft = EditorValues & { savedAt: string }
 const AUTOSAVE_MS = 5000
 
 /**
@@ -10,15 +12,18 @@ const AUTOSAVE_MS = 5000
  */
 export function useEditorAutosave(
   key: string,
-  values: { title: string; content: string },
+  values: EditorValues,
   enabled: boolean,
-  loaded: { title: string; content: string },
+  loaded: EditorValues,
 ) {
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   // Bản viết dở từ lần trước, chỉ đề nghị khôi phục nếu khác với nội dung đang có
   const [restorable, setRestorable] = useState<Draft | null>(() => {
     const draft = readMock<Draft | null>(key, null)
-    return draft && (draft.title !== loaded.title || draft.content !== loaded.content)
+    return draft &&
+      (draft.title !== loaded.title ||
+        draft.content !== loaded.content ||
+        (draft.number != null && draft.number !== loaded.number))
       ? draft
       : null
   })
@@ -37,7 +42,7 @@ export function useEditorAutosave(
     if (!enabled) return
     const timer = setTimeout(flush, AUTOSAVE_MS)
     return () => clearTimeout(timer)
-  }, [enabled, values.title, values.content, flush])
+  }, [enabled, values.number, values.title, values.content, flush])
 
   return {
     savedAt,
