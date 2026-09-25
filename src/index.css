@@ -1,0 +1,272 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource/be-vietnam-pro/400.css';
+@import '@fontsource/be-vietnam-pro/500.css';
+@import '@fontsource/be-vietnam-pro/600.css';
+@import '@fontsource-variable/cormorant-garamond/wght.css';
+@import '@fontsource/great-vibes/400.css';
+@import '@fontsource-variable/literata/opsz.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Be Vietnam Pro', system-ui, sans-serif;
+  --font-heading: 'Cormorant Garamond Variable', Georgia, serif;
+  --font-script: 'Great Vibes', cursive;
+  --font-reading: 'Literata Variable', Georgia, serif;
+  --color-rose-gold: var(--rose-gold);
+  --color-neon: var(--neon);
+  --color-wine: var(--wine);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Light: giấy hồng nhạt, chữ tím mận */
+  --background: #fbf4f6;
+  --foreground: #2a1530;
+  --card: #ffffff;
+  --card-foreground: #2a1530;
+  --popover: #ffffff;
+  --popover-foreground: #2a1530;
+  --primary: #b0144f;
+  --primary-foreground: #ffffff;
+  --secondary: #f3e3ea;
+  --secondary-foreground: #4a1a33;
+  --muted: #f3e8ec;
+  --muted-foreground: #6e5563;
+  --accent: #f6dde6;
+  --accent-foreground: #5a1030;
+  --destructive: #c62828;
+  --border: #ead7df;
+  --input: #e2cbd5;
+  --ring: #b0144f;
+  --rose-gold: #9a5a43;
+  --neon: #d6106a;
+  --wine: #7a1f3d;
+  --chart-1: #b0144f;
+  --chart-2: #9a5a43;
+  --chart-3: #7a1f3d;
+  --chart-4: #6e5563;
+  --chart-5: #d6106a;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2a1530;
+  --sidebar-primary: #b0144f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f6dde6;
+  --sidebar-accent-foreground: #5a1030;
+  --sidebar-border: #ead7df;
+  --sidebar-ring: #b0144f;
+}
+
+.dark {
+  /* Dark (mặc định): tím mận nửa đêm, burgundy, vàng hồng, hồng neon */
+  --background: #1a0f1d;
+  --foreground: #f4e7ed;
+  --card: #24152a;
+  --card-foreground: #f4e7ed;
+  --popover: #24152a;
+  --popover-foreground: #f4e7ed;
+  --primary: #ff3d8b;
+  --primary-foreground: #1a0f1d;
+  --secondary: #3a1b2e;
+  --secondary-foreground: #f4e7ed;
+  --muted: #2a1830;
+  --muted-foreground: #b9a0ad;
+  --accent: #4a1d35;
+  --accent-foreground: #f4e7ed;
+  --destructive: #ff6b6b;
+  --border: rgb(217 166 143 / 14%);
+  --input: rgb(244 231 237 / 12%);
+  --ring: #ff3d8b;
+  --rose-gold: #d9a68f;
+  --neon: #ff3d8b;
+  --wine: #7a1f3d;
+  --chart-1: #ff3d8b;
+  --chart-2: #d9a68f;
+  --chart-3: #7a1f3d;
+  --chart-4: #b9a0ad;
+  --chart-5: #4a1d35;
+  --sidebar: #24152a;
+  --sidebar-foreground: #f4e7ed;
+  --sidebar-primary: #ff3d8b;
+  --sidebar-primary-foreground: #1a0f1d;
+  --sidebar-accent: #4a1d35;
+  --sidebar-accent-foreground: #f4e7ed;
+  --sidebar-border: rgb(217 166 143 / 14%);
+  --sidebar-ring: #ff3d8b;
+}
+
+/* Màu nền trang đọc: ghi đè token trong vùng đọc, độc lập với giao diện sáng/tối của web */
+.reader-tone-white,
+.reader-tone-paper {
+  color-scheme: light;
+  --primary-foreground: #ffffff;
+  --destructive: #c62828;
+}
+.reader-tone-white {
+  --background: #fdfbf8;
+  --foreground: #2a1a22;
+  --card: #ffffff;
+  --card-foreground: #2a1a22;
+  --popover: #ffffff;
+  --popover-foreground: #2a1a22;
+  --primary: #b0144f;
+  --secondary: #f2ece8;
+  --secondary-foreground: #2a1a22;
+  --muted: #f2ece8;
+  --muted-foreground: #6f6068;
+  --accent: #f0e4e4;
+  --accent-foreground: #2a1a22;
+  --border: #e8dfda;
+  --input: #ddd2cc;
+  --ring: #b0144f;
+  --rose-gold: #9a5a43;
+}
+.reader-tone-paper {
+  --background: #f4ead3;
+  --foreground: #3a2b1d;
+  --card: #f9f1dd;
+  --card-foreground: #3a2b1d;
+  --popover: #f9f1dd;
+  --popover-foreground: #3a2b1d;
+  --primary: #9b2c47;
+  --secondary: #eadcbd;
+  --secondary-foreground: #3a2b1d;
+  --muted: #ebdfc3;
+  --muted-foreground: #6c5843;
+  --accent: #e8d6b6;
+  --accent-foreground: #3a2b1d;
+  --border: #dfcda8;
+  --input: #d5c29c;
+  --ring: #9b2c47;
+  --rose-gold: #8a5236;
+}
+.reader-tone-gray,
+.reader-tone-black {
+  color-scheme: dark;
+  --destructive: #ff6b6b;
+}
+.reader-tone-gray {
+  --background: #38363a;
+  --foreground: #e6e1dd;
+  --card: #424044;
+  --card-foreground: #e6e1dd;
+  --popover: #424044;
+  --popover-foreground: #e6e1dd;
+  --primary: #ff82ad;
+  --primary-foreground: #2a1a22;
+  --secondary: #4a474c;
+  --secondary-foreground: #e6e1dd;
+  --muted: #464349;
+  --muted-foreground: #b7afab;
+  --accent: #514b52;
+  --accent-foreground: #e6e1dd;
+  --border: rgb(255 255 255 / 12%);
+  --input: rgb(255 255 255 / 16%);
+  --ring: #ff82ad;
+  --rose-gold: #dcb29d;
+}
+.reader-tone-black {
+  --background: #000000;
+  --foreground: #cbc3c6;
+  --card: #121012;
+  --card-foreground: #cbc3c6;
+  --popover: #121012;
+  --popover-foreground: #cbc3c6;
+  --primary: #e8578f;
+  --primary-foreground: #000000;
+  --secondary: #1c191c;
+  --secondary-foreground: #cbc3c6;
+  --muted: #1a171a;
+  --muted-foreground: #8e8589;
+  --accent: #251e23;
+  --accent-foreground: #cbc3c6;
+  --border: rgb(255 255 255 / 10%);
+  --input: rgb(255 255 255 / 14%);
+  --ring: #e8578f;
+  --rose-gold: #b88d79;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  /* Cormorant mặc định dùng số kiểu cổ (1 giống I, 3 thụt xuống): tiêu đề dùng số đều hàng */
+  h1,
+  h2,
+  h3 {
+    font-variant-numeric: lining-nums;
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@theme {
+  --animate-hero-progress: hero-progress linear forwards;
+  @keyframes hero-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
