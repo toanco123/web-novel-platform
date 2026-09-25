@@ -20,7 +20,7 @@ Phạm vi giai đoạn đầu: đọc truyện, đăng nhập, tủ truyện + l
 | SEO cơ bản | Thẻ `<title>`/`<meta>` native của React 19 | SPA SEO hạn chế — chấp nhận, có thể thêm prerender sau |
 | Backend | **Supabase**: Postgres, Auth (email + Google), Storage (ảnh bìa), RLS | Không phải tự viết server |
 | Chất lượng code | oxlint + Prettier, Vitest + Testing Library | |
-| Deploy | Vercel / Netlify (static) | Cần rewrite mọi route về `index.html` |
+| Deploy | **Vercel** (nối repo GitHub, push `main` tự deploy) | `vercel.json` rewrite mọi route về `index.html` |
 
 ---
 
@@ -185,7 +185,7 @@ web-truyen/
 4. **UI tài khoản**: đăng nhập/đăng ký ✅ (25/09/2026, chi tiết ở `plan-dang-nhap-dang-ky.md`), nút tủ truyện + bình luận/đánh giá ✅ (trên trang chi tiết); còn trang Tủ truyện, lịch sử đọc (vẫn mock).
 4b. **Sáng tác & thể loại** ✅ (25/09/2026, chi tiết ở `plan-sang-tac-va-the-loai.md`): tạo thể loại, đăng truyện, soạn/nhập chương, xuất bản.
 5. **Nối Supabase**: tạo schema + RLS + seed, Auth, thay `api.ts` từng feature.
-6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy.
+6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---
 

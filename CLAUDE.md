@@ -56,4 +56,5 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
 - `cn()` ở `src/lib/utils.ts` re-export từ package `cn` (của shadcn, thay cho clsx + tailwind-merge).
 - Prettier: không dấu chấm phẩy, nháy đơn, `printWidth` 100.
 - Rule `react/only-export-components` đã tắt riêng cho `src/components/ui/**`.
-- Biến env không có tiền tố `VITE_` (HOST, PORT) chỉ dùng trong `vite.config.ts`, không lộ ra client. `.env` được gitignore; `.env.example` là file mẫu.
+- Biến env không có tiền tố `VITE_` (HOST, PORT) chỉ dùng trong `vite.config.ts`, không lộ ra client. `.gitignore` chặn mọi `.env*`; riêng `.env.example` (file mẫu) đã được track nên sửa vẫn commit bình thường.
+- Deploy: Vercel (project `toanco123s-projects/web-novel-platform`) nối repo GitHub: push `main` → production https://web-novel-platform-gules.vercel.app, nhánh khác → bản preview (phải đăng nhập Vercel mới xem được). `vercel.json` chuyển mọi đường dẫn về `index.html` (SPA) và cache lâu `/assets/*`. Biến `VITE_*` (vd Supabase) phải khai báo ở Vercel → Settings → Environment Variables vì `.env` không lên git.
