@@ -12,6 +12,8 @@ import { ChapterTable } from '@/features/studio/components/ChapterTable'
 import { DeleteStoryDialog } from '@/features/studio/components/DeleteStoryDialog'
 import { StatusBadge } from '@/features/studio/components/StatusBadge'
 import { StoryForm } from '@/features/studio/components/StoryForm'
+import { StoryReportsPanel } from '@/features/studio/components/StoryReportsPanel'
+import { StoryStatsPanel } from '@/features/studio/components/StoryStatsPanel'
 import { StudioBreadcrumb } from '@/features/studio/components/StudioBreadcrumb'
 import { studioErrorMessage } from '@/features/studio/errors'
 import { useMyStory, useSetStoryVisibility, useUpdateStory } from '@/features/studio/hooks'
@@ -58,16 +60,37 @@ function ManageStory({ story }: { story: MyStory }) {
       </header>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-10">
-        <TabsList>
-          <TabsTrigger value="chuong" className="px-4">
-            Chương ({story.chapterCount})
-          </TabsTrigger>
-          <TabsTrigger value="thong-tin" className="px-4">
-            Thông tin truyện
-          </TabsTrigger>
-        </TabsList>
+        {/* Màn hẹp: 4 tab cuộn ngang được */}
+        <div className="relative -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+          <TabsList>
+            <TabsTrigger value="chuong" className="px-4">
+              Chương ({story.chapterCount})
+            </TabsTrigger>
+            <TabsTrigger value="thong-ke" className="px-4">
+              Thống kê
+            </TabsTrigger>
+            <TabsTrigger value="bao-loi" className="px-4">
+              Báo lỗi
+              {story.openReports > 0 && (
+                <span className="rounded-full bg-neon px-1.5 text-[0.7rem] leading-4 font-semibold text-background">
+                  {story.openReports}
+                  <span className="sr-only"> chưa xử lý</span>
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="thong-tin" className="px-4">
+              Thông tin truyện
+            </TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="chuong" className="mt-6">
           <ChapterTable storyId={story.id} />
+        </TabsContent>
+        <TabsContent value="thong-ke" className="mt-6">
+          <StoryStatsPanel storyId={story.id} published={published} />
+        </TabsContent>
+        <TabsContent value="bao-loi" className="mt-6">
+          <StoryReportsPanel storyId={story.id} />
         </TabsContent>
         <TabsContent value="thong-tin" className="mt-6">
           <EditStoryInfo story={story} />

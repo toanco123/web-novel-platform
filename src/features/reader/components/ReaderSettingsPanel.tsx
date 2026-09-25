@@ -1,9 +1,19 @@
 import { Minus, Plus, RotateCcw } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { fonts, toneClass, tones, widths } from '../readerOptions'
+import { useSpeechSettings } from '../speech/useSpeechSettings'
+import { pickVoice, speechSupported, useVoices } from '../speech/useVoices'
 import {
   FONT_SIZE_RANGE,
   LINE_HEIGHT_RANGE,
@@ -26,6 +36,32 @@ export function ReaderSettingsPanel() {
 
   return (
     <div className="space-y-7">
+      <Group label="Cách đọc" id="reader-mode">
+        <div role="group" aria-labelledby="reader-mode" className="flex gap-2">
+          {(
+            [
+              [false, 'Từng chương'],
+              [true, 'Cuộn liên tục'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={settings.continuous === value}
+              onClick={() => update({ continuous: value })}
+              className={cn(segment, settings.continuous === value ? segmentActive : segmentIdle)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {settings.continuous
+            ? 'Đọc gần hết chương thì chương sau tự nối vào bên dưới.'
+            : 'Mỗi chương một trang, bấm “Chương sau” hoặc phím → để sang chương mới.'}
+        </p>
+      </Group>
+
       <Group label="Màu nền" id="reader-tone">
         <div role="radiogroup" aria-labelledby="reader-tone" className="grid grid-cols-5 gap-2">
           {tones.map((t) => {
@@ -141,6 +177,8 @@ export function ReaderSettingsPanel() {
         </div>
       </Group>
 
+      {speechSupported() && <SpeechSettings />}
+
       <Button
         variant="ghost"
         className="w-full text-muted-foreground"
@@ -151,6 +189,50 @@ export function ReaderSettingsPanel() {
         Đặt lại mặc định
       </Button>
     </div>
+  )
+}
+
+/** Giọng đọc và tự chuyển chương cho tính năng nghe truyện */
+function SpeechSettings() {
+  const { voiceURI, autoNext, update } = useSpeechSettings()
+  const { all, vietnamese } = useVoices()
+  const current = pickVoice(all, voiceURI)
+
+  return (
+    <Group label="Nghe truyện" id="reader-speech">
+      <div className="space-y-3" role="group" aria-labelledby="reader-speech">
+        {all.length > 0 && (
+          <Select value={current?.voiceURI ?? ''} onValueChange={(v) => update({ voiceURI: v })}>
+            <SelectTrigger
+              aria-label="Giọng đọc"
+              className="w-full rounded-lg data-[size=default]:h-10"
+            >
+              <SelectValue placeholder="Giọng mặc định" />
+            </SelectTrigger>
+            <SelectContent position="popper" className="max-h-72">
+              {all.map((v) => (
+                <SelectItem key={v.voiceURI} value={v.voiceURI}>
+                  {v.name} ({v.lang})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {vietnamese.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Máy bạn chưa có giọng tiếng Việt nên có thể đọc sai dấu. Cài thêm giọng tiếng Việt trong
+            cài đặt ngôn ngữ của máy để nghe rõ hơn.
+          </p>
+        )}
+        <label className="flex cursor-pointer items-center gap-3 text-sm">
+          <Checkbox
+            checked={autoNext}
+            onCheckedChange={(checked) => update({ autoNext: checked === true })}
+          />
+          Hết chương tự đọc tiếp chương sau
+        </label>
+      </div>
+    </Group>
   )
 }
 

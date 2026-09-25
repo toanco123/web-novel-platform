@@ -13,6 +13,8 @@ export type ReaderSettings = {
   fontSize: number
   lineHeight: number
   width: ReaderWidth
+  /** Cuộn liên tục: hết chương thì chương sau tự nối vào bên dưới */
+  continuous: boolean
 }
 
 export const READER_DEFAULTS: ReaderSettings = {
@@ -21,6 +23,7 @@ export const READER_DEFAULTS: ReaderSettings = {
   fontSize: 19,
   lineHeight: 1.85,
   width: 'medium',
+  continuous: false,
 }
 
 export const FONT_SIZE_RANGE = { min: 15, max: 28 }

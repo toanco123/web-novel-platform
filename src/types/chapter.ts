@@ -8,13 +8,6 @@ export type ChapterSummary = {
 
 export type ChapterOrder = 'asc' | 'desc'
 
-export type Page<T> = {
-  items: T[]
-  total: number
-  page: number
-  pageCount: number
-}
-
 export type ChapterStatus = 'draft' | 'published'
 
 /** Chương đầy đủ nội dung (truyện do người dùng đăng) */

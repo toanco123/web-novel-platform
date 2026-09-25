@@ -120,7 +120,8 @@
   --rose-gold: #d9a68f;
   --neon: #ff3d8b;
   --wine: #7a1f3d;
-  --chart-1: #ff3d8b;
+  /* Cột biểu đồ: tối hơn neon một chút để nằm trong dải sáng dễ đọc trên nền tối (đã kiểm) */
+  --chart-1: #f5347f;
   --chart-2: #d9a68f;
   --chart-3: #7a1f3d;
   --chart-4: #b9a0ad;

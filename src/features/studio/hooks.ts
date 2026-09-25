@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/auth/hooks'
 import type { ChapterStatus } from '@/types/chapter'
+import type { ChapterReport } from '@/types/report'
 import * as api from './api'
 
 export const studioKeys = {
@@ -9,6 +10,8 @@ export const studioKeys = {
   story: (userId: string, id: string) => ['studio', userId, 'story', id] as const,
   chapters: (userId: string, id: string) => ['studio', userId, 'chapters', id] as const,
   chapter: (userId: string, id: string, n: number) => ['studio', userId, 'chapter', id, n] as const,
+  stats: (userId: string, id: string) => ['studio', userId, 'stats', id] as const,
+  reports: (userId: string, id: string) => ['studio', userId, 'reports', id] as const,
 }
 
 function useUserId() {
@@ -112,5 +115,32 @@ export function useImportChapters(storyId: string) {
     mutationFn: ({ items, publish }: { items: api.ChapterInput[]; publish: boolean }) =>
       api.importChapters(storyId, items, publish),
     onSuccess: invalidate,
+  })
+}
+
+export function useStoryStats(storyId: string) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: studioKeys.stats(userId, storyId),
+    queryFn: () => api.getStoryStats(storyId),
+  })
+}
+
+export function useStoryReports(storyId: string) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: studioKeys.reports(userId, storyId),
+    queryFn: () => api.getStoryReports(storyId),
+  })
+}
+
+export function useSetReportStatus(storyId: string) {
+  const queryClient = useQueryClient()
+  const userId = useUserId()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: ChapterReport['status'] }) =>
+      api.setReportStatus(storyId, id, status),
+    // Làm mới danh sách báo lỗi và số báo lỗi trên tab/danh sách truyện
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: studioKeys.all(userId) }),
   })
 }

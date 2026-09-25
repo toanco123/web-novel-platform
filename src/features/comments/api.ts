@@ -1,48 +1,78 @@
 // Nơi DUY NHẤT xử lý bình luận và chấm điểm. Giai đoạn UI: bình luận mẫu + localStorage.
-import { requireUser } from '@/features/auth/api'
-import { mockDelay as delay, readMock, writeMock } from '@/lib/mockStorage'
-import { seedComments } from '@/mocks/comments'
-import { stories } from '@/mocks/stories'
+import { getProfiles, requireUser } from '@/features/auth/api'
+import { mockDelay as delay } from '@/lib/mockStorage'
+import {
+  loadRatings,
+  loadUserComments,
+  ratingsOf,
+  saveRatings,
+  saveUserComments,
+} from '@/mocks/activity'
+import { findStory } from '@/mocks/catalog'
+import { seedChapterComments, seedComments } from '@/mocks/comments'
 import type { Comment, RatingSummary, Score } from '@/types/comment'
 
 export const COMMENTS_PER_PAGE = 10
 
-const COMMENTS_KEY = 'mock-comments'
-const RATINGS_KEY = 'mock-ratings'
-type Ratings = Record<string, Record<string, Score>> // userId → slug → điểm
-
-const seedCache = new Map<string, Comment[]>()
-function seeded(slug: string) {
-  if (!seedCache.has(slug)) {
-    const story = stories.find((s) => s.slug === slug)
-    seedCache.set(slug, story ? seedComments(story) : [])
-  }
-  return seedCache.get(slug)!
+/**
+ * Truyện có sẵn của hệ thống (chỉ truyện này có bình luận mẫu và điểm gốc); truyện người dùng
+ * đăng thì null: điểm của nó đã tính từ lượt chấm thật, cộng điểm gốc nữa sẽ bị tính hai lần
+ */
+function seedStory(slug: string) {
+  const story = findStory(slug)
+  return story?.ownerId === null ? story : null
 }
 
-const userComments = () => readMock<Comment[]>(COMMENTS_KEY, [])
+const seedCache = new Map<string, Comment[]>()
+/** Bình luận mẫu của truyện (chapter = null) hoặc của một chương */
+function seeded(slug: string, chapter: number | null) {
+  const key = `${slug}#${chapter ?? ''}`
+  if (!seedCache.has(key)) {
+    const story = seedStory(slug)
+    const valid = story && (chapter === null || (chapter >= 1 && chapter <= story.chapterCount))
+    seedCache.set(
+      key,
+      !valid ? [] : chapter === null ? seedComments(story) : seedChapterComments(story, chapter),
+    )
+  }
+  return seedCache.get(key)!
+}
 
-export async function getComments(slug: string, cursor = 0) {
+/** Bình luận của truyện (chapter = null, mặc định) hoặc của một chương, mới nhất trước */
+export async function getComments(
+  slug: string,
+  { chapter = null, cursor = 0 }: { chapter?: number | null; cursor?: number } = {},
+) {
   await delay()
-  const all = [...userComments().filter((c) => c.storySlug === slug), ...seeded(slug)].sort(
+  const own = loadUserComments().filter((c) => c.storySlug === slug && c.chapterNumber === chapter)
+  const all = [...own, ...seeded(slug, chapter)].sort(
     (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
   )
-  const items = all.slice(cursor, cursor + COMMENTS_PER_PAGE)
+  const page = all.slice(cursor, cursor + COMMENTS_PER_PAGE)
+  // Tên và ảnh lấy theo hồ sơ hiện tại (người dùng có thể đã đổi sau khi bình luận)
+  const profiles = await getProfiles(page.map((c) => c.user.id))
+  const items = page.map((c) => ({ ...c, user: profiles.get(c.user.id) ?? c.user }))
   const next = cursor + items.length
   return { items, total: all.length, nextCursor: next < all.length ? next : null }
 }
 
-export async function addComment(slug: string, content: string): Promise<Comment> {
+export async function addComment(
+  slug: string,
+  content: string,
+  chapter: number | null = null,
+): Promise<Comment> {
   await delay(400)
   const user = await requireUser()
   const comment: Comment = {
     id: crypto.randomUUID(),
     storySlug: slug,
-    user: { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl },
+    chapterNumber: chapter,
+    // Không chép ảnh đại diện (data URL) vào từng bình luận; khi đọc sẽ lấy theo hồ sơ
+    user: { id: user.id, displayName: user.displayName, avatarUrl: null },
     content: content.trim(),
     createdAt: new Date().toISOString(),
   }
-  writeMock(COMMENTS_KEY, [comment, ...userComments()])
+  saveUserComments([comment, ...loadUserComments()])
   return comment
 }
 
@@ -50,13 +80,8 @@ export async function addComment(slug: string, content: string): Promise<Comment
 export async function deleteComment(id: string) {
   await delay(300)
   const user = await requireUser()
-  writeMock(
-    COMMENTS_KEY,
-    userComments().filter((c) => !(c.id === id && c.user.id === user.id)),
-  )
+  saveUserComments(loadUserComments().filter((c) => !(c.id === id && c.user.id === user.id)))
 }
-
-const loadRatings = () => readMock<Ratings>(RATINGS_KEY, {})
 
 /** Phân bố 5→1 sao suy ra từ điểm trung bình gốc (dữ liệu giả, chỉ để vẽ biểu đồ) */
 function baseDistribution(average: number, count: number): Record<Score, number> {
@@ -68,14 +93,12 @@ function baseDistribution(average: number, count: number): Record<Score, number>
 
 export async function getRatingSummary(slug: string): Promise<RatingSummary> {
   await delay()
-  const story = stories.find((s) => s.slug === slug)
+  const story = seedStory(slug)
   const base = story
     ? { average: story.ratingAvg, count: story.ratingCount }
     : { average: 0, count: 0 }
   const distribution = baseDistribution(base.average, base.count)
-  const extra = Object.values(loadRatings())
-    .map((byStory) => byStory[slug])
-    .filter((s): s is Score => !!s)
+  const extra = ratingsOf(slug)
   for (const score of extra) distribution[score]++
   const count = base.count + extra.length
   const total = base.average * base.count + extra.reduce((a, b) => a + b, 0)
@@ -92,6 +115,6 @@ export async function rateStory(slug: string, score: Score) {
   await delay(300)
   const user = await requireUser()
   const ratings = loadRatings()
-  writeMock(RATINGS_KEY, { ...ratings, [user.id]: { ...ratings[user.id], [slug]: score } })
+  saveRatings({ ...ratings, [user.id]: { ...ratings[user.id], [slug]: score } })
   return score
 }

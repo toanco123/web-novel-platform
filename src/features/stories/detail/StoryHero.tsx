@@ -4,6 +4,8 @@ import { Container } from '@/components/common/Container'
 import { Button } from '@/components/ui/button'
 import { useSession } from '@/features/auth/hooks'
 import { FollowButton } from '@/features/library/components/FollowButton'
+import { useStoryProgress } from '@/features/library/hooks'
+import { resumeState } from '@/features/library/resume'
 import { formatCount, formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import type { Story } from '@/types/story'
@@ -114,24 +116,7 @@ export function StoryHero({ story }: { story: Story }) {
             </dl>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              {story.firstChapterNumber !== null && (
-                <Button
-                  asChild
-                  className="h-11 rounded-full bg-[#ff3d8b] px-6 text-[#1a0f1d] shadow-[0_0_30px_rgb(255_61_139/0.4)] hover:bg-[#ff5c9e]"
-                >
-                  <Link to={paths.chapter(story.slug, story.firstChapterNumber)}>
-                    <BookOpen />
-                    Đọc từ chương {story.firstChapterNumber}
-                  </Link>
-                </Button>
-              )}
-              {story.latestChapter && story.latestChapter.number !== story.firstChapterNumber && (
-                <Button asChild variant="outline" className={onDarkOutline}>
-                  <Link to={paths.chapter(story.slug, story.latestChapter.number)}>
-                    Chương mới nhất ({story.latestChapter.number})
-                  </Link>
-                </Button>
-              )}
+              <ReadButtons story={story} />
               {isOwner ? (
                 <Button asChild variant="outline" className={onDarkOutline}>
                   <Link to={paths.studioStory(story.id)}>
@@ -147,6 +132,51 @@ export function StoryHero({ story }: { story: Story }) {
         </div>
       </Container>
     </section>
+  )
+}
+
+const primaryButton =
+  'h-11 rounded-full bg-[#ff3d8b] px-6 text-[#1a0f1d] shadow-[0_0_30px_rgb(255_61_139/0.4)] hover:bg-[#ff5c9e]'
+
+/** Đã đọc dở: "Đọc tiếp" là nút chính; chưa đọc: đọc từ chương đầu và chương mới nhất */
+function ReadButtons({ story }: { story: Story }) {
+  const { data: progress } = useStoryProgress(story.slug)
+  if (story.firstChapterNumber === null) return null
+
+  if (progress) {
+    return (
+      <>
+        <Button asChild className={primaryButton}>
+          <Link to={paths.chapter(story.slug, progress.chapter)} state={resumeState(progress)}>
+            <BookOpen />
+            Đọc tiếp chương {progress.chapter}
+          </Link>
+        </Button>
+        {progress.chapter !== story.firstChapterNumber && (
+          <Button asChild variant="outline" className={onDarkOutline}>
+            <Link to={paths.chapter(story.slug, story.firstChapterNumber)}>Đọc từ đầu</Link>
+          </Button>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Button asChild className={primaryButton}>
+        <Link to={paths.chapter(story.slug, story.firstChapterNumber)}>
+          <BookOpen />
+          Đọc từ chương {story.firstChapterNumber}
+        </Link>
+      </Button>
+      {story.latestChapter && story.latestChapter.number !== story.firstChapterNumber && (
+        <Button asChild variant="outline" className={onDarkOutline}>
+          <Link to={paths.chapter(story.slug, story.latestChapter.number)}>
+            Chương mới nhất ({story.latestChapter.number})
+          </Link>
+        </Button>
+      )}
+    </>
   )
 }
 

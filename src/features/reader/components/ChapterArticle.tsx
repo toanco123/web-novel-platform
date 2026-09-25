@@ -17,9 +17,14 @@ type Props = {
   nav?: ReactNode
   /** Chạm vào vùng chữ (không bôi đen, không bấm link) để ẩn/hiện thanh công cụ */
   onTap?: () => void
+  /** Đoạn đang được đọc to (tô nền) */
+  activeParagraph?: number
+  /** Cuộn liên tục: chỉ chương đầu là h1, các chương nối sau là h2 */
+  headingLevel?: 1 | 2
 }
 
-export function ChapterArticle({ chapter, nav, onTap }: Props) {
+export function ChapterArticle({ chapter, nav, onTap, activeParagraph, headingLevel = 1 }: Props) {
+  const Heading = headingLevel === 1 ? 'h1' : 'h2'
   const { font, fontSize, lineHeight } = useReaderSettings()
   const paragraphs = toParagraphs(chapter.content)
   const words = countWords(chapter.content)
@@ -34,7 +39,7 @@ export function ChapterArticle({ chapter, nav, onTap }: Props) {
   }
 
   return (
-    <article>
+    <article data-chapter={chapter.number} aria-labelledby={`chapter-${chapter.number}-title`}>
       <header className="text-center">
         <Link
           to={paths.story(chapter.story.slug)}
@@ -43,9 +48,12 @@ export function ChapterArticle({ chapter, nav, onTap }: Props) {
           {chapter.story.title}
         </Link>
         <p className="mt-6 text-sm text-muted-foreground">Chương {chapter.number}</p>
-        <h1 className="mt-1 font-heading text-4xl leading-tight font-semibold text-balance sm:text-5xl">
+        <Heading
+          id={`chapter-${chapter.number}-title`}
+          className="mt-1 font-heading text-4xl leading-tight font-semibold text-balance sm:text-5xl"
+        >
           {chapter.title}
-        </h1>
+        </Heading>
         <ul className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
           <li className="flex items-center gap-1.5">
             <CalendarDays className="size-3.5" aria-hidden />
@@ -84,7 +92,15 @@ export function ChapterArticle({ chapter, nav, onTap }: Props) {
         style={{ fontSize, lineHeight }}
       >
         {paragraphs.map((p, i) => (
-          <p key={i} className="whitespace-pre-line">
+          <p
+            key={i}
+            data-paragraph={i}
+            className={cn(
+              'rounded-sm whitespace-pre-line transition-colors duration-300',
+              i === activeParagraph &&
+                'bg-primary/10 shadow-[0_0_0_0.35em] shadow-primary/10 motion-reduce:transition-none',
+            )}
+          >
             {p}
           </p>
         ))}

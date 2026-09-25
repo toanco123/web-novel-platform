@@ -2,6 +2,7 @@
 // Các api đọc truyện/chương/thể loại đều lấy từ đây để truyện mới đăng hiện khắp nơi.
 import type { ChapterSummary } from '@/types/chapter'
 import type { Genre, Story } from '@/types/story'
+import { loadViews, ratingsOf, totalViews } from './activity'
 import { mockChapterContent } from './chapterContent'
 import { mockChapters } from './chapters'
 import { genres as seedGenres, stories as seedStories } from './stories'
@@ -11,8 +12,12 @@ export function allGenres(): Genre[] {
   return [...seedGenres, ...loadUserGenres().map(({ createdAt: _createdAt, ...g }) => g)]
 }
 
-/** Chuyển truyện người dùng sang dạng Story; số chương, chương mới nhất chỉ tính chương đã xuất bản */
-export function toStory(stored: StoredStory, genres = allGenres()): Story {
+/**
+ * Chuyển truyện người dùng sang dạng Story; số chương, chương mới nhất chỉ tính chương đã xuất bản.
+ * Lượt đọc và điểm lấy từ hoạt động thật của người đọc (truyện có sẵn dùng số cố định).
+ */
+export function toStory(stored: StoredStory, genres = allGenres(), views = loadViews()): Story {
+  const ratings = ratingsOf(stored.slug)
   const published = loadChapters(stored.id).filter((c) => c.status === 'published')
   const latest = published.at(-1)
   const lastPublish = published.reduce(
@@ -31,9 +36,9 @@ export function toStory(stored: StoredStory, genres = allGenres()): Story {
     description: stored.description,
     coverUrl: stored.coverUrl,
     chapterCount: published.length,
-    viewCount: 0,
-    ratingAvg: 0,
-    ratingCount: 0,
+    viewCount: totalViews(views[stored.slug]),
+    ratingAvg: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0,
+    ratingCount: ratings.length,
     firstChapterNumber: published[0]?.number ?? null,
     latestChapter: latest ? { number: latest.number, title: latest.title } : null,
     createdAt: stored.publishedAt ?? stored.createdAt,
@@ -49,9 +54,10 @@ export function toStory(stored: StoredStory, genres = allGenres()): Story {
  */
 export function catalog(viewerId: string | null = null): Story[] {
   const genres = allGenres()
+  const views = loadViews()
   const mine = loadUserStories()
     .filter((s) => s.visibility === 'published' || s.owner.id === viewerId)
-    .map((s) => toStory(s, genres))
+    .map((s) => toStory(s, genres, views))
   return [...seedStories, ...mine]
 }
 

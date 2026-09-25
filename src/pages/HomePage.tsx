@@ -1,5 +1,6 @@
 import { Container } from '@/components/common/Container'
 import { SITE_NAME, SITE_TAGLINE } from '@/config/site'
+import { ContinueReading } from '@/features/library/components/ContinueReading'
 import { EditorPicks } from '@/features/stories/sections/EditorPicks'
 import { GenreCloud } from '@/features/stories/sections/GenreCloud'
 import { HeroShowcase } from '@/features/stories/sections/HeroShowcase'
@@ -15,6 +16,7 @@ export default function HomePage() {
       <h1 className="sr-only">{SITE_NAME}</h1>
 
       <HeroShowcase />
+      <ContinueReading />
       <EditorPicks />
 
       <Container className="mt-16 grid gap-12 lg:grid-cols-[minmax(0,1fr)_20rem]">

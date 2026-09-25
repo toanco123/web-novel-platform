@@ -73,7 +73,7 @@ test('cài đặt đọc áp dụng ngay và được lưu lại', async () => {
   await user.click(within(dialog).getByRole('radio', { name: 'Giấy vàng' }))
   await user.click(within(dialog).getByRole('button', { name: 'Không chân' }))
 
-  const paragraph = screen.getAllByText(/\S/, { selector: 'article p' }).at(-1)!
+  const paragraph = screen.getAllByText(/\S/, { selector: 'article[data-chapter] p' }).at(-1)!
   expect(paragraph.parentElement).toHaveStyle({ fontSize: '20px' })
   expect(paragraph.parentElement).toHaveClass('font-sans')
   expect(document.querySelector('.reader-tone-paper')).not.toBeNull()

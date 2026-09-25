@@ -29,7 +29,7 @@ export function TrendingWeekly() {
             ? Array.from({ length: 6 }, (_, i) => (
                 <li key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
               ))
-            : data.map((s, i) => (
+            : data.map(({ story: s, value }, i) => (
                 <li key={s.slug}>
                   <Link
                     to={paths.story(s.slug)}
@@ -49,7 +49,7 @@ export function TrendingWeekly() {
                         {s.title}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {formatCount(s.viewCount)} lượt đọc
+                        {formatCount(value)} lượt đọc tuần này
                       </span>
                     </span>
                   </Link>

@@ -1,6 +1,11 @@
 // Nơi DUY NHẤT xử lý đăng nhập. Hiện là auth giả lưu trong localStorage (chỉ dùng khi dev);
 // khi nối Supabase chỉ thay ruột các hàm này (xem mục 6 trong documents/plan-dang-nhap-dang-ky.md).
-import { mockDelay as delay, readMock as read, writeMock as write } from '@/lib/mockStorage'
+import {
+  mockDelay as delay,
+  readMock as read,
+  writeMock as write,
+  writeMockStrict,
+} from '@/lib/mockStorage'
 import type { AuthProvider, User } from '@/types/user'
 
 type AuthErrorCode = 'invalid_credentials' | 'email_taken' | 'unauthenticated'
@@ -30,6 +35,8 @@ const demoUser: MockUser = {
 
 const loadUsers = () => read<MockUser[]>(USERS_KEY, [demoUser])
 const saveUsers = (users: MockUser[]) => write(USERS_KEY, users)
+// Ảnh đại diện là data URL, có thể làm đầy bộ nhớ: báo lỗi thay vì âm thầm bỏ qua
+const saveUsersStrict = (users: MockUser[]) => writeMockStrict(USERS_KEY, users)
 const toPublic = ({ password: _password, ...user }: MockUser): User => user
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
@@ -110,6 +117,37 @@ export async function updatePassword(password: string) {
   const id = read<string | null>(SESSION_KEY, null)
   if (!id) return
   saveUsers(loadUsers().map((u) => (u.id === id ? { ...u, password } : u)))
+}
+
+/** Tên và ảnh hiện tại của nhiều người dùng (bình luận hiển thị theo hồ sơ mới nhất) */
+export async function getProfiles(ids: string[]) {
+  const wanted = new Set(ids)
+  return new Map(
+    loadUsers()
+      .filter((u) => wanted.has(u.id))
+      .map((u) => [u.id, { id: u.id, displayName: u.displayName, avatarUrl: u.avatarUrl }]),
+  )
+}
+
+export async function updateProfile(input: { displayName: string; avatarUrl: string | null }) {
+  await delay(500)
+  const current = await requireUser()
+  const users = loadUsers()
+  const user = users.find((u) => u.id === current.id)!
+  const updated = { ...user, displayName: input.displayName.trim(), avatarUrl: input.avatarUrl }
+  saveUsersStrict(users.map((u) => (u.id === updated.id ? updated : u)))
+  return toPublic(updated)
+}
+
+export async function changePassword(input: { currentPassword: string; newPassword: string }) {
+  await delay(500)
+  const current = await requireUser()
+  const users = loadUsers()
+  const user = users.find((u) => u.id === current.id)!
+  if (user.password === null || user.password !== input.currentPassword) {
+    throw new AuthError('invalid_credentials', 'Mật khẩu hiện tại không đúng.')
+  }
+  saveUsers(users.map((u) => (u.id === user.id ? { ...u, password: input.newPassword } : u)))
 }
 
 export async function signOut() {

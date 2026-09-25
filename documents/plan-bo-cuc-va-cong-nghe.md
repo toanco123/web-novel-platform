@@ -105,7 +105,7 @@ Sidebar: Truyện cùng tác giả, Truyện cùng thể loại
   - Cỡ chữ 15–28px, giãn dòng 1.5–2.3, độ rộng khung Hẹp / Vừa / Rộng.
   - Lưu ở Zustand key `reader-settings`.
 - Phím ← → chuyển chương (không kích hoạt khi đang gõ hoặc đang mở hộp thoại). Chương kế được tải trước.
-- Chưa làm: lịch sử đọc / "Đọc tiếp", bình luận theo chương.
+- Bổ sung (25/09/2026, chi tiết ở `plan-trang-con-thieu-va-tinh-nang-doc.md`): lịch sử đọc + "Đọc tiếp" (nhớ vị trí cuộn), bình luận theo chương, báo lỗi chương, nghe truyện (Web Speech API), chế độ cuộn liên tục.
 
 **Khi nối API thật**, chỉ thay ruột `getChapter(slug, number)` trong `features/chapters/api.ts`. Hàm phải trả về `ChapterContent` (`src/types/chapter.ts`):
 - `story`: `{ slug, title, author, status, chapterCount }`.
@@ -181,8 +181,9 @@ web-truyen/
 
 1. **Khởi tạo** ✅ (25/09/2026): Vite 8 + React 19 + TS, Tailwind v4, shadcn/ui (preset Nova, Radix), React Router v8, TanStack Query, Zustand, oxlint/Prettier, Vitest.
 2. **Nền UI** ✅ (25/09/2026): theme sáng/tối, MainLayout, Header (menu, search, mobile drawer), Footer, component chung.
-3. **Mock data** + các trang: Trang chủ ✅ (25/09/2026) → Chi tiết truyện ✅ (25/09/2026, chi tiết ở `plan-trang-chi-tiet-truyen.md`) → Trang đọc ✅ (25/09/2026, UI + cài đặt đọc; còn lịch sử đọc) → Thể loại/Danh sách → Tìm kiếm.
-4. **UI tài khoản**: đăng nhập/đăng ký ✅ (25/09/2026, chi tiết ở `plan-dang-nhap-dang-ky.md`), nút tủ truyện + bình luận/đánh giá ✅ (trên trang chi tiết); còn trang Tủ truyện, lịch sử đọc (vẫn mock).
+3. **Mock data** + các trang: Trang chủ ✅ (25/09/2026) → Chi tiết truyện ✅ (25/09/2026, chi tiết ở `plan-trang-chi-tiet-truyen.md`) → Trang đọc ✅ (25/09/2026, UI + cài đặt đọc + lịch sử đọc) → Thể loại/Danh sách/Bảng xếp hạng ✅ → Tìm kiếm ✅ (25/09/2026, chi tiết ở `plan-trang-con-thieu-va-tinh-nang-doc.md`).
+4. **UI tài khoản**: đăng nhập/đăng ký ✅ (25/09/2026, chi tiết ở `plan-dang-nhap-dang-ky.md`), nút tủ truyện + bình luận/đánh giá ✅ (trên trang chi tiết), trang Tủ truyện + lịch sử đọc + báo chương mới ✅, trang Tài khoản ✅, trang thông tin (giới thiệu/liên hệ/điều khoản/bảo mật) ✅ (25/09/2026, vẫn mock).
+4c. **Tính năng đọc & tác giả** ✅ (25/09/2026): nghe truyện, cuộn liên tục, bình luận chương, báo lỗi chương, thống kê + báo lỗi trong khu Sáng tác.
 4b. **Sáng tác & thể loại** ✅ (25/09/2026, chi tiết ở `plan-sang-tac-va-the-loai.md`): tạo thể loại, đăng truyện, soạn/nhập chương, xuất bản.
 5. **Nối Supabase**: tạo schema + RLS + seed, Auth, thay `api.ts` từng feature.
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).

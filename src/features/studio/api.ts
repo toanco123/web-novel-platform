@@ -3,6 +3,17 @@
 import { requireUser } from '@/features/auth/api'
 import { mockDelay as delay } from '@/lib/mockStorage'
 import { slugify } from '@/lib/slugify'
+import {
+  dayKey,
+  followerCount,
+  loadReports,
+  loadUserComments,
+  loadViews,
+  ratingsOf,
+  recentViews,
+  saveReports,
+  totalViews,
+} from '@/mocks/activity'
 import { takenStorySlugs } from '@/mocks/catalog'
 import {
   loadChapters,
@@ -13,6 +24,7 @@ import {
   type StoredStory,
 } from '@/mocks/userContent'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
+import type { ChapterReport } from '@/types/report'
 import type { StoryStatus } from '@/types/story'
 
 type StudioErrorCode = 'not_found' | 'no_published_chapters' | 'last_published_chapter'
@@ -47,6 +59,10 @@ export type MyStory = StoredStory & {
   chapterCount: number
   publishedCount: number
   draftCount: number
+  views: number
+  followers: number
+  /** Báo lỗi chương chưa xử lý */
+  openReports: number
 }
 
 const now = () => new Date().toISOString()
@@ -59,6 +75,10 @@ function withCounts(story: StoredStory): MyStory {
     chapterCount: chapters.length,
     publishedCount,
     draftCount: chapters.length - publishedCount,
+    views: totalViews(loadViews()[story.slug]),
+    followers: followerCount(story.slug),
+    openReports: loadReports().filter((r) => r.storySlug === story.slug && r.status === 'open')
+      .length,
   }
 }
 
@@ -294,4 +314,74 @@ export async function importChapters(storyId: string, items: ChapterInput[], pub
   saveChapters(storyId, [...chapters, ...added])
   touch(stories, story)
   return added
+}
+
+// ── Thống kê & báo lỗi ──────────────────────────────────────────────────
+
+export const STATS_DAYS = 7
+
+export type StoryStats = {
+  views: number
+  viewsRecent: number
+  /** Lượt đọc từng ngày trong STATS_DAYS ngày gần nhất, cũ trước (day: YYYY-MM-DD) */
+  viewsByDay: { day: string; views: number }[]
+  /** Lượt đọc từng chương đã xuất bản, theo thứ tự chương */
+  viewsByChapter: { number: number; title: string; views: number }[]
+  followers: number
+  ratingAvg: number
+  ratingCount: number
+  comments: number
+}
+
+export async function getStoryStats(storyId: string): Promise<StoryStats> {
+  await delay()
+  const { story } = await ownStory(storyId)
+  const stats = loadViews()[story.slug]
+  const ratings = ratingsOf(story.slug)
+  const today = new Date()
+  const viewsByDay = Array.from({ length: STATS_DAYS }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(d.getDate() - (STATS_DAYS - 1 - i))
+    const day = dayKey(d)
+    return { day, views: stats?.byDay[day] ?? 0 }
+  })
+  return {
+    views: totalViews(stats),
+    viewsRecent: recentViews(stats, STATS_DAYS, today),
+    viewsByDay,
+    viewsByChapter: loadChapters(story.id)
+      .filter((c) => c.status === 'published')
+      .map((c) => ({ number: c.number, title: c.title, views: stats?.byChapter[c.number] ?? 0 })),
+    followers: followerCount(story.slug),
+    ratingAvg: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0,
+    ratingCount: ratings.length,
+    comments: loadUserComments().filter((c) => c.storySlug === story.slug).length,
+  }
+}
+
+/** Báo lỗi chương của truyện mình: chưa xử lý trước, rồi mới nhất trước */
+export async function getStoryReports(storyId: string): Promise<ChapterReport[]> {
+  await delay()
+  const { story } = await ownStory(storyId)
+  return loadReports()
+    .filter((r) => r.storySlug === story.slug)
+    .sort(
+      (a, b) =>
+        Number(a.status === 'resolved') - Number(b.status === 'resolved') ||
+        b.createdAt.localeCompare(a.createdAt),
+    )
+}
+
+export async function setReportStatus(
+  storyId: string,
+  reportId: string,
+  status: ChapterReport['status'],
+) {
+  await delay(300)
+  const { story } = await ownStory(storyId)
+  const reports = loadReports()
+  if (!reports.some((r) => r.id === reportId && r.storySlug === story.slug)) {
+    throw new StudioError('not_found')
+  }
+  saveReports(reports.map((r) => (r.id === reportId ? { ...r, status } : r)))
 }

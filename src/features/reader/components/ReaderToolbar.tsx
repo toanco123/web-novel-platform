@@ -1,4 +1,4 @@
-import { ALargeSmall, ArrowLeft, House, ListOrdered } from 'lucide-react'
+import { ALargeSmall, ArrowLeft, Headphones, House, ListOrdered } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,9 +23,11 @@ type Props = {
   /** Bảng đang mở (mục lục / cài đặt); trang đọc giữ state để nút ở chỗ khác cũng mở được */
   open: ReaderPanel | null
   setOpen: (panel: ReaderPanel | null) => void
+  /** Nút nghe truyện; bỏ trống khi trình duyệt không hỗ trợ đọc to */
+  listen?: { active: boolean; onClick: () => void }
 }
 
-export function ReaderToolbar({ chapter, visible, open, setOpen }: Props) {
+export function ReaderToolbar({ chapter, visible, open, setOpen, listen }: Props) {
   const { story } = chapter
   const wide = useMediaQuery('(min-width: 768px)')
 
@@ -57,6 +59,18 @@ export function ReaderToolbar({ chapter, visible, open, setOpen }: Props) {
             </p>
           </div>
 
+          {listen && (
+            <Button
+              variant="ghost"
+              className={cn('h-10 gap-2 rounded-full px-3', listen.active && 'text-primary')}
+              aria-label="Nghe truyện"
+              aria-pressed={listen.active}
+              onClick={listen.onClick}
+            >
+              <Headphones />
+              <span className="hidden md:inline">Nghe</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             className="h-10 gap-2 rounded-full px-3"

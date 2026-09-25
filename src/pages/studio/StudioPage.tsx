@@ -6,7 +6,7 @@ import { SITE_NAME } from '@/config/site'
 import { StoryCover } from '@/features/stories/StoryCover'
 import { StatusBadge } from '@/features/studio/components/StatusBadge'
 import { useMyStories } from '@/features/studio/hooks'
-import { formatRelativeTime } from '@/lib/format'
+import { formatCount, formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
 
 export default function StudioPage() {
@@ -70,6 +70,14 @@ export default function StudioPage() {
                         ? 'Chưa có chương'
                         : `${s.chapterCount} chương${s.draftCount ? ` (${s.draftCount} nháp)` : ''}`}
                     </p>
+                    {s.visibility === 'published' && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formatCount(s.views)} lượt đọc, {formatCount(s.followers)} theo dõi
+                        {s.openReports > 0 && (
+                          <span className="text-neon">, {s.openReports} báo lỗi chưa xử lý</span>
+                        )}
+                      </p>
+                    )}
                     <StatusBadge
                       published={s.visibility === 'published'}
                       className="mt-2 sm:hidden"

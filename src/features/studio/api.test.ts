@@ -115,3 +115,29 @@ test('sửa chương giữ số chương; nhập nhiều chương đánh số ti
     [3, 'Gặp lại', 'published'],
   ])
 })
+
+test('thống kê đếm lượt đọc của người khác, không tính lượt của tác giả', async () => {
+  const { recordChapterView } = await import('@/features/chapters/api')
+  const { followStory } = await import('@/features/library/api')
+  signInAs('demo')
+  const story = await studio.createStory(input)
+  await studio.saveChapter(story.id, chapter, { publish: true })
+  await studio.saveChapter(story.id, { ...chapter, title: 'Hai' }, { publish: true })
+  await studio.publishStory(story.id)
+  await recordChapterView(story.slug, 1) // tác giả tự đọc: không tính
+
+  const reader = await secondUser()
+  signInAs(reader)
+  await recordChapterView(story.slug, 1)
+  await recordChapterView(story.slug, 2)
+  await recordChapterView(story.slug, 2) // cùng lần tải trang: không tính lại
+  await followStory(story.slug)
+
+  signInAs('demo')
+  const stats = await studio.getStoryStats(story.id)
+  expect(stats).toMatchObject({ views: 2, viewsRecent: 2, followers: 1, comments: 0 })
+  expect(stats.viewsByChapter.map((c) => c.views)).toEqual([1, 1])
+  expect(stats.viewsByDay).toHaveLength(studio.STATS_DAYS)
+  expect(stats.viewsByDay.at(-1)!.views).toBe(2)
+  expect(await getStory(story.slug)).toMatchObject({ viewCount: 2 })
+})

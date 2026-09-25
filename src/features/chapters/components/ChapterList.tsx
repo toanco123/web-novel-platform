@@ -1,8 +1,7 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
+import { Pagination } from '@/components/common/Pagination'
 import { SectionError } from '@/components/common/SectionHeading'
 import { formatDate } from '@/lib/format'
-import { pageList } from '@/lib/pagination'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import type { ChapterOrder } from '@/types/chapter'
@@ -17,9 +16,11 @@ type Props = {
   /** Tạo query string cho trang/thứ tự (giữ trên URL để chia sẻ được) */
   searchFor: (page: number, order: ChapterOrder) => string
   onNavigate: () => void
+  /** Chương người xem đang đọc dở (gắn nhãn "Đang đọc") */
+  readingChapter?: number
 }
 
-export function ChapterList({ story, page, order, searchFor, onNavigate }: Props) {
+export function ChapterList({ story, page, order, searchFor, onNavigate, readingChapter }: Props) {
   const { data, isPending, isError, isPlaceholderData } = useChapterList(story.slug, page, order)
 
   if (story.chapterCount === 0) {
@@ -93,6 +94,11 @@ export function ChapterList({ story, page, order, searchFor, onNavigate }: Props
                       </span>{' '}
                       {c.title}
                     </span>
+                    {c.number === readingChapter && (
+                      <span className="rounded-sm bg-rose-gold/15 px-1.5 py-0.5 text-[0.65rem] font-semibold text-rose-gold">
+                        Đang đọc
+                      </span>
+                    )}
                     {c.number === story.latestChapter?.number && (
                       <span className="rounded-sm bg-neon/15 px-1.5 py-0.5 text-[0.65rem] font-semibold text-neon">
                         Mới
@@ -107,82 +113,16 @@ export function ChapterList({ story, page, order, searchFor, onNavigate }: Props
         </ol>
       )}
 
-      {data && data.pageCount > 1 && (
-        <ChapterPagination
+      {data && (
+        <Pagination
           page={data.page}
           pageCount={data.pageCount}
-          hrefFor={(p) => searchFor(p, order)}
+          searchFor={(p) => searchFor(p, order)}
+          label="Phân trang danh sách chương"
+          preventScrollReset
           onNavigate={onNavigate}
         />
       )}
     </div>
-  )
-}
-
-function ChapterPagination({
-  page,
-  pageCount,
-  hrefFor,
-  onNavigate,
-}: {
-  page: number
-  pageCount: number
-  hrefFor: (page: number) => string
-  onNavigate: () => void
-}) {
-  const item =
-    'inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm tabular-nums'
-  const link = (p: number, children: React.ReactNode, label?: string) => (
-    <Link
-      to={{ search: hrefFor(p) }}
-      preventScrollReset
-      onClick={onNavigate}
-      aria-label={label}
-      aria-current={p === page ? 'page' : undefined}
-      className={cn(
-        item,
-        p === page
-          ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-      )}
-    >
-      {children}
-    </Link>
-  )
-
-  return (
-    <nav aria-label="Phân trang danh sách chương" className="mt-6">
-      <ul className="flex flex-wrap items-center justify-center gap-1">
-        <li>
-          {page > 1 ? (
-            link(page - 1, <ChevronLeft className="size-4" />, 'Trang trước')
-          ) : (
-            <span className={cn(item, 'opacity-40')} aria-hidden>
-              <ChevronLeft className="size-4" />
-            </span>
-          )}
-        </li>
-        {pageList(page, pageCount).map((p, i) => (
-          <li key={`${p}-${i}`}>
-            {p === '…' ? (
-              <span className={cn(item, 'text-muted-foreground')} aria-hidden>
-                …
-              </span>
-            ) : (
-              link(p, p, `Trang ${p}`)
-            )}
-          </li>
-        ))}
-        <li>
-          {page < pageCount ? (
-            link(page + 1, <ChevronRight className="size-4" />, 'Trang sau')
-          ) : (
-            <span className={cn(item, 'opacity-40')} aria-hidden>
-              <ChevronRight className="size-4" />
-            </span>
-          )}
-        </li>
-      </ul>
-    </nav>
   )
 }

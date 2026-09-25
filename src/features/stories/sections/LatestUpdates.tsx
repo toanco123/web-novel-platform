@@ -9,7 +9,7 @@ export function LatestUpdates() {
 
   return (
     <section aria-labelledby="latest-updates">
-      <SectionHeading id="latest-updates" moreTo={paths.ongoing}>
+      <SectionHeading id="latest-updates" moreTo={paths.latest}>
         Mới cập nhật
       </SectionHeading>
       {isError ? (

@@ -39,7 +39,10 @@ export function ReaderChapterIndex({ slug, current, max, onNavigate }: Props) {
       <div className="flex flex-wrap items-center gap-3 border-b px-4 pb-4">
         {pageCount > 1 && (
           <Select value={String(page)} onValueChange={(v) => setPage(Number(v))}>
-            <SelectTrigger aria-label="Chọn khoảng chương" className="h-9 rounded-full">
+            <SelectTrigger
+              aria-label="Chọn khoảng chương"
+              className="rounded-full data-[size=default]:h-9"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

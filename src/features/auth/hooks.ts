@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { StorageFullError } from '@/lib/mockStorage'
 import type { User } from '@/types/user'
 import * as api from './api'
 
@@ -34,11 +35,26 @@ export function useSignOut() {
   return useMutation({ mutationFn: api.signOut, onSuccess: () => setSession(null) })
 }
 
+export function useUpdateProfile() {
+  const setSession = useSetSession()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: api.updateProfile,
+    onSuccess: (user) => {
+      setSession(user)
+      // Bình luận hiển thị tên/ảnh mới
+      void queryClient.invalidateQueries({ queryKey: ['comments'] })
+    },
+  })
+}
+
+export const useChangePassword = () => useMutation({ mutationFn: api.changePassword })
+
 export const useSendPasswordReset = () => useMutation({ mutationFn: api.sendPasswordReset })
 export const useUpdatePassword = () => useMutation({ mutationFn: api.updatePassword })
 
 /** Thông báo lỗi hiển thị cho người dùng từ lỗi bất kỳ của các hàm auth */
 export function authErrorMessage(error: unknown) {
-  if (error instanceof api.AuthError) return error.message
+  if (error instanceof api.AuthError || error instanceof StorageFullError) return error.message
   return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'
 }

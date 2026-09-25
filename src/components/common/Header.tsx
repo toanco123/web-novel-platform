@@ -26,9 +26,10 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { UserAvatar } from '@/features/auth/components/UserAvatar'
-import { UserMenu } from '@/features/auth/components/UserMenu'
+import { UpdateBadge, UserMenu } from '@/features/auth/components/UserMenu'
 import { useSession, useSignOut } from '@/features/auth/hooks'
 import { useGenres } from '@/features/genres/hooks'
+import { useLibraryUpdateCount } from '@/features/library/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
@@ -144,6 +145,7 @@ function MobileNav() {
   const [open, setOpen] = useState(false)
   const { data: genres } = useGenres()
   const { data: user } = useSession()
+  const { data: updates = 0 } = useLibraryUpdateCount()
   const signOut = useSignOut()
   const navigate = useNavigate()
   const current = useCurrentPath()
@@ -181,6 +183,7 @@ function MobileNav() {
               <Link to={paths.library} onClick={close} className={menuLink}>
                 <BookMarked className="size-4" aria-hidden />
                 Tủ truyện
+                <UpdateBadge count={updates} />
               </Link>
               <Link to={paths.studio} onClick={close} className={menuLink}>
                 <PenLine className="size-4" aria-hidden />

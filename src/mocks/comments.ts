@@ -30,6 +30,19 @@ const texts = [
   'Đã thêm vào tủ, cuối tuần cày tiếp.',
 ]
 
+const chapterTexts = [
+  'Chương này ngắn quá, đọc chưa đã 😭',
+  'Đoạn cuối chương làm mình nổi da gà luôn.',
+  'Hóng chương sau quá tác giả ơi!',
+  'Câu thoại cuối chương đỉnh thật sự.',
+  'Tới đây mới thấy nam chính có tâm.',
+  'Đọc lại chương này lần hai mới hiểu vụ bức thư.',
+  'Tội nữ chính ghê, mong chương sau bớt ngược.',
+  'Chương này nhịp hơi chậm nhưng tả cảnh đẹp.',
+  'Ai để ý chi tiết chiếc trâm không, chắc chắn có ẩn ý.',
+  'Điểm danh đọc tới đây rồi nè.',
+]
+
 const HOUR = 3600 * 1000
 
 /** Bình luận mẫu cố định theo slug (3–18 bình luận mỗi truyện) */
@@ -43,8 +56,30 @@ export function seedComments(story: Story): Comment[] {
     return {
       id: `seed-${story.slug}-${i}`,
       storySlug: story.slug,
+      chapterNumber: null,
       user: { id: `seed-user-${name}`, displayName: name, avatarUrl: null },
       content: pick(rand, texts),
+      createdAt: new Date(Date.now() - hoursAgo * HOUR).toISOString(),
+    }
+  })
+}
+
+/** Bình luận mẫu của một chương (0–6), cố định theo slug + số chương */
+export function seedChapterComments(story: Story, number: number): Comment[] {
+  const rand = seededRandom(`comments:${story.slug}#${number}`)
+  const count = Math.floor(rand() * 7)
+  // Chương đăng càng lâu thì bình luận càng cũ (mỗi chương cách nhau ~20 giờ như mockChapters)
+  const chapterAge = (story.chapterCount - number) * 20
+  let hoursAgo = chapterAge + 1 + rand() * 5
+  return Array.from({ length: count }, (_, i) => {
+    hoursAgo += rand() * 12
+    const name = pick(rand, names)
+    return {
+      id: `seed-${story.slug}-c${number}-${i}`,
+      storySlug: story.slug,
+      chapterNumber: number,
+      user: { id: `seed-user-${name}`, displayName: name, avatarUrl: null },
+      content: pick(rand, chapterTexts),
       createdAt: new Date(Date.now() - hoursAgo * HOUR).toISOString(),
     }
   })

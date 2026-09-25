@@ -6,6 +6,7 @@ import { SITE_NAME } from '@/config/site'
 import { ChapterList } from '@/features/chapters/components/ChapterList'
 import { CommentsSection } from '@/features/comments/components/CommentsSection'
 import { useComments } from '@/features/comments/hooks'
+import { useStoryProgress } from '@/features/library/hooks'
 import { SectionNav } from '@/features/stories/detail/SectionNav'
 import { SideStoryList } from '@/features/stories/detail/SideStoryList'
 import { StoryDescription } from '@/features/stories/detail/StoryDescription'
@@ -48,6 +49,7 @@ function StoryDetail({ story }: { story: Story }) {
   const comments = useComments(story.slug)
   const byAuthor = useStoriesByAuthor(story.author.slug, story.slug)
   const related = useRelatedStories(story.slug)
+  const { data: progress } = useStoryProgress(story.slug)
 
   const searchFor = (p: number, o: ChapterOrder) => {
     const next = new URLSearchParams()
@@ -88,6 +90,7 @@ function StoryDetail({ story }: { story: Story }) {
               order={order}
               searchFor={searchFor}
               onNavigate={scrollToChapters}
+              readingChapter={progress?.chapter}
             />
           </section>
 

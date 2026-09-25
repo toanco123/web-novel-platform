@@ -65,7 +65,9 @@ test('đã đăng nhập: thêm vào tủ được lưu theo tài khoản', asyn
   // Nút đổi ngay (optimistic); dữ liệu được lưu sau khi api trả về
   await expect
     .poll(() => JSON.parse(localStorage.getItem('mock-library') ?? 'null'), slow)
-    .toEqual({ demo: ['truong-an-khong-tuyet'] })
+    .toEqual({
+      demo: [expect.objectContaining({ slug: 'truong-an-khong-tuyet', seenChapter: 412 })],
+    })
 })
 
 test('đăng nhập rồi gửi và xóa bình luận', async () => {

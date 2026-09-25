@@ -16,6 +16,12 @@ const passwordsMatch = (d: { password: string; confirmPassword: string }) =>
   d.password === d.confirmPassword
 const mismatch = { path: ['confirmPassword'], message: 'Mật khẩu nhập lại không khớp' }
 
+const displayName = z
+  .string()
+  .trim()
+  .min(2, 'Tên hiển thị cần ít nhất 2 ký tự')
+  .max(30, 'Tên hiển thị tối đa 30 ký tự')
+
 export const loginSchema = z.object({
   email,
   password: z.string().min(1, 'Nhập mật khẩu'),
@@ -23,11 +29,7 @@ export const loginSchema = z.object({
 
 export const registerSchema = z
   .object({
-    displayName: z
-      .string()
-      .trim()
-      .min(2, 'Tên hiển thị cần ít nhất 2 ký tự')
-      .max(30, 'Tên hiển thị tối đa 30 ký tự'),
+    displayName,
     email,
     password: newPassword,
     confirmPassword: z.string().min(1, 'Nhập lại mật khẩu'),
@@ -44,10 +46,26 @@ export const resetPasswordSchema = z
   })
   .refine(passwordsMatch, mismatch)
 
+export const profileSchema = z.object({ displayName })
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Nhập mật khẩu hiện tại'),
+    password: newPassword,
+    confirmPassword: z.string().min(1, 'Nhập lại mật khẩu mới'),
+  })
+  .refine(passwordsMatch, mismatch)
+  .refine((d) => d.password !== d.currentPassword, {
+    path: ['password'],
+    message: 'Mật khẩu mới cần khác mật khẩu hiện tại',
+  })
+
 export type LoginValues = z.infer<typeof loginSchema>
 export type RegisterValues = z.infer<typeof registerSchema>
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>
+export type ProfileValues = z.infer<typeof profileSchema>
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>
 
 /** 0: chưa nhập, 1: yếu, 2: tạm được, 3: mạnh */
 export function passwordStrength(password: string): 0 | 1 | 2 | 3 {

@@ -33,3 +33,29 @@ test('chấm điểm cập nhật điểm trung bình, chấm lại thì thay đ
   )
   expect(await getMyRating(story.slug)).toBe(5)
 })
+
+test('bình luận chương tách riêng với bình luận của truyện', async () => {
+  signIn()
+  const storyBefore = await getComments(story.slug)
+  const chapterBefore = await getComments(story.slug, { chapter: 3 })
+  await addComment(story.slug, 'Đoạn cuối chương 3 hay ghê', 3)
+
+  const chapter = await getComments(story.slug, { chapter: 3 })
+  expect(chapter.total).toBe(chapterBefore.total + 1)
+  expect(chapter.items[0]).toMatchObject({
+    content: 'Đoạn cuối chương 3 hay ghê',
+    chapterNumber: 3,
+  })
+  expect((await getComments(story.slug)).total).toBe(storyBefore.total)
+  expect((await getComments(story.slug, { chapter: 4 })).items).not.toContainEqual(
+    expect.objectContaining({ content: 'Đoạn cuối chương 3 hay ghê' }),
+  )
+})
+
+test('bình luận hiện tên mới nhất của người viết', async () => {
+  signIn()
+  await addComment(story.slug, 'Hóng chương mới')
+  const { updateProfile } = await import('@/features/auth/api')
+  await updateProfile({ displayName: 'Tên Mới', avatarUrl: null })
+  expect((await getComments(story.slug)).items[0].user.displayName).toBe('Tên Mới')
+})

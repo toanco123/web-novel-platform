@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { ChapterOrder } from '@/types/chapter'
 import * as api from './api'
 
@@ -32,4 +32,24 @@ export function usePrefetchChapter(slug: string, number: number | undefined) {
       queryFn: () => api.getChapter(slug, number),
     })
   }, [queryClient, slug, number])
+}
+
+/** Tính 1 lượt đọc khi mở chương */
+export function useRecordChapterView(slug: string, number: number | undefined) {
+  useEffect(() => {
+    if (number !== undefined) void api.recordChapterView(slug, number)
+  }, [slug, number])
+}
+
+/** Lấy một chương qua cache (dùng ngoài render, vd giọng đọc cần nội dung chương kế) */
+export function useFetchChapter() {
+  const queryClient = useQueryClient()
+  return useCallback(
+    (slug: string, number: number) =>
+      queryClient.fetchQuery({
+        queryKey: chapterKeys.detail(slug, number),
+        queryFn: () => api.getChapter(slug, number),
+      }),
+    [queryClient],
+  )
 }

@@ -1,7 +1,11 @@
 import { useEffect, useRef } from 'react'
+import { chapterElement, progressOf } from '../progress'
 
-/** Thanh tiến độ đọc mỏng trên cùng; cập nhật thẳng style để không render lại khi cuộn */
-export function ReadingProgress() {
+/**
+ * Thanh tiến độ đọc mỏng trên cùng, tính trong chương đang đọc (không tính phần bình luận
+ * bên dưới); cập nhật thẳng style để không render lại khi cuộn
+ */
+export function ReadingProgress({ chapter }: { chapter: number }) {
   const barRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -9,8 +13,8 @@ export function ReadingProgress() {
     const update = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        const max = document.documentElement.scrollHeight - window.innerHeight
-        const ratio = max > 0 ? Math.min(1, window.scrollY / max) : 0
+        const el = chapterElement(chapter)
+        const ratio = el ? progressOf(el) : 0
         barRef.current?.style.setProperty('transform', `scaleX(${ratio})`)
       })
     }
@@ -22,7 +26,7 @@ export function ReadingProgress() {
       window.removeEventListener('scroll', update)
       window.removeEventListener('resize', update)
     }
-  }, [])
+  }, [chapter])
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5">

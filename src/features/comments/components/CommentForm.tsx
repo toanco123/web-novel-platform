@@ -11,8 +11,16 @@ import type { User } from '@/types/user'
 import { useAddComment } from '../hooks'
 import { COMMENT_MAX, commentSchema, type CommentValues } from '../schemas'
 
-export function CommentForm({ slug, user }: { slug: string; user: User }) {
-  const add = useAddComment(slug)
+type Props = {
+  slug: string
+  user: User
+  /** Có số: bình luận cho chương đó */
+  chapter?: number | null
+}
+
+export function CommentForm({ slug, user, chapter = null }: Props) {
+  const add = useAddComment(slug, chapter)
+  const id = chapter === null ? 'comment-content' : `comment-content-${chapter}`
   const {
     register,
     control,
@@ -32,21 +40,25 @@ export function CommentForm({ slug, user }: { slug: string; user: User }) {
       <UserAvatar user={user} className="size-9 shrink-0" />
       <div className="min-w-0 flex-1 space-y-2">
         {add.isError && <FormAlert>{authErrorMessage(add.error)}</FormAlert>}
-        <label htmlFor="comment-content" className="sr-only">
+        <label htmlFor={id} className="sr-only">
           Viết bình luận
         </label>
         <Textarea
-          id="comment-content"
+          id={id}
           {...register('content')}
           rows={3}
-          placeholder="Chia sẻ cảm nhận của bạn về truyện này…"
+          placeholder={
+            chapter === null
+              ? 'Chia sẻ cảm nhận của bạn về truyện này…'
+              : 'Bạn nghĩ gì về chương này?'
+          }
           aria-invalid={!!errors.content}
-          aria-describedby="comment-content-hint"
+          aria-describedby={`${id}-hint`}
           className="min-h-24 resize-y rounded-lg px-3.5 py-3"
         />
         <div className="flex items-center justify-between gap-3">
           <p
-            id="comment-content-hint"
+            id={`${id}-hint`}
             className={cn(
               'text-xs',
               errors.content || length > COMMENT_MAX ? 'text-destructive' : 'text-muted-foreground',

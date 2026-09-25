@@ -27,6 +27,8 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       globals: true,
       setupFiles: './src/test/setup.ts',
+      // Test luồng đi qua nhiều trang, mỗi lần gọi api giả có độ trễ; chạy song song dễ quá 5s mặc định
+      testTimeout: 10_000,
     },
   }
 })
