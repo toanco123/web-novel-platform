@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm, useWatch } from 'react-hook-form'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { FormAlert } from '@/features/auth/components/FormAlert'
@@ -12,8 +13,26 @@ import { slugify } from '@/lib/slugify'
 import { cn } from '@/lib/utils'
 import type { Story } from '@/types/story'
 import { studioErrorMessage } from '../errors'
-import { DESCRIPTION_MAX, storySchema, type StoryValues } from '../schemas'
+import {
+  DESCRIPTION_MAX,
+  storyFormSchema,
+  type ChapterValues,
+  type StoryFormValues,
+  type StoryValues,
+} from '../schemas'
+import { useUnsavedChangesPrompt } from '../useUnsavedChangesPrompt'
+import { ChapterFields } from './ChapterFields'
+import { ConfirmDialog } from './ConfirmDialog'
 import { CoverUpload } from './CoverUpload'
+
+export type StorySubmitExtra = {
+  /** Chương 1 viết kèm; null khi để trống (hoặc form sửa truyện) */
+  chapter: ChapterValues | null
+  /** Bấm "Đăng truyện": xuất bản chương 1 và công khai truyện luôn */
+  publish: boolean
+  /** Gọi trước khi tự điều hướng sau khi lưu thành công (bỏ hỏi rời trang) */
+  allowLeave: () => void
+}
 
 type Props = {
   defaultValues?: StoryValues
@@ -25,7 +44,9 @@ type Props = {
   pending: boolean
   error?: unknown
   success?: string | null
-  onSubmit: (values: StoryValues) => void
+  /** Truyện mới: thêm phần viết chương 1 và nút "Đăng truyện" cạnh nút lưu */
+  firstChapter?: boolean
+  onSubmit: (values: StoryValues, extra: StorySubmitExtra) => void
 }
 
 const empty: StoryValues = {
@@ -45,24 +66,46 @@ export function StoryForm({
   pending,
   error,
   success,
+  firstChapter = false,
   onSubmit,
 }: Props) {
   const {
     register,
     control,
     handleSubmit,
+    setError,
     formState: { errors },
-  } = useForm<StoryValues>({
-    resolver: zodResolver(storySchema),
+  } = useForm<StoryFormValues>({
+    resolver: zodResolver(storyFormSchema),
     mode: 'onTouched',
-    defaultValues,
+    defaultValues: { ...defaultValues, chapter: { title: '', content: '' } },
   })
-  const values = useWatch({ control }) as StoryValues
+  const values = useWatch({ control }) as StoryFormValues
   const previewSlug = slug ?? (slugify(values.title) || 'ten-truyen')
+  const leave = useUnsavedChangesPrompt(
+    firstChapter && values.chapter.content.trim() !== '' && !pending,
+  )
+
+  const submit = (publish: boolean) =>
+    handleSubmit(({ chapter, ...story }) => {
+      if (publish && !chapter.content) {
+        setError(
+          'chapter.content',
+          { message: 'Viết nội dung chương 1 để đăng truyện (hoặc bấm Lưu nháp)' },
+          { shouldFocus: true },
+        )
+        return
+      }
+      onSubmit(story, {
+        chapter: firstChapter && chapter.content ? chapter : null,
+        publish,
+        allowLeave: leave.allowNextNavigation,
+      })
+    })
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={submit(false)}
       noValidate
       className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_14rem]"
     >
@@ -179,11 +222,62 @@ export function StoryForm({
           />
         </fieldset>
 
-        <div className="sm:w-56">
-          <SubmitButton pending={pending} pendingLabel={pendingLabel}>
-            {submitLabel}
-          </SubmitButton>
-        </div>
+        {firstChapter ? (
+          <>
+            <section aria-labelledby="first-chapter-heading" className="space-y-6 border-t pt-8">
+              <div>
+                <h2 id="first-chapter-heading" className="font-heading text-2xl font-semibold">
+                  Chương 1
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Không bắt buộc. Viết luôn chương đầu, hoặc để trống rồi thêm chương hay nhập file
+                  .txt ở bước sau.
+                </p>
+              </div>
+              <ChapterFields
+                idPrefix="first-chapter"
+                titleField={register('chapter.title')}
+                contentField={register('chapter.content')}
+                contentValue={values.chapter.content}
+                errors={{
+                  title: errors.chapter?.title?.message,
+                  content: errors.chapter?.content?.message,
+                }}
+                titleLabel="Tiêu đề chương"
+                contentLabel="Nội dung chương 1"
+                textareaClassName="min-h-72"
+              />
+            </section>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={pending}
+                className="h-11 rounded-lg px-5"
+              >
+                {submitLabel}
+              </Button>
+              <Button
+                type="button"
+                disabled={pending}
+                onClick={submit(true)}
+                className="h-11 rounded-lg px-5"
+              >
+                Đăng truyện
+              </Button>
+              <p role="status" className="text-sm text-muted-foreground">
+                {pending ? pendingLabel : ''}
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="sm:w-56">
+            <SubmitButton pending={pending} pendingLabel={pendingLabel}>
+              {submitLabel}
+            </SubmitButton>
+          </div>
+        )}
       </div>
 
       <aside className="hidden lg:block">
@@ -195,6 +289,16 @@ export function StoryForm({
           </p>
         </div>
       </aside>
+
+      <ConfirmDialog
+        open={leave.blocker.state === 'blocked'}
+        onOpenChange={(open) => !open && leave.blocker.reset?.()}
+        title="Rời trang khi chưa lưu?"
+        description="Truyện và nội dung chương 1 đang viết chưa được lưu, rời trang sẽ mất."
+        cancelLabel="Ở lại viết tiếp"
+        confirmLabel="Rời trang"
+        onConfirm={() => leave.blocker.proceed?.()}
+      />
     </form>
   )
 }

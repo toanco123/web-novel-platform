@@ -18,7 +18,7 @@ test('đăng truyện → viết chương → xuất bản → truyện hiện c
   const { router, user } = renderApp('/sang-tac/truyen-moi')
 
   // Form truyện: báo lỗi khi thiếu, rồi điền đủ
-  await user.click(await screen.findByRole('button', { name: 'Lưu và thêm chương' }, slow))
+  await user.click(await screen.findByRole('button', { name: 'Lưu nháp' }, slow))
   expect(await screen.findByText('Chọn ít nhất 1 thể loại')).toBeInTheDocument()
 
   await user.type(screen.getByLabelText('Tên truyện'), 'Mùa Hạ Năm Ấy')
@@ -33,7 +33,7 @@ test('đăng truyện → viết chương → xuất bản → truyện hiện c
   expect(
     await screen.findByRole('button', { name: 'Bỏ thể loại Thanh xuân' }, slow),
   ).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Lưu và thêm chương' }))
+  await user.click(screen.getByRole('button', { name: 'Lưu nháp' }))
 
   // Trang quản lý: chưa xuất bản được vì chưa có chương
   expect(await screen.findByRole('heading', { level: 1, name: 'Mùa Hạ Năm Ấy' }, slow))
@@ -61,6 +61,39 @@ test('đăng truyện → viết chương → xuất bản → truyện hiện c
     await within(section).findByRole('link', { name: 'Mùa Hạ Năm Ấy' }, slow),
   ).toBeInTheDocument()
   expect(within(section).getByRole('link', { name: 'Chương 1: Gặp lại' })).toBeInTheDocument()
+})
+
+test('tạo truyện kèm chương 1 rồi bấm Đăng truyện thì công khai ngay', async () => {
+  signIn()
+  const { router, user } = renderApp('/sang-tac/truyen-moi?the-loai=ngon-tinh')
+  await user.type(await screen.findByLabelText('Tên truyện', {}, slow), 'Gió Mùa Thu')
+  await user.type(
+    screen.getByLabelText('Giới thiệu'),
+    'Một câu chuyện tình học trò nhẹ nhàng giữa hai người bạn cùng bàn.',
+  )
+
+  // Chưa viết chương 1 thì chưa đăng được
+  await user.click(screen.getByRole('button', { name: 'Đăng truyện' }))
+  expect(await screen.findByText(/Viết nội dung chương 1 để đăng truyện/)).toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/sang-tac/truyen-moi')
+
+  await user.type(screen.getByLabelText('Tiêu đề chương'), 'Gặp lại')
+  await user.type(screen.getByLabelText('Nội dung chương 1'), content)
+  await user.click(screen.getByRole('button', { name: 'Đăng truyện' }))
+
+  // Sang trang quản lý: truyện đã công khai, có chương 1
+  expect(await screen.findByRole('heading', { level: 1, name: 'Gió Mùa Thu' }, slow))
+  expect(screen.getByRole('button', { name: 'Ẩn truyện' })).toBeInTheDocument()
+  const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
+  expect(within(list).getByText('Gặp lại')).toBeInTheDocument()
+
+  // Người đọc thấy truyện ở trang chủ
+  localStorage.removeItem('mock-auth-session')
+  await router.navigate('/')
+  const latest = await screen.findByRole('heading', { name: 'Mới cập nhật' }, slow)
+  expect(
+    await within(latest.closest('section')!).findByRole('link', { name: 'Gió Mùa Thu' }, slow),
+  ).toBeInTheDocument()
 })
 
 test('rời trình soạn chương khi chưa lưu thì hỏi lại', async () => {
@@ -150,4 +183,105 @@ test('?the-loai không có thật thì bỏ qua, form để trống thể loại
   renderApp('/sang-tac/truyen-moi?the-loai=khong-co-that')
   expect(await screen.findByLabelText('Tên truyện', {}, slow)).toBeInTheDocument()
   expect(screen.queryByRole('list', { name: 'Thể loại đã chọn' })).not.toBeInTheDocument()
+})
+
+test('danh sách Sáng tác: menu ⋯ mở tab sửa thông tin và xóa truyện', async () => {
+  signIn()
+  const { createStory } = await import('./api')
+  const story = await createStory({
+    title: 'Truyện trong menu',
+    description: 'Mô tả đủ dài cho truyện thử nghiệm trong test.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  const menu = { name: 'Thao tác cho truyện Truyện trong menu' }
+  const { router, user } = renderApp('/sang-tac')
+
+  await user.click(await screen.findByRole('button', menu, slow))
+  await user.click(await screen.findByRole('menuitem', { name: 'Sửa thông tin' }))
+  await expect
+    .poll(() => router.state.location.pathname + router.state.location.search, slow)
+    .toBe(`/sang-tac/truyen/${story.id}?muc=thong-tin`)
+  expect(
+    await screen.findByRole('tab', { name: 'Thông tin truyện', selected: true }, slow),
+  ).toBeInTheDocument()
+  expect(screen.getByLabelText('Tên truyện')).toHaveValue('Truyện trong menu')
+
+  // Xóa ngay từ danh sách: vẫn ở trang Sáng tác, báo đã xóa
+  await router.navigate('/sang-tac')
+  await user.click(await screen.findByRole('button', menu, slow))
+  await user.click(await screen.findByRole('menuitem', { name: 'Xóa truyện' }))
+  const dialog = await screen.findByRole('dialog')
+  await user.type(within(dialog).getByLabelText(/để xác nhận/), 'Truyện trong menu')
+  await user.click(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }))
+  expect(await screen.findByText('Bạn chưa đăng truyện nào', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Đã xóa truyện “Truyện trong menu”.')).toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/sang-tac')
+})
+
+test('chọn số chương: bỏ trống chương 2 để viết chương 3, rồi viết bù từ dòng "chưa viết"', async () => {
+  signIn()
+  const { createStory, saveChapter } = await import('./api')
+  const story = await createStory({
+    title: 'Truyện nhảy chương',
+    description: 'Mô tả đủ dài cho truyện thử nghiệm trong test.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  await saveChapter(story.id, { title: 'Một', content }, { publish: true })
+  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}/chuong-moi`)
+
+  const number = await screen.findByLabelText('Số chương', {}, slow)
+  expect(number).toHaveValue(2)
+  // Trùng số chương đã có thì báo ngay
+  await user.clear(number)
+  await user.type(number, '1')
+  await user.tab()
+  expect(await screen.findByText('Chương 1 đã có, chọn số khác')).toBeInTheDocument()
+
+  await user.clear(number)
+  await user.type(number, '3')
+  expect(await screen.findByText(/Chương 2 chưa xuất bản/)).toBeInTheDocument()
+  await user.type(screen.getByLabelText('Nội dung'), content)
+  await user.click(screen.getByRole('button', { name: 'Xuất bản chương' }))
+
+  // Trang quản lý: chương 2 hiện là chỗ trống, bấm để viết bù
+  const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
+  await user.click(await within(list).findByRole('link', { name: 'Viết chương 2' }, slow))
+  await expect.poll(() => router.state.location.search, slow).toBe('?so=2')
+  expect(await screen.findByLabelText('Số chương', {}, slow)).toHaveValue(2)
+})
+
+test('đổi số chương nháp rồi lưu thì quay về trang quản lý với số mới', async () => {
+  signIn()
+  const { createStory, saveChapter } = await import('./api')
+  const story = await createStory({
+    title: 'Truyện đổi số',
+    description: 'Mô tả đủ dài cho truyện thử nghiệm trong test.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  await saveChapter(story.id, { title: 'Nháp', content }) // chương 1, nháp
+  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}/chuong/1`)
+
+  const number = await screen.findByLabelText('Số chương', {}, slow)
+  await user.clear(number)
+  await user.type(number, '4')
+  // Lưu xong, chương theo số cũ không còn: không được thoáng hiện trang "không tìm thấy"
+  let notFoundShown = false
+  const observer = new MutationObserver(() => {
+    notFoundShown ||= !!document.body.textContent?.includes('Không tìm thấy chương này')
+  })
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true })
+  await user.click(screen.getByRole('button', { name: 'Lưu nháp' }))
+
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`/sang-tac/truyen/${story.id}`)
+  const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
+  observer.disconnect()
+  expect(notFoundShown).toBe(false)
+  expect(within(list).getByText('Chưa viết 3 chương')).toBeInTheDocument()
+  expect(within(list).getByRole('link', { name: 'Sửa chương 4' })).toBeInTheDocument()
 })

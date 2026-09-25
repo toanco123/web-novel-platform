@@ -27,8 +27,9 @@ export default function NewStoryPage() {
         items={[{ label: 'Sáng tác', to: paths.studio }, { label: 'Đăng truyện mới' }]}
       />
       <h1 className="font-heading text-4xl font-semibold">Đăng truyện mới</h1>
-      <p className="mt-1 mb-8 text-muted-foreground">
-        Truyện được lưu dạng nháp. Sau đó bạn viết hoặc nhập chương, rồi xuất bản.
+      <p className="mt-1 mb-8 max-w-prose text-muted-foreground">
+        Điền thông tin truyện và viết luôn chương 1 nếu muốn. "Lưu nháp" để viết tiếp sau, "Đăng
+        truyện" để công khai ngay.
       </p>
       <StoryForm
         defaultValues={{
@@ -39,14 +40,21 @@ export default function NewStoryPage() {
           coverUrl: null,
         }}
         authorName={user?.displayName ?? ''}
-        submitLabel="Lưu và thêm chương"
+        firstChapter
+        submitLabel="Lưu nháp"
         pendingLabel="Đang lưu…"
         pending={create.isPending}
         error={create.error}
-        onSubmit={(values) =>
-          create.mutate(values, {
-            onSuccess: (story) => navigate(paths.studioStory(story.id), { replace: true }),
-          })
+        onSubmit={(story, { chapter, publish, allowLeave }) =>
+          create.mutate(
+            { story, firstChapter: chapter ? { chapter, publish } : undefined },
+            {
+              onSuccess: (created) => {
+                allowLeave()
+                navigate(paths.studioStory(created.id), { replace: true })
+              },
+            },
+          )
         }
       />
     </>

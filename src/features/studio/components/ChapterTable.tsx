@@ -1,5 +1,5 @@
 import { FileUp, MoreHorizontal, PenLine, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router'
 import { SectionError } from '@/components/common/SectionHeading'
 import { Button } from '@/components/ui/button'
@@ -57,61 +57,90 @@ export function ChapterTable({ storyId }: { storyId: string }) {
         </p>
       ) : (
         <ul className="divide-y rounded-xl border bg-card/40" aria-label="Danh sách chương">
-          {chapters.data.map((c) => (
-            <li key={c.id} className="flex items-center gap-3 px-4 py-3">
-              <span className="w-10 shrink-0 text-sm text-muted-foreground tabular-nums">
-                {c.number}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {c.title || <span className="text-muted-foreground italic">Chưa đặt tên</span>}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {number.format(countWords(c.content))} chữ, sửa {formatRelativeTime(c.updatedAt)}
-                </p>
-              </div>
-              <StatusBadge published={c.status === 'published'} className="hidden sm:inline-flex" />
-              <Button asChild variant="ghost" size="sm" aria-label={`Sửa chương ${c.number}`}>
-                <Link to={paths.studioChapter(storyId, c.number)}>
-                  <PenLine />
-                  <span className="hidden sm:inline">Sửa</span>
-                </Link>
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Thao tác khác cho chương ${c.number}`}
-                  >
-                    <MoreHorizontal />
+          {chapters.data.map((c, i) => {
+            // Số còn trống trước chương này (tác giả bỏ qua để viết trước chương sau, hoặc đã xóa)
+            const gapFrom = (i === 0 ? 0 : chapters.data[i - 1].number) + 1
+            const gapTo = c.number - 1
+            return (
+              <Fragment key={c.id}>
+                {gapFrom <= gapTo && (
+                  <li className="flex items-center gap-3 bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
+                    <span className="min-w-10 shrink-0 whitespace-nowrap tabular-nums">
+                      {gapFrom === gapTo ? gapFrom : `${gapFrom}–${gapTo}`}
+                    </span>
+                    <p className="min-w-0 flex-1 italic">
+                      {gapFrom === gapTo ? 'Chưa viết' : `Chưa viết ${gapTo - gapFrom + 1} chương`}
+                    </p>
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={paths.studioNewChapter(storyId, gapFrom)}>
+                        <Plus />
+                        Viết chương {gapFrom}
+                      </Link>
+                    </Button>
+                  </li>
+                )}
+                <li className="flex items-center gap-3 px-4 py-3">
+                  <span className="w-10 shrink-0 text-sm text-muted-foreground tabular-nums">
+                    {c.number}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {c.title || (
+                        <span className="text-muted-foreground italic">Chưa đặt tên</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {number.format(countWords(c.content))} chữ, sửa{' '}
+                      {formatRelativeTime(c.updatedAt)}
+                    </p>
+                  </div>
+                  <StatusBadge
+                    published={c.status === 'published'}
+                    className="hidden sm:inline-flex"
+                  />
+                  <Button asChild variant="ghost" size="sm" aria-label={`Sửa chương ${c.number}`}>
+                    <Link to={paths.studioChapter(storyId, c.number)}>
+                      <PenLine />
+                      <span className="hidden sm:inline">Sửa</span>
+                    </Link>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <p className="px-2 py-1.5 sm:hidden">
-                    <StatusBadge published={c.status === 'published'} />
-                  </p>
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      setStatus.mutate({
-                        number: c.number,
-                        status: c.status === 'published' ? 'draft' : 'published',
-                      })
-                    }
-                  >
-                    {c.status === 'published' ? 'Chuyển về nháp' : 'Xuất bản chương'}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => setConfirmDelete(c.number)}
-                  >
-                    Xóa chương
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </li>
-          ))}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Thao tác khác cho chương ${c.number}`}
+                      >
+                        <MoreHorizontal />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <p className="px-2 py-1.5 sm:hidden">
+                        <StatusBadge published={c.status === 'published'} />
+                      </p>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          setStatus.mutate({
+                            number: c.number,
+                            status: c.status === 'published' ? 'draft' : 'published',
+                          })
+                        }
+                      >
+                        {c.status === 'published' ? 'Chuyển về nháp' : 'Xuất bản chương'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => setConfirmDelete(c.number)}
+                      >
+                        Xóa chương
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </li>
+              </Fragment>
+            )
+          })}
         </ul>
       )}
 
@@ -119,7 +148,7 @@ export function ChapterTable({ storyId }: { storyId: string }) {
         open={confirmDelete !== null}
         onOpenChange={(open) => !open && setConfirmDelete(null)}
         title={`Xóa chương ${confirmDelete}?`}
-        description="Chương sẽ bị xóa vĩnh viễn và không khôi phục được."
+        description="Chương cùng bình luận và báo lỗi của chương sẽ bị xóa vĩnh viễn, không khôi phục được."
         confirmLabel="Xóa chương"
         destructive
         pending={remove.isPending}
