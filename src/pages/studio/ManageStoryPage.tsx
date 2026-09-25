@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { NotFound } from '@/components/common/NotFound'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -29,8 +29,15 @@ export default function ManageStoryPage() {
   return <ManageStory story={story} />
 }
 
+const TABS = ['chuong', 'thong-ke', 'bao-loi', 'thong-tin']
+
 function ManageStory({ story }: { story: MyStory }) {
-  const [tab, setTab] = useState('chuong')
+  // Tab nằm trên URL (?muc=) để link từ danh sách Sáng tác mở đúng tab
+  const [params, setParams] = useSearchParams()
+  const muc = params.get('muc') ?? ''
+  const tab = TABS.includes(muc) ? muc : 'chuong'
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const navigate = useNavigate()
   const published = story.visibility === 'published'
 
   return (
@@ -59,7 +66,16 @@ function ManageStory({ story }: { story: MyStory }) {
         </div>
       </header>
 
-      <Tabs value={tab} onValueChange={setTab} className="mt-10">
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          setParams(value === 'chuong' ? {} : { muc: value }, {
+            replace: true,
+            preventScrollReset: true,
+          })
+        }
+        className="mt-10"
+      >
         {/* Màn hẹp: 4 tab cuộn ngang được */}
         <div className="relative -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
           <TabsList>
@@ -107,7 +123,16 @@ function ManageStory({ story }: { story: MyStory }) {
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
           Xóa vĩnh viễn truyện và toàn bộ chương. Không khôi phục được.
         </p>
-        <DeleteStoryDialog storyId={story.id} title={story.title} />
+        <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+          Xóa truyện
+        </Button>
+        <DeleteStoryDialog
+          storyId={story.id}
+          title={story.title}
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          onDeleted={() => navigate(paths.studio, { replace: true })}
+        />
       </section>
     </>
   )

@@ -1,9 +1,20 @@
-import { Plus } from 'lucide-react'
+import { MoreHorizontal, PenLine, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { SectionError } from '@/components/common/SectionHeading'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { SITE_NAME } from '@/config/site'
+import { FormAlert } from '@/features/auth/components/FormAlert'
 import { StoryCover } from '@/features/stories/StoryCover'
+import type { MyStory } from '@/features/studio/api'
+import { DeleteStoryDialog } from '@/features/studio/components/DeleteStoryDialog'
 import { StatusBadge } from '@/features/studio/components/StatusBadge'
 import { useMyStories } from '@/features/studio/hooks'
 import { formatCount, formatRelativeTime } from '@/lib/format'
@@ -11,6 +22,10 @@ import { paths } from '@/lib/routes'
 
 export default function StudioPage() {
   const { data: stories, isPending, isError } = useMyStories()
+  // Giữ truyện đang xóa khi đóng dialog để hiệu ứng đóng chạy hết
+  const [deleting, setDeleting] = useState<MyStory | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deletedTitle, setDeletedTitle] = useState<string | null>(null)
 
   return (
     <>
@@ -19,7 +34,7 @@ export default function StudioPage() {
         <div>
           <h1 className="font-heading text-4xl font-semibold">Sáng tác của bạn</h1>
           <p className="mt-1 text-muted-foreground">
-            Truyện mới luôn là bản nháp. Thêm chương rồi xuất bản khi sẵn sàng.
+            Viết luôn chương 1 khi tạo truyện, hoặc lưu nháp rồi đăng khi sẵn sàng.
           </p>
         </div>
         <Button asChild className="h-10 rounded-full px-5">
@@ -31,6 +46,11 @@ export default function StudioPage() {
       </div>
 
       <div className="mt-8">
+        {deletedTitle && (
+          <div className="mb-4">
+            <FormAlert variant="success">Đã xóa truyện “{deletedTitle}”.</FormAlert>
+          </div>
+        )}
         {isError ? (
           <SectionError />
         ) : isPending ? (
@@ -53,10 +73,10 @@ export default function StudioPage() {
         ) : (
           <ul className="divide-y rounded-xl border bg-card/40">
             {stories.map((s) => (
-              <li key={s.id}>
+              <li key={s.id} className="flex items-center transition-colors hover:bg-muted/40">
                 <Link
                   to={paths.studioStory(s.id)}
-                  className="group grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4 p-4 transition-colors hover:bg-muted/40 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto]"
+                  className="group grid min-w-0 flex-1 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4 p-4 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto]"
                 >
                   <StoryCover
                     story={{ ...s, author: { slug: '', name: s.owner.displayName } }}
@@ -90,11 +110,64 @@ export default function StudioPage() {
                     </span>
                   </div>
                 </Link>
+                {/* Nút menu nằm ngoài Link: không lồng nút trong thẻ a */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="mr-2 shrink-0 sm:mr-3"
+                      aria-label={`Thao tác cho truyện ${s.title}`}
+                    >
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link to={paths.studioStory(s.id, 'thong-tin')}>
+                        <PenLine />
+                        Sửa thông tin
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to={paths.studioNewChapter(s.id)}>
+                        <Plus />
+                        Viết chương mới
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => {
+                        setDeletedTitle(null)
+                        setDeleting(s)
+                        setDeleteOpen(true)
+                      }}
+                    >
+                      <Trash2 />
+                      Xóa truyện
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {deleting && (
+        <DeleteStoryDialog
+          key={deleting.id}
+          storyId={deleting.id}
+          title={deleting.title}
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          onDeleted={() => {
+            setDeleteOpen(false)
+            setDeletedTitle(deleting.title)
+          }}
+        />
+      )}
     </>
   )
 }

@@ -37,6 +37,24 @@ test('truyện mới là nháp, đường dẫn tự sinh và không trùng', as
   expect(c.slug).toBe('truong-an-khong-tuyet-2')
 })
 
+test('tạo truyện kèm chương 1: đăng ngay thì công khai, lưu nháp thì cả hai là nháp', async () => {
+  signInAs('demo')
+  const published = await studio.createStory(input, { chapter, publish: true })
+  expect(published).toMatchObject({ visibility: 'published', chapterCount: 1, publishedCount: 1 })
+  localStorage.removeItem('mock-auth-session')
+  expect(await getStory(published.slug)).toMatchObject({ title: input.title, chapterCount: 1 })
+
+  signInAs('demo')
+  const draft = await studio.createStory(
+    { ...input, title: 'Bản nháp' },
+    { chapter, publish: false },
+  )
+  expect(draft).toMatchObject({ visibility: 'draft', chapterCount: 1, draftCount: 1 })
+  expect(await studio.getMyChapters(draft.id)).toMatchObject([
+    { number: 1, title: 'Gặp lại', status: 'draft' },
+  ])
+})
+
 test('không xuất bản được truyện chưa có chương công khai', async () => {
   signInAs('demo')
   const story = await studio.createStory(input)

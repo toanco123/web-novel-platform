@@ -126,20 +126,38 @@ function uniqueSlug(title: string) {
   return slug
 }
 
-export async function createStory(input: StoryInput): Promise<MyStory> {
+export type FirstChapterInput = {
+  chapter: ChapterInput
+  /** true: xuất bản chương 1 và công khai truyện luôn; false: cả hai là nháp */
+  publish: boolean
+}
+
+/** Tạo truyện (nháp), kèm chương 1 nếu người viết đã viết ngay trong form tạo truyện */
+export async function createStory(
+  input: StoryInput,
+  firstChapter?: FirstChapterInput,
+): Promise<MyStory> {
   await delay(400)
   const user = await requireUser()
+  const publish = firstChapter?.publish ?? false
   const story: StoredStory = {
     ...normalize(input),
     id: crypto.randomUUID(),
     slug: uniqueSlug(input.title),
     owner: { id: user.id, displayName: user.displayName },
-    visibility: 'draft',
+    visibility: publish ? 'published' : 'draft',
     createdAt: now(),
     updatedAt: now(),
-    publishedAt: null,
+    publishedAt: publish ? now() : null,
   }
-  saveUserStories([...loadUserStories(), story])
+  // Ghi chương trước: localStorage đầy thì báo lỗi mà không để lại truyện rỗng
+  if (firstChapter) saveChapters(story.id, [newChapter(story.id, 1, firstChapter.chapter, publish)])
+  try {
+    saveUserStories([...loadUserStories(), story])
+  } catch (error) {
+    if (firstChapter) removeChapters(story.id)
+    throw error
+  }
   return withCounts(story)
 }
 

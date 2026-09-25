@@ -36,5 +36,36 @@ export const chapterSchema = z.object({
 
 export type ChapterValues = z.infer<typeof chapterSchema>
 
+/** Chương 1 viết ngay trong form tạo truyện: để trống nội dung thì chỉ tạo truyện */
+export const firstChapterSchema = z
+  .object({
+    title: chapterSchema.shape.title,
+    content: z
+      .string()
+      .trim()
+      .max(CONTENT_MAX, `Nội dung chương tối đa ${CONTENT_MAX.toLocaleString('vi-VN')} ký tự`),
+  })
+  .superRefine(({ title, content }, ctx) => {
+    if (content && content.length < CONTENT_MIN) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['content'],
+        message: `Nội dung chương cần ít nhất ${CONTENT_MIN} ký tự`,
+      })
+    }
+    if (!content && title) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['content'],
+        message: 'Viết nội dung chương 1 hoặc xóa tiêu đề chương',
+      })
+    }
+  })
+
+/** Form truyện: thông tin truyện + chương 1 (chỉ hiện khi tạo truyện mới) */
+export const storyFormSchema = storySchema.extend({ chapter: firstChapterSchema })
+
+export type StoryFormValues = z.infer<typeof storyFormSchema>
+
 /** Số chữ (từ) của văn bản */
 export const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length

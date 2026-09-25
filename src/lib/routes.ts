@@ -19,7 +19,9 @@ export const paths = {
   /** genre: chọn sẵn thể loại trong form đăng truyện */
   studioNewStory: (genre?: string) =>
     genre ? `/sang-tac/truyen-moi?the-loai=${encodeURIComponent(genre)}` : '/sang-tac/truyen-moi',
-  studioStory: (id: string) => `/sang-tac/truyen/${id}`,
+  /** tab: mở sẵn tab của trang quản lý truyện (mặc định tab Chương) */
+  studioStory: (id: string, tab?: 'thong-ke' | 'bao-loi' | 'thong-tin') =>
+    tab ? `/sang-tac/truyen/${id}?muc=${tab}` : `/sang-tac/truyen/${id}`,
   studioNewChapter: (id: string) => `/sang-tac/truyen/${id}/chuong-moi`,
   studioChapter: (id: string, number: number) => `/sang-tac/truyen/${id}/chuong/${number}`,
   studioImport: (id: string) => `/sang-tac/truyen/${id}/nhap-file`,

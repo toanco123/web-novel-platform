@@ -3,22 +3,19 @@ import { History } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { FormAlert } from '@/features/auth/components/FormAlert'
-import { authInputClass, FormField } from '@/features/auth/components/FormField'
 import { paths } from '@/lib/routes'
-import { cn } from '@/lib/utils'
 import type { Chapter } from '@/types/chapter'
 import type { MyStory } from '../api'
 import { studioErrorMessage } from '../errors'
 import { useSaveChapter } from '../hooks'
-import { chapterSchema, CONTENT_MAX, countWords, type ChapterValues } from '../schemas'
+import { chapterSchema, type ChapterValues } from '../schemas'
 import { useEditorAutosave } from '../useEditorAutosave'
 import { useUnsavedChangesPrompt } from '../useUnsavedChangesPrompt'
+import { ChapterFields } from './ChapterFields'
 import { ConfirmDialog } from './ConfirmDialog'
 import { StatusBadge } from './StatusBadge'
 
-const number = new Intl.NumberFormat('vi-VN')
 const clock = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' })
 
 type Props = {
@@ -103,47 +100,13 @@ export function ChapterEditor({ story, chapter, nextNumber }: Props) {
 
       <div className="max-w-3xl space-y-6">
         {save.isError && <FormAlert>{studioErrorMessage(save.error)}</FormAlert>}
-        <FormField
-          id="chapter-title"
-          label="Tiêu đề chương (không bắt buộc)"
-          error={errors.title?.message}
-        >
-          {(c) => (
-            <Input
-              {...c}
-              {...register('title')}
-              autoComplete="off"
-              placeholder="Ví dụ: Gặp lại"
-              className={authInputClass}
-            />
-          )}
-        </FormField>
-        <FormField
-          id="chapter-content"
-          label="Nội dung"
-          error={errors.content?.message}
-          below={
-            <p
-              className={cn(
-                'text-xs text-muted-foreground tabular-nums',
-                values.content.length > CONTENT_MAX && 'text-destructive',
-              )}
-            >
-              {number.format(countWords(values.content))} chữ,{' '}
-              {number.format(values.content.length)}/{number.format(CONTENT_MAX)} ký tự. Các đoạn
-              cách nhau bằng một dòng trống.
-            </p>
-          }
-        >
-          {(c) => (
-            <textarea
-              {...c}
-              {...register('content')}
-              placeholder="Bắt đầu viết chương của bạn…"
-              className="field-sizing-content min-h-[50vh] w-full rounded-lg border border-input bg-transparent px-4 py-3 font-heading text-lg leading-relaxed outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive dark:bg-input/30"
-            />
-          )}
-        </FormField>
+        <ChapterFields
+          idPrefix="chapter"
+          titleField={register('title')}
+          contentField={register('content')}
+          contentValue={values.content}
+          errors={{ title: errors.title?.message, content: errors.content?.message }}
+        />
       </div>
 
       {/* Thanh thao tác dính dưới đáy màn hình */}

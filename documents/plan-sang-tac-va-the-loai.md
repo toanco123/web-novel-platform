@@ -21,6 +21,10 @@ Khác với plan:
   - Header có nút **"Đăng truyện"** (desktop: icon + chữ; tablet: icon; mobile: trong menu trượt).
   - **Mọi** trang thể loại có nút "Đăng truyện {thể loại}", mở form với thể loại đó chọn sẵn (`/sang-tac/truyen-moi?the-loai=slug`; slug không có thật thì bỏ qua). Trang `/the-loai` cũng có nút "Đăng truyện".
 - Tiêu đề `h1–h3` dùng số đều hàng (`lining-nums`) vì font Cormorant mặc định cho số "1" trông như chữ "I".
+- Bổ sung sau (25/09/2026), theo phản hồi "tạo truyện chưa có chỗ nhập nội dung":
+  - Form tạo truyện có phần **Chương 1** (không bắt buộc) và 2 nút **"Lưu nháp"** / **"Đăng truyện"** (xem mục 1.3).
+  - Danh sách `/sang-tac` có menu **⋯** cho từng truyện (xem mục 1.2).
+  - Tab trang quản lý nằm trên URL (`?muc=`) để link mở đúng tab (xem mục 1.4).
 
 **Chia 3 giai đoạn**, mỗi giai đoạn xong là dùng được:
 - **A. Thể loại:** trang `/the-loai` và tạo thể loại.
@@ -72,6 +76,10 @@ Sáng tác của bạn                          [+ Đăng truyện mới]
 └───────┴──────────────────────────────┴──────────┴─────────┘
 ```
 - Mỗi dòng dẫn tới trang quản lý. Trên mobile, mỗi truyện là một thẻ.
+- Nút **⋯** cuối mỗi dòng (nằm ngoài link của dòng):
+  - "Sửa thông tin" mở trang quản lý ở tab Thông tin truyện (`paths.studioStory(id, 'thong-tin')`).
+  - "Viết chương mới".
+  - "Xóa truyện" mở cùng `DeleteStoryDialog` (phải gõ đúng tên); xóa xong ở lại danh sách và báo "Đã xóa truyện “…”".
 - Chưa có truyện: "Bạn chưa đăng truyện nào. Bắt đầu với truyện đầu tiên." kèm nút.
 
 ### 1.3 Form truyện (tạo mới và sửa dùng chung `StoryForm`)
@@ -86,7 +94,13 @@ Sáng tác của bạn                          [+ Đăng truyện mới]
   - Kéo-thả hoặc chọn file JPG/PNG/WebP ≤ 2 MB.
   - Tự cắt giữa khung 2:3, thu về 480×720 WebP, xem trước ngay.
   - Có nút "Đổi ảnh" và "Bỏ ảnh"; chưa có ảnh thì xem trước bằng bìa chữ tự sinh.
-- Lưu lần đầu thì truyện là **bản nháp**, rồi chuyển sang trang quản lý.
+- **Chương 1** (chỉ khi tạo truyện, không bắt buộc): tiêu đề + nội dung, dùng chung ô soạn `ChapterFields` với trình soạn chương.
+  - Để trống nội dung thì chỉ tạo truyện (thêm chương hoặc nhập file .txt sau). Đã viết thì nội dung phải ≥ 100 ký tự; có tiêu đề mà không có nội dung thì báo lỗi.
+  - **"Lưu nháp"**: truyện (và chương 1 nếu có) là bản nháp.
+  - **"Đăng truyện"**: xuất bản chương 1 và công khai truyện luôn; chưa viết chương 1 thì báo lỗi ở ô nội dung.
+  - Rời trang khi đã gõ nội dung chương 1 thì hỏi lại (`useUnsavedChangesPrompt`).
+  - `createStory(input, { chapter, publish })` ghi chương trước rồi mới ghi truyện, để bộ nhớ đầy thì không sinh truyện rỗng.
+- Lưu xong thì chuyển sang trang quản lý.
 - Bố cục desktop: form bên trái, cột xem trước bên phải (bìa + `StoryCard` như người đọc sẽ thấy). Mobile: một cột.
 
 ### 1.4 Quản lý truyện `/sang-tac/truyen/:storyId`
@@ -99,6 +113,7 @@ Thông tin | Chương (12)                                  (tabs)
 ── Vùng nguy hiểm ──  [Ẩn truyện] [Xóa truyện]
 ```
 - **Tab "Thông tin":** `StoryForm` để sửa. **Tab "Chương":** danh sách chương kèm trạng thái.
+- Tab đang mở nằm trên URL: `?muc=thong-ke|bao-loi|thong-tin` (tab Chương thì không có tham số), đổi tab dùng `replace`.
 - **Quy tắc xuất bản:**
   - Truyện chỉ xuất bản được khi có **≥ 1 chương đã xuất bản**; nút bị khóa kèm lý do.
   - Truyện đang công khai thì không được ẩn hoặc xóa chương đã xuất bản cuối cùng, phải ẩn truyện trước.
@@ -214,6 +229,8 @@ Thông tin | Chương (12)                                  (tabs)
   - Chưa đăng nhập vào `/sang-tac` thì bị chuyển sang đăng nhập.
   - Tạo thể loại trong dialog, và tạo ngay trong `GenrePicker`.
   - Đăng truyện → viết chương → xuất bản chương → xuất bản truyện → truyện hiện ở "Mới cập nhật" và mở được `/truyen/:slug`.
+  - Tạo truyện kèm chương 1 rồi "Đăng truyện" → công khai ngay; bấm khi chưa viết chương 1 thì báo lỗi.
+  - Menu ⋯ ở `/sang-tac`: "Sửa thông tin" mở đúng tab, "Xóa truyện" ngay từ danh sách.
   - Nhập file `.txt` → bảng xem trước đúng số chương → "Thêm N chương".
   - Xóa truyện phải gõ đúng tên.
 - `npm run build`, `npm run lint` sạch.

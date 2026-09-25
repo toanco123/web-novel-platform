@@ -59,7 +59,16 @@ export function useMyChapter(storyId: string, number: number | null) {
 
 export function useCreateStory() {
   const invalidate = useInvalidateAll()
-  return useMutation({ mutationFn: api.createStory, onSuccess: invalidate })
+  return useMutation({
+    mutationFn: ({
+      story,
+      firstChapter,
+    }: {
+      story: api.StoryInput
+      firstChapter?: api.FirstChapterInput
+    }) => api.createStory(story, firstChapter),
+    onSuccess: invalidate,
+  })
 }
 
 export function useUpdateStory(id: string) {
