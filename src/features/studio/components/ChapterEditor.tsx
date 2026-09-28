@@ -1,22 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { History, TriangleAlert } from 'lucide-react'
+import { History } from 'lucide-react'
 import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { FormAlert } from '@/features/auth/components/FormAlert'
-import { authInputClass, FormField } from '@/features/auth/components/FormField'
 import { paths } from '@/lib/routes'
-import { cn } from '@/lib/utils'
 import type { Chapter } from '@/types/chapter'
 import type { MyStory } from '../api'
 import { studioErrorMessage } from '../errors'
 import { useSaveChapter } from '../hooks'
-import { CHAPTER_NUMBER_MAX, chapterFormSchema, type ChapterFormValues } from '../schemas'
+import { chapterFormSchema, type ChapterFormValues } from '../schemas'
 import { useEditorAutosave } from '../useEditorAutosave'
 import { useUnsavedChangesPrompt } from '../useUnsavedChangesPrompt'
-import { ChapterFields } from './ChapterFields'
+import { ChapterFields, ChapterNumberField } from './ChapterFields'
 import { ConfirmDialog } from './ConfirmDialog'
 import { StatusBadge } from './StatusBadge'
 
@@ -154,55 +151,14 @@ export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props
 
       <div className="max-w-3xl space-y-6">
         {save.isError && <FormAlert>{studioErrorMessage(save.error)}</FormAlert>}
-        <FormField
+        <ChapterNumberField
           id="chapter-number"
-          label="Số chương"
+          field={register('number', { valueAsNumber: true })}
           error={errors.number?.message}
-          below={
-            <>
-              {numberNote && (
-                <p id="chapter-number-note" className="text-xs text-muted-foreground">
-                  {numberNote}
-                </p>
-              )}
-              {skipped && (
-                <p
-                  id="chapter-number-skipped"
-                  className="flex gap-2.5 rounded-lg border border-rose-gold/40 bg-rose-gold/10 px-3.5 py-2.5 text-sm"
-                >
-                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-rose-gold" aria-hidden />
-                  {skippedMessage(skipped, values.number)}
-                </p>
-              )}
-            </>
-          }
-        >
-          {(c) => (
-            <Input
-              {...c}
-              aria-describedby={
-                [
-                  c['aria-describedby'],
-                  numberNote && 'chapter-number-note',
-                  skipped && 'chapter-number-skipped',
-                ]
-                  .filter(Boolean)
-                  .join(' ') || undefined
-              }
-              {...register('number', { valueAsNumber: true })}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={CHAPTER_NUMBER_MAX}
-              step={1}
-              readOnly={numberLocked}
-              className={cn(
-                authInputClass,
-                'w-32 tabular-nums read-only:bg-muted/50 read-only:text-muted-foreground',
-              )}
-            />
-          )}
-        </FormField>
+          readOnly={numberLocked}
+          note={numberNote}
+          warning={skipped && skippedMessage(skipped, values.number)}
+        />
         <ChapterFields
           idPrefix="chapter"
           titleField={register('title')}

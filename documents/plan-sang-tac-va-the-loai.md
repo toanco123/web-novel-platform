@@ -22,12 +22,13 @@ Khác với plan:
   - **Mọi** trang thể loại có nút "Đăng truyện {thể loại}", mở form với thể loại đó chọn sẵn (`/sang-tac/truyen-moi?the-loai=slug`; slug không có thật thì bỏ qua). Trang `/the-loai` cũng có nút "Đăng truyện".
 - Tiêu đề `h1–h3` dùng số đều hàng (`lining-nums`) vì font Cormorant mặc định cho số "1" trông như chữ "I".
 - Bổ sung sau (25/09/2026), theo phản hồi "tạo truyện chưa có chỗ nhập nội dung":
-  - Form tạo truyện có phần **Chương 1** (không bắt buộc) và 2 nút **"Lưu nháp"** / **"Đăng truyện"** (xem mục 1.3).
+  - Form tạo truyện có phần **Chương đầu tiên** (không bắt buộc) và 2 nút **"Lưu nháp"** / **"Đăng truyện"** (xem mục 1.3).
   - Danh sách `/sang-tac` có menu **⋯** cho từng truyện (xem mục 1.2).
   - Tab trang quản lý nằm trên URL (`?muc=`) để link mở đúng tab (xem mục 1.4).
 - Bổ sung sau (25/09/2026), theo phản hồi "viết xong chương 1, chưa biết viết gì cho chương 2, muốn viết chương 3":
   - Tác giả **chọn được số chương**, được bỏ trống số ở giữa (xem mục 1.5).
   - Danh sách chương hiện chỗ trống "Chưa viết" kèm nút viết bù (xem mục 1.4).
+- Bổ sung sau (28/09/2026): phần chương đầu tiên của form tạo truyện cũng **chọn được số chương** (mặc định 1), cho truyện đăng tiếp từ nơi khác (xem mục 1.3).
 
 **Chia 3 giai đoạn**, mỗi giai đoạn xong là dùng được:
 - **A. Thể loại:** trang `/the-loai` và tạo thể loại.
@@ -97,11 +98,12 @@ Sáng tác của bạn                          [+ Đăng truyện mới]
   - Kéo-thả hoặc chọn file JPG/PNG/WebP ≤ 2 MB.
   - Tự cắt giữa khung 2:3, thu về 480×720 WebP, xem trước ngay.
   - Có nút "Đổi ảnh" và "Bỏ ảnh"; chưa có ảnh thì xem trước bằng bìa chữ tự sinh.
-- **Chương 1** (chỉ khi tạo truyện, không bắt buộc): tiêu đề + nội dung, dùng chung ô soạn `ChapterFields` với trình soạn chương.
+- **Chương đầu tiên** (chỉ khi tạo truyện, không bắt buộc): số chương + tiêu đề + nội dung, dùng chung `ChapterNumberField`/`ChapterFields` với trình soạn chương.
+  - Số chương mặc định 1, đổi được (truyện đăng tiếp từ nơi khác bắt đầu từ chương 50). Chỉ kiểm tra khi có viết nội dung.
   - Để trống nội dung thì chỉ tạo truyện (thêm chương hoặc nhập file .txt sau). Đã viết thì nội dung phải ≥ 100 ký tự; có tiêu đề mà không có nội dung thì báo lỗi.
-  - **"Lưu nháp"**: truyện (và chương 1 nếu có) là bản nháp.
-  - **"Đăng truyện"**: xuất bản chương 1 và công khai truyện luôn; chưa viết chương 1 thì báo lỗi ở ô nội dung.
-  - Rời trang khi đã gõ nội dung chương 1 thì hỏi lại (`useUnsavedChangesPrompt`).
+  - **"Lưu nháp"**: truyện (và chương nếu có) là bản nháp.
+  - **"Đăng truyện"**: xuất bản chương đó và công khai truyện luôn; chưa viết chương thì báo lỗi ở ô nội dung.
+  - Rời trang khi đã gõ nội dung chương thì hỏi lại (`useUnsavedChangesPrompt`).
   - `createStory(input, { chapter, publish })` ghi chương trước rồi mới ghi truyện, để bộ nhớ đầy thì không sinh truyện rỗng.
 - Lưu xong thì chuyển sang trang quản lý.
 - Bố cục desktop: form bên trái, cột xem trước bên phải (bìa + `StoryCard` như người đọc sẽ thấy). Mobile: một cột.
@@ -239,7 +241,7 @@ Thông tin | Chương (12)                                  (tabs)
   - Chưa đăng nhập vào `/sang-tac` thì bị chuyển sang đăng nhập.
   - Tạo thể loại trong dialog, và tạo ngay trong `GenrePicker`.
   - Đăng truyện → viết chương → xuất bản chương → xuất bản truyện → truyện hiện ở "Mới cập nhật" và mở được `/truyen/:slug`.
-  - Tạo truyện kèm chương 1 rồi "Đăng truyện" → công khai ngay; bấm khi chưa viết chương 1 thì báo lỗi.
+  - Tạo truyện kèm chương đầu tiên (đổi số thành 50) rồi "Đăng truyện" → công khai ngay với chương 50; bấm khi chưa viết chương thì báo lỗi.
   - Menu ⋯ ở `/sang-tac`: "Sửa thông tin" mở đúng tab, "Xóa truyện" ngay từ danh sách.
   - Chọn số chương: trùng số thì báo lỗi, bỏ trống chương 2 để viết chương 3 rồi viết bù từ dòng "Chưa viết"; đổi số chương nháp rồi lưu thì về trang quản lý (không thoáng hiện trang "không tìm thấy").
 - **Test api số chương:** chọn số và viết bù, chặn trùng số, chương đã từng xuất bản không đổi số được, xóa chương thì xóa bình luận/báo lỗi của chương.

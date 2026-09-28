@@ -136,12 +136,13 @@ function uniqueSlug(title: string) {
 }
 
 export type FirstChapterInput = {
-  chapter: ChapterInput
-  /** true: xuất bản chương 1 và công khai truyện luôn; false: cả hai là nháp */
+  /** number: số của chương đầu tiên (mặc định 1, vd truyện đăng tiếp từ nơi khác bắt đầu từ 50) */
+  chapter: ChapterInput & { number?: number }
+  /** true: xuất bản chương đó và công khai truyện luôn; false: cả hai là nháp */
   publish: boolean
 }
 
-/** Tạo truyện (nháp), kèm chương 1 nếu người viết đã viết ngay trong form tạo truyện */
+/** Tạo truyện (nháp), kèm chương đầu tiên nếu người viết đã viết ngay trong form tạo truyện */
 export async function createStory(
   input: StoryInput,
   firstChapter?: FirstChapterInput,
@@ -160,7 +161,10 @@ export async function createStory(
     publishedAt: publish ? now() : null,
   }
   // Ghi chương trước: localStorage đầy thì báo lỗi mà không để lại truyện rỗng
-  if (firstChapter) saveChapters(story.id, [newChapter(story.id, 1, firstChapter.chapter, publish)])
+  if (firstChapter) {
+    const { chapter } = firstChapter
+    saveChapters(story.id, [newChapter(story.id, chapter.number ?? 1, chapter, publish)])
+  }
   try {
     saveUserStories([...loadUserStories(), story])
   } catch (error) {

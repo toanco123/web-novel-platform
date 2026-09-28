@@ -34,7 +34,7 @@ export default function StudioPage() {
         <div>
           <h1 className="font-heading text-4xl font-semibold">Sáng tác của bạn</h1>
           <p className="mt-1 text-muted-foreground">
-            Viết luôn chương 1 khi tạo truyện, hoặc lưu nháp rồi đăng khi sẵn sàng.
+            Viết luôn chương đầu tiên khi tạo truyện, hoặc lưu nháp rồi đăng khi sẵn sàng.
           </p>
         </div>
         <Button asChild className="h-10 rounded-full px-5">

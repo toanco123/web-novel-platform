@@ -28,8 +28,8 @@ export default function NewStoryPage() {
       />
       <h1 className="font-heading text-4xl font-semibold">Đăng truyện mới</h1>
       <p className="mt-1 mb-8 max-w-prose text-muted-foreground">
-        Điền thông tin truyện và viết luôn chương 1 nếu muốn. "Lưu nháp" để viết tiếp sau, "Đăng
-        truyện" để công khai ngay.
+        Điền thông tin truyện và viết luôn chương đầu tiên nếu muốn. "Lưu nháp" để viết tiếp sau,
+        "Đăng truyện" để công khai ngay.
       </p>
       <StoryForm
         defaultValues={{

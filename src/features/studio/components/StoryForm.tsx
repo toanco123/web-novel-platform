@@ -16,19 +16,18 @@ import { studioErrorMessage } from '../errors'
 import {
   DESCRIPTION_MAX,
   storyFormSchema,
-  type ChapterValues,
   type StoryFormValues,
   type StoryValues,
 } from '../schemas'
 import { useUnsavedChangesPrompt } from '../useUnsavedChangesPrompt'
-import { ChapterFields } from './ChapterFields'
+import { ChapterFields, ChapterNumberField } from './ChapterFields'
 import { ConfirmDialog } from './ConfirmDialog'
 import { CoverUpload } from './CoverUpload'
 
 export type StorySubmitExtra = {
-  /** Chương 1 viết kèm; null khi để trống (hoặc form sửa truyện) */
-  chapter: ChapterValues | null
-  /** Bấm "Đăng truyện": xuất bản chương 1 và công khai truyện luôn */
+  /** Chương đầu tiên viết kèm (số chương chọn được); null khi để trống (hoặc form sửa truyện) */
+  chapter: StoryFormValues['chapter'] | null
+  /** Bấm "Đăng truyện": xuất bản chương đầu tiên và công khai truyện luôn */
   publish: boolean
   /** Gọi trước khi tự điều hướng sau khi lưu thành công (bỏ hỏi rời trang) */
   allowLeave: () => void
@@ -44,7 +43,7 @@ type Props = {
   pending: boolean
   error?: unknown
   success?: string | null
-  /** Truyện mới: thêm phần viết chương 1 và nút "Đăng truyện" cạnh nút lưu */
+  /** Truyện mới: thêm phần viết chương đầu tiên và nút "Đăng truyện" cạnh nút lưu */
   firstChapter?: boolean
   onSubmit: (values: StoryValues, extra: StorySubmitExtra) => void
 }
@@ -78,7 +77,7 @@ export function StoryForm({
   } = useForm<StoryFormValues>({
     resolver: zodResolver(storyFormSchema),
     mode: 'onTouched',
-    defaultValues: { ...defaultValues, chapter: { title: '', content: '' } },
+    defaultValues: { ...defaultValues, chapter: { number: 1, title: '', content: '' } },
   })
   const values = useWatch({ control }) as StoryFormValues
   const previewSlug = slug ?? (slugify(values.title) || 'ten-truyen')
@@ -91,7 +90,7 @@ export function StoryForm({
       if (publish && !chapter.content) {
         setError(
           'chapter.content',
-          { message: 'Viết nội dung chương 1 để đăng truyện (hoặc bấm Lưu nháp)' },
+          { message: 'Viết nội dung chương để đăng truyện (hoặc bấm Lưu nháp)' },
           { shouldFocus: true },
         )
         return
@@ -227,13 +226,19 @@ export function StoryForm({
             <section aria-labelledby="first-chapter-heading" className="space-y-6 border-t pt-8">
               <div>
                 <h2 id="first-chapter-heading" className="font-heading text-2xl font-semibold">
-                  Chương 1
+                  Chương đầu tiên
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Không bắt buộc. Viết luôn chương đầu, hoặc để trống rồi thêm chương hay nhập file
                   .txt ở bước sau.
                 </p>
               </div>
+              <ChapterNumberField
+                id="first-chapter-number"
+                field={register('chapter.number', { valueAsNumber: true })}
+                error={errors.chapter?.number?.message}
+                note="Mặc định là chương 1. Truyện đăng tiếp từ nơi khác thì đổi thành số chương bắt đầu."
+              />
               <ChapterFields
                 idPrefix="first-chapter"
                 titleField={register('chapter.title')}
@@ -244,7 +249,7 @@ export function StoryForm({
                   content: errors.chapter?.content?.message,
                 }}
                 titleLabel="Tiêu đề chương"
-                contentLabel="Nội dung chương 1"
+                contentLabel="Nội dung chương"
                 textareaClassName="min-h-72"
               />
             </section>
@@ -294,7 +299,7 @@ export function StoryForm({
         open={leave.blocker.state === 'blocked'}
         onOpenChange={(open) => !open && leave.blocker.reset?.()}
         title="Rời trang khi chưa lưu?"
-        description="Truyện và nội dung chương 1 đang viết chưa được lưu, rời trang sẽ mất."
+        description="Truyện và nội dung chương đang viết chưa được lưu, rời trang sẽ mất."
         cancelLabel="Ở lại viết tiếp"
         confirmLabel="Rời trang"
         onConfirm={() => leave.blocker.proceed?.()}

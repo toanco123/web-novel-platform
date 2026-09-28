@@ -55,6 +55,13 @@ test('tạo truyện kèm chương 1: đăng ngay thì công khai, lưu nháp th
   expect(await studio.getMyChapters(draft.id)).toMatchObject([
     { number: 1, title: 'Gặp lại', status: 'draft' },
   ])
+
+  // Truyện đăng tiếp từ nơi khác: chương đầu tiên mang số người viết chọn
+  const later = await studio.createStory(
+    { ...input, title: 'Đăng tiếp' },
+    { chapter: { ...chapter, number: 50 }, publish: true },
+  )
+  expect((await studio.getMyChapters(later.id)).map((c) => c.number)).toEqual([50])
 })
 
 test('không xuất bản được truyện chưa có chương công khai', async () => {

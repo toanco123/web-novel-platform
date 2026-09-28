@@ -63,7 +63,7 @@ test('đăng truyện → viết chương → xuất bản → truyện hiện c
   expect(within(section).getByRole('link', { name: 'Chương 1: Gặp lại' })).toBeInTheDocument()
 })
 
-test('tạo truyện kèm chương 1 rồi bấm Đăng truyện thì công khai ngay', async () => {
+test('tạo truyện kèm chương đầu tiên (chọn số chương) rồi bấm Đăng truyện thì công khai ngay', async () => {
   signIn()
   const { router, user } = renderApp('/sang-tac/truyen-moi?the-loai=ngon-tinh')
   await user.type(await screen.findByLabelText('Tên truyện', {}, slow), 'Gió Mùa Thu')
@@ -72,20 +72,26 @@ test('tạo truyện kèm chương 1 rồi bấm Đăng truyện thì công khai
     'Một câu chuyện tình học trò nhẹ nhàng giữa hai người bạn cùng bàn.',
   )
 
-  // Chưa viết chương 1 thì chưa đăng được
+  // Chưa viết chương thì chưa đăng được
   await user.click(screen.getByRole('button', { name: 'Đăng truyện' }))
-  expect(await screen.findByText(/Viết nội dung chương 1 để đăng truyện/)).toBeInTheDocument()
+  expect(await screen.findByText(/Viết nội dung chương để đăng truyện/)).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/sang-tac/truyen-moi')
 
+  // Truyện đăng tiếp từ nơi khác: bắt đầu từ chương 50
+  const number = screen.getByLabelText('Số chương')
+  expect(number).toHaveValue(1)
+  await user.clear(number)
+  await user.type(number, '50')
   await user.type(screen.getByLabelText('Tiêu đề chương'), 'Gặp lại')
-  await user.type(screen.getByLabelText('Nội dung chương 1'), content)
+  await user.type(screen.getByLabelText('Nội dung chương'), content)
   await user.click(screen.getByRole('button', { name: 'Đăng truyện' }))
 
-  // Sang trang quản lý: truyện đã công khai, có chương 1
+  // Sang trang quản lý: truyện đã công khai, có chương 50
   expect(await screen.findByRole('heading', { level: 1, name: 'Gió Mùa Thu' }, slow))
   expect(screen.getByRole('button', { name: 'Ẩn truyện' })).toBeInTheDocument()
   const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
   expect(within(list).getByText('Gặp lại')).toBeInTheDocument()
+  expect(within(list).getByRole('link', { name: 'Sửa chương 50' })).toBeInTheDocument()
 
   // Người đọc thấy truyện ở trang chủ
   localStorage.removeItem('mock-auth-session')
