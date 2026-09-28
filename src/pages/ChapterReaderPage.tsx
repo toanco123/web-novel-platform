@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { SITE_NAME } from '@/config/site'
 import { useChapter, usePrefetchChapter, useRecordChapterView } from '@/features/chapters/hooks'
 import { ReportChapterDialog } from '@/features/feedback/components/ReportChapterDialog'
+import { useAutoScroll } from '@/features/reader/autoscroll/useAutoScroll'
+import { AutoScrollBar } from '@/features/reader/components/AutoScrollBar'
 import { ChapterArticle } from '@/features/reader/components/ChapterArticle'
 import { ChapterComments } from '@/features/reader/components/ChapterComments'
 import { ChapterEnd } from '@/features/reader/components/ChapterEnd'
@@ -51,13 +53,14 @@ function Reader({ slug, number }: { slug: string; number: number }) {
   const navigate = useNavigate()
   const location = useLocation()
   const navState = location.state as ReaderNavState
-  const [toolbarVisible, setToolbarVisible] = useAutoHideToolbar()
+  const width = useReaderSettings((s) => s.width)
+  const continuous = useReaderSettings((s) => s.continuous)
+  const autoScroll = useAutoScroll(number, continuous)
+  const [toolbarVisible, setToolbarVisible] = useAutoHideToolbar(autoScroll.status === 'running')
   // Gắn bảng đang mở với số chương: chuyển sang chương khác là bảng tự đóng
   const [panel, setPanel] = useState<{ name: ReaderPanel; chapter: number } | null>(null)
   const open = panel?.chapter === number ? panel.name : null
   const setOpen = (name: ReaderPanel | null) => setPanel(name ? { name, chapter: number } : null)
-  const width = useReaderSettings((s) => s.width)
-  const continuous = useReaderSettings((s) => s.continuous)
   const reducedMotion = usePrefersReducedMotion()
 
   // Cuộn liên tục: chuỗi chương bắt đầu lại khi điều hướng không phải do chính việc cuộn
@@ -80,6 +83,23 @@ function Reader({ slug, number }: { slug: string; number: number }) {
     const { status, chapter: speaking, stop } = speechRef.current
     if (status === 'idle' || navState?.stream || navState?.speech) return
     if (speaking !== number) stop()
+  }, [location.key, number, navState])
+
+  // Nút "Chương sau" trên thanh tự cuộn: sang chương đó rồi cuộn tiếp từ đầu chương.
+  // Người đọc tự chuyển chương cách khác (mục lục, phím, link) thì tạm dừng
+  const continueAt = useRef<number | null>(null)
+  const autoScrollRef = useRef(autoScroll)
+  useEffect(() => {
+    autoScrollRef.current = autoScroll
+  })
+  useEffect(() => {
+    const { status, start, pause } = autoScrollRef.current
+    if (continueAt.current === number) {
+      continueAt.current = null
+      start()
+    } else if (status === 'running' && !navState?.stream) {
+      pause()
+    }
   }, [location.key, number, navState])
 
   // Đoạn đang đọc luôn ở giữa màn hình
@@ -121,16 +141,35 @@ function Reader({ slug, number }: { slug: string; number: number }) {
   const openIndex = () => setOpen('index')
   const toggleToolbar = () => setToolbarVisible((v) => !v)
   const listening = speech.status !== 'idle'
+  const autoScrolling = autoScroll.status !== 'off'
+  // Nghe truyện và tự động cuộn không chạy cùng lúc: bật cái này thì tắt cái kia
   const listen = speech.supported
     ? {
         active: listening,
         onClick: () => {
           if (speech.status === 'playing') speech.pause()
           else if (speech.status === 'paused') speech.resume()
-          else speech.start(number, firstVisibleParagraph(number))
+          else {
+            autoScroll.stop()
+            speech.start(number, firstVisibleParagraph(number))
+          }
         },
       }
     : undefined
+  const autoScrollButton = {
+    active: autoScrolling,
+    onClick: () => {
+      if (autoScroll.status === 'running') autoScroll.pause()
+      else if (autoScroll.status === 'paused') autoScroll.resume()
+      else {
+        // Bắt đầu tự cuộn thì ẩn thanh công cụ để đọc; chạm vào chữ để hiện lại
+        speech.stop()
+        autoScroll.start()
+        setToolbarVisible(false)
+      }
+    },
+  }
+  const next = chapter.next
 
   return (
     <>
@@ -149,12 +188,16 @@ function Reader({ slug, number }: { slug: string; number: number }) {
         open={open}
         setOpen={setOpen}
         listen={listen}
+        autoScroll={autoScrollButton}
       />
       {resumed && <ResumeNotice key={location.key} chapter={number} />}
 
       <main
         id="chapter-content"
-        className={cn('mx-auto px-5 pt-24 pb-20 sm:px-8 sm:pt-28', listening && 'pb-36')}
+        className={cn(
+          'mx-auto px-5 pt-24 pb-20 sm:px-8 sm:pt-28',
+          (listening || autoScrolling) && 'pb-36',
+        )}
         style={{ maxWidth: `calc(${widths.find((w) => w.value === width)?.maxWidth} + 4rem)` }}
       >
         {continuous ? (
@@ -178,6 +221,19 @@ function Reader({ slug, number }: { slug: string; number: number }) {
       </main>
 
       {listening && <SpeechBar speech={speech} />}
+      {autoScrolling && (
+        <AutoScrollBar
+          autoScroll={autoScroll}
+          chapter={number}
+          // Cuộn liên tục thì chương sau tự nối vào, không cần nút sang chương
+          next={continuous ? null : (next?.number ?? null)}
+          onNext={() => {
+            if (!next) return
+            continueAt.current = next.number
+            navigate(paths.chapter(slug, next.number))
+          }}
+        />
+      )}
     </>
   )
 }

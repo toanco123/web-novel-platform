@@ -1,4 +1,4 @@
-import { ALargeSmall, ArrowLeft, Headphones, House, ListOrdered } from 'lucide-react'
+import { ALargeSmall, ArrowLeft, ChevronsDown, Headphones, House, ListOrdered } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,9 +25,11 @@ type Props = {
   setOpen: (panel: ReaderPanel | null) => void
   /** Nút nghe truyện; bỏ trống khi trình duyệt không hỗ trợ đọc to */
   listen?: { active: boolean; onClick: () => void }
+  /** Nút tự động cuộn */
+  autoScroll: { active: boolean; onClick: () => void }
 }
 
-export function ReaderToolbar({ chapter, visible, open, setOpen, listen }: Props) {
+export function ReaderToolbar({ chapter, visible, open, setOpen, listen, autoScroll }: Props) {
   const { story } = chapter
   const wide = useMediaQuery('(min-width: 768px)')
 
@@ -59,6 +61,16 @@ export function ReaderToolbar({ chapter, visible, open, setOpen, listen }: Props
             </p>
           </div>
 
+          <Button
+            variant="ghost"
+            className={cn('h-10 gap-2 rounded-full px-3', autoScroll.active && 'text-primary')}
+            aria-label="Tự động cuộn"
+            aria-pressed={autoScroll.active}
+            onClick={autoScroll.onClick}
+          >
+            <ChevronsDown />
+            <span className="hidden md:inline">Tự cuộn</span>
+          </Button>
           {listen && (
             <Button
               variant="ghost"

@@ -27,3 +27,6 @@ export const widths: { value: ReaderWidth; label: string; maxWidth: string }[] =
   { value: 'medium', label: 'Vừa', maxWidth: '40rem' },
   { value: 'wide', label: 'Rộng', maxWidth: '48rem' },
 ]
+
+/** Tốc độ dạng "1,25×" (thanh nghe truyện và thanh tự cuộn) */
+export const rateLabel = (rate: number) => `${rate.toLocaleString('vi-VN')}×`

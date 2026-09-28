@@ -51,6 +51,7 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
   - **Mốc DOM:** mỗi chương là `<article data-chapter>`, mỗi đoạn là `<p data-paragraph>`. Tiến độ, lưu vị trí và giọng đọc đều dựa vào hai mốc này (`features/reader/progress.ts`).
   - **Hai chế độ:** từng chương, hoặc cuộn liên tục (`ChapterStream`: nối chương sau và đổi URL theo chương đang đọc, dùng `replace` + `state: { stream: true }`). Điều hướng không có `stream` thì chuỗi chương bắt đầu lại.
   - **Nghe truyện:** `features/reader/speech` (Web Speech API, Zustand key `reader-speech`). Giọng đọc tự chuyển chương thì điều hướng kèm `state: { speech: true }`. Người đọc tự chuyển chương khác thì dừng đọc.
+  - **Tự động cuộn:** `features/reader/autoscroll` (Zustand key `reader-autoscroll`; 1× = 220 chữ/phút, đo theo bố cục thật). Không chạy cùng nghe truyện. Trong lúc tự cuộn, thanh công cụ chỉ ẩn/hiện khi chạm chữ (`useAutoHideToolbar(frozen)`). Hết chương thì dừng, nút "Chương sau" trên thanh nổi sang chương và cuộn tiếp; tự chuyển chương cách khác thì tạm dừng. Cuộn liên tục thì chờ ở đáy trang tới khi chương sau nối vào (`[data-stream-end]` đánh dấu hết chuỗi). Hai thanh nổi dùng chung `FloatingBar`.
   - **Lịch sử và lượt đọc:** ghi bằng `useReadingTracker` + `useRecordChapterView` (không tính lượt của chính tác giả).
   - **Cuối chương:** có "Báo lỗi chương" (`features/feedback`) và bình luận của chương (`CommentsSection` với prop `chapter`).
 - **Cuộn trang**: layout dùng `AppScrollRestoration` thay vì `ScrollRestoration` trực tiếp (lý do ghi trong file).
@@ -75,7 +76,7 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
   - Test auth gọi `localStorage.clear()` trong `beforeEach`.
   - Mock có độ trễ nên `findBy*` cần `{ timeout: 3000 }`; `testTimeout` chung là 10 giây.
   - Điều hướng tới trang lazy-load và dữ liệu ghi sau cập nhật lạc quan cần `expect.poll(...)` thay vì kiểm tra ngay sau `user.click`.
-  - `src/test/setup.ts` đã stub các API jsdom thiếu cho Radix. jsdom không có `speechSynthesis`/`IntersectionObserver`: test nghe truyện dùng `vi.stubGlobal`, còn cuộn liên tục thì bấm nút "Tải chương N".
+  - `src/test/setup.ts` đã stub các API jsdom thiếu cho Radix. jsdom không có `speechSynthesis`/`IntersectionObserver`: test nghe truyện dùng `vi.stubGlobal`, còn cuộn liên tục thì bấm nút "Tải chương N". Test tự động cuộn giả `requestAnimationFrame`/`scrollTo` và `getBoundingClientRect` (xem `features/reader/autoscroll.test.tsx`).
 - Kiểm tra UI ở 375px, 768px, 1440px và cả hai theme; ảnh chụp Playwright để trong `.playwright-mcp/` (đã gitignore).
 - Tailwind v4 không có `tailwind.config`; theme/token (màu, font Geist, dark mode qua class `.dark`) nằm trong `src/index.css`. Dùng các class token của shadcn (`bg-background`, `text-muted-foreground`...) thay vì màu cứng.
 - `cn()` ở `src/lib/utils.ts` re-export từ package `cn` (của shadcn, thay cho clsx + tailwind-merge).

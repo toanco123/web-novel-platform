@@ -189,7 +189,8 @@ function StreamChapter({
           </div>
         </div>
       ) : (
-        <div className="mt-16 space-y-10">
+        // data-stream-end: chuỗi chương đã hết (tự động cuộn dừng hẳn thay vì chờ chương sau)
+        <div className="mt-16 space-y-10" data-stream-end>
           <ChapterEnd chapter={chapter} />
           <ChapterNav
             chapter={chapter}

@@ -6,10 +6,8 @@ import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import type { ChapterContent } from '@/types/chapter'
 import { fonts } from '../readerOptions'
-import { countWords, toParagraphs } from '../text'
+import { countWords, toParagraphs, WORDS_PER_MINUTE } from '../text'
 import { useReaderSettings } from '../useReaderSettings'
-
-const WORDS_PER_MINUTE = 220
 
 type Props = {
   chapter: ChapterContent
