@@ -773,6 +773,50 @@ export type Database = {
       }
     }
     Functions: {
+      admin_overview: { Args: { p_days?: number }; Returns: Json }
+      admin_stories: {
+        Args: {
+          p_owner_id?: string
+          p_query?: string
+          p_sort?: string
+          p_visibility?: Database["public"]["Enums"]["publication_status"]
+        }
+        Returns: {
+          chapter_count: number
+          comment_count: number
+          created_at: string
+          follower_count: number
+          id: string
+          open_reports: number
+          owner_id: string
+          owner_name: string
+          published_count: number
+          rating_avg: number
+          rating_count: number
+          slug: string
+          status: Database["public"]["Enums"]["story_status"]
+          title: string
+          updated_at: string
+          view_count: number
+          visibility: Database["public"]["Enums"]["publication_status"]
+        }[]
+      }
+      admin_users: {
+        Args: { p_query?: string }
+        Returns: {
+          avatar_url: string
+          comment_count: number
+          created_at: string
+          display_name: string
+          email: string
+          follow_count: number
+          id: string
+          is_admin: boolean
+          last_sign_in_at: string
+          provider: string
+          story_count: number
+        }[]
+      }
       create_story: {
         Args: {
           p_cover_path?: string

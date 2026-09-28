@@ -51,6 +51,17 @@ export const routes: RouteObject[] = [
     ],
   },
   {
+    // Trang quản trị dùng Ant Design, nằm ở chunk riêng nên không làm nặng các trang đọc
+    path: 'quan-tri',
+    lazy: page(() => import('@/pages/admin/AdminShell')),
+    HydrateFallback: PageLoader,
+    children: [
+      { index: true, lazy: page(() => import('@/pages/admin/AdminDashboardPage')) },
+      { path: 'nguoi-dung', lazy: page(() => import('@/pages/admin/AdminUsersPage')) },
+      { path: 'truyen', lazy: page(() => import('@/pages/admin/AdminStoriesPage')) },
+    ],
+  },
+  {
     Component: ReaderLayout,
     HydrateFallback: PageLoader,
     children: [

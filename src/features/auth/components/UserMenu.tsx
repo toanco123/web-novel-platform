@@ -1,4 +1,4 @@
-import { BookMarked, LogOut, PenLine, UserRound } from 'lucide-react'
+import { BookMarked, LayoutDashboard, LogOut, PenLine, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import {
   DropdownMenu,
@@ -73,6 +73,14 @@ export function UserMenu({ user }: { user: User }) {
             Tài khoản
           </Link>
         </DropdownMenuItem>
+        {user.isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link to={paths.admin}>
+              <LayoutDashboard />
+              Quản trị
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={signOut.isPending}

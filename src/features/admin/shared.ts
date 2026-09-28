@@ -1,0 +1,116 @@
+// Phần dùng chung của hai backend trang quản trị (api.mock.ts, api.remote.ts)
+import type { StoryStatus, StoryVisibility } from '@/types/story'
+
+export const ADMIN_PAGE_SIZE = 20
+
+/** Kỳ thống kê của trang Tổng quan (số ngày, tính cả hôm nay) */
+export const ADMIN_PERIODS = [7, 30, 90] as const
+export type AdminPeriod = (typeof ADMIN_PERIODS)[number]
+
+export type AdminOverview = {
+  totals: {
+    users: number
+    /** Tài khoản tạo trong kỳ */
+    newUsers: number
+    publishedStories: number
+    draftStories: number
+    publishedChapters: number
+    views: number
+    viewsInPeriod: number
+    comments: number
+    openReports: number
+  }
+  /** Mỗi ngày trong kỳ (cũ trước), day dạng 2026-09-25 */
+  days: { day: string; signups: number; views: number; stories: number; chapters: number }[]
+  /** Số truyện công khai theo thể loại, nhiều trước (tối đa 10) */
+  genres: { name: string; stories: number }[]
+  /** Truyện nhiều lượt đọc nhất (tối đa 10, chỉ truyện đã có lượt đọc) */
+  topStories: {
+    id: string
+    slug: string
+    title: string
+    visibility: StoryVisibility
+    authorName: string
+    views: number
+    followers: number
+    ratingAvg: number
+    ratingCount: number
+  }[]
+}
+
+export type AdminUser = {
+  id: string
+  email: string
+  displayName: string
+  avatarUrl: string | null
+  /** email, google, facebook... */
+  provider: string
+  isAdmin: boolean
+  /** null: dữ liệu giả cũ không có mốc */
+  createdAt: string | null
+  lastSignInAt: string | null
+  storyCount: number
+  commentCount: number
+  followCount: number
+}
+
+export type AdminStory = {
+  id: string
+  slug: string
+  title: string
+  /** null: truyện có sẵn của hệ thống (chỉ ở bản giả) */
+  ownerId: string | null
+  ownerName: string
+  visibility: StoryVisibility
+  status: StoryStatus
+  /** Số chương đã xuất bản */
+  publishedCount: number
+  /** Tổng số chương, kể cả nháp */
+  chapterCount: number
+  views: number
+  followers: number
+  ratingAvg: number
+  ratingCount: number
+  comments: number
+  openReports: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type AdminStorySort = 'updated' | 'views' | 'created'
+
+export type AdminUserQuery = { q?: string; page: number }
+
+export type AdminStoryQuery = {
+  q?: string
+  visibility?: StoryVisibility
+  ownerId?: string
+  sort?: AdminStorySort
+  page: number
+}
+
+/** "2026-09-25" → Date theo giờ máy (không lệch ngày do múi giờ) */
+const parseDay = (day: string) => {
+  const [y, m, d] = day.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+const shortDay = new Intl.DateTimeFormat('vi-VN', { day: 'numeric', month: 'numeric' })
+const longDay = new Intl.DateTimeFormat('vi-VN', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'numeric',
+  year: 'numeric',
+})
+
+/** "2026-09-25" → "25/9" (nhãn trục biểu đồ) */
+export const formatShortDay = (day: string) => shortDay.format(parseDay(day))
+/** "2026-09-25" → "Thứ Sáu, 25/9/2026" */
+export const formatLongDay = (day: string) => longDay.format(parseDay(day))
+
+export class AdminError extends Error {
+  code = 'forbidden' as const
+  constructor() {
+    super('Chỉ quản trị viên mới xem được trang này.')
+    this.name = 'AdminError'
+  }
+}

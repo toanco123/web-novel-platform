@@ -409,6 +409,42 @@ select pg_temp.expect(
   (select count(*) = 0 from public.stories where slug = 'hoa-no-nam-ay'),
   'truyện của tài khoản bị xóa cũng bị xóa');
 
+-- ── Trang quản trị: chỉ quản trị viên (app_metadata.role = admin) gọi được ──
+
+set local role anon;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+select pg_temp.expect_error($$select public.admin_overview(30)$$, '42501');
+select pg_temp.expect_error($$select * from public.admin_users()$$, '42501');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error($$select public.admin_overview(30)$$, 'forbidden');
+select pg_temp.expect_error($$select * from public.admin_users()$$, 'forbidden');
+select pg_temp.expect_error($$select * from public.admin_stories()$$, 'forbidden');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_users('tac gia a')
+    where email = 'a@kiem-tra.local' and display_name = 'Tác giả A'),
+  'quản trị viên thấy email người dùng, tìm được theo tên không dấu');
+select pg_temp.expect(
+  exists (select 1 from public.admin_stories(p_visibility => 'draft')
+    where slug = 'truong-an-khong-tuyet-2'),
+  'quản trị viên thấy truyện nháp của người khác');
+select pg_temp.expect(
+  (select (o -> 'totals' ->> 'draftStories')::integer >= 1
+      and jsonb_array_length(o -> 'days') = 7
+    from public.admin_overview(7) as o),
+  'admin_overview có tổng số và đủ 7 ngày');
+
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;
