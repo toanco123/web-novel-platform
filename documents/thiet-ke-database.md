@@ -70,6 +70,8 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `too_many_genres` | Chọn quá 5 thể loại | `StudioError('too_many_genres')` ("Chọn tối đa 5 thể loại."); form cũng chặn trước |
 | `not_found` | RPC không thấy truyện, hoặc truyện không phải của mình | `StudioError('not_found')` |
 | `unauthenticated` | Gọi RPC cần đăng nhập khi chưa đăng nhập | `AuthError('unauthenticated')` |
+| `rate_limited` | Vượt giới hạn tần suất (bảng dưới) | `AuthError('rate_limited')` qua `limitError()` (`features/auth/shared.ts`) |
+| `duplicate_comment` | Gửi lại đúng bình luận vừa gửi (cùng truyện/chương, trong 10 phút) | `AuthError('rate_limited')` "Bạn vừa gửi bình luận này rồi." |
 | `forbidden` | Gọi RPC quản trị (`admin_*`) mà không phải quản trị viên | `AdminError` |
 | `23505` (unique) | Trùng số chương / trùng thể loại | `chapter_exists` / `GenreExistsError` |
 | `42501` | Không có quyền (RLS hoặc grant) | Lỗi chung |
@@ -81,6 +83,18 @@ Lỗi nghiệp vụ nằm trong `error.message` (mã `P0001`). Các luật tự 
 - **Theo dõi:** khi theo dõi, `seen_chapter` = max(chương mới nhất, chương đã đọc tới). Ghi `reading_history` tới chương xa hơn thì mốc này được nâng lên.
 - **Số liệu:** theo dõi/bỏ theo dõi và chấm/đổi/xóa điểm tự cập nhật `story_stats`.
 - **Báo lỗi:** đổi trạng thái sang `resolved` thì đặt `resolved_at`.
+
+**Giới hạn tần suất** (trigger `before insert`, migration `rate_limits_and_account_deletion`; bản giả làm giống ở `src/mocks/rateLimit.ts`):
+
+| Việc | Giới hạn |
+|---|---|
+| Lượt đọc | 1 lượt / người / chương / ngày. Người đăng nhập tính theo id, khách theo hash IP (`private.chapter_view_log`, tự dọn sau 2 ngày) |
+| Bình luận | 3 / phút và 30 / giờ mỗi người; không gửi lại nội dung vừa gửi trong 10 phút |
+| Tin nhắn liên hệ | 3 / giờ mỗi email, 5 / giờ mỗi IP |
+| Báo lỗi chương | 10 / giờ mỗi người |
+| Tạo thể loại | 10 / ngày mỗi người |
+
+IP chỉ lưu dạng hash SHA-256 kèm bí mật ngẫu nhiên (`private.secrets`), không lưu IP gốc.
 
 ## 5. RLS và quyền
 
@@ -123,7 +137,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `create_story(title, description, status, genres[], cover_path?, first_chapter?, publish?)` | đã đăng nhập | Tạo truyện, thể loại và chương đầu trong một transaction; trả về dòng `studio_stories`. `first_chapter` = `{"number"?, "title", "content"}`. Slug trùng thì thêm `-2`, `-3`… |
 | `update_story(id, title, description, status, genres[], cover_path?)` | đã đăng nhập | Sửa truyện và thay thể loại cùng lúc |
 | `studio_story_stats(story_id)` | chủ truyện | jsonb giống kiểu `StoryStats` |
-| `record_chapter_view(slug, number)` | mọi người | +1 lượt đọc (bỏ qua chủ truyện và chương chưa xuất bản) |
+| `record_chapter_view(slug, number)` | mọi người | +1 lượt đọc (bỏ qua chủ truyện, chương chưa xuất bản và lượt lặp lại trong ngày) |
+| `delete_account()` | đã đăng nhập | Xóa tài khoản của chính người gọi; khóa ngoại cascade xóa hồ sơ, truyện, chương, bình luận, tủ truyện... |
 | `save_reading_progress(slug, chapter, chapter_title, progress?)` | đã đăng nhập | Ghi chỗ đang đọc. Không truyền `progress` thì giữ vị trí cũ nếu vẫn chương đó |
 | `merge_guest_history(entries)` | đã đăng nhập | Gộp lịch sử lúc còn là khách. `entries` giống mảng `ReadingProgress` |
 | `get_library()`, `library_update_count()` | đã đăng nhập | Truyện đang theo dõi kèm số chương mới, và số truyện có chương mới |
@@ -167,6 +182,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | auth | `getSession`, `signIn…`, `signUp`, `sendPasswordReset`, `updatePassword`, `signOut` | `supabase.auth.*` (ánh xạ ở mục 6 `plan-dang-nhap-dang-ky.md`). `User` = user của session (email, `app_metadata.provider`) + `profiles` |
 | auth | `getProfiles(ids)` | `profiles.select('id, display_name, avatar_url').in('id', ids)` |
 | auth | `updateProfile` | Upload lên `avatars`, rồi `update profiles` |
+| auth | `deleteAccount(password)` | Tài khoản email: kiểm tra mật khẩu bằng cách đăng nhập lại. Xóa thư mục `{uid}/` trong `avatars` và `covers` (Storage không tự xóa theo), rồi `rpc('delete_account')` và `auth.signOut({ scope: 'local' })` |
 | auth | `changePassword` | `auth.updateUser({ password })`. Kiểm tra mật khẩu cũ bằng cách đăng nhập lại, hoặc bật "Secure password change" |
 | stories | `getFeaturedStories`, `getEditorPicks` | `curated_stories` (theo `list`, `position`), rồi `story_cards.in('id', …)`. Chưa có truyện chọn tay nào công khai thì lấy tự động: nổi bật là 4 truyện công khai nhiều lượt đọc nhất (rồi cập nhật gần nhất); biên tập chọn là 8 truyện theo `rating_avg`, `rating_count`, `created_at` giảm dần |
 | stories | `getLatestUpdated` / `getNewReleases` | `story_cards` công khai, `order('updated_at' / 'created_at', desc)` |
@@ -221,7 +237,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
   - Redirect URL (`/auth/callback`, `/reset-password`; localhost và domain Vercel).
   - Bật Google/Facebook.
   - Mẫu email tiếng Việt.
-- **Chống spam:** giới hạn tần suất lượt đọc (hiện chỉ chống trùng ở client), bình luận và liên hệ.
+- ~~**Chống spam**~~ (xong 28/09/2026: giới hạn ở mục 4). Còn có thể thêm captcha (Cloudflare Turnstile) cho form liên hệ và đăng ký nếu vẫn bị spam.
 - **Vai trò quản trị:** đã có trang `/admin` chỉ để xem (tổng quan, người dùng, truyện; plan: `plan-trang-quan-tri.md`). Xử lý báo lỗi, quản lý thể loại và `curated_stories` vẫn làm qua Dashboard.
   - Cấp quyền (chạy trong SQL editor hoặc `supabase db query --linked`), rồi người đó đăng xuất và đăng nhập lại để JWT có vai trò mới:
     `update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role": "admin"}' where email = '...';`

@@ -76,3 +76,23 @@ export function passwordStrength(password: string): 0 | 1 | 2 | 3 {
   if (password.length >= 12 || /[^\p{L}\d]/u.test(password)) score++
   return Math.max(1, score) as 1 | 2 | 3
 }
+
+/**
+ * Xác nhận xóa tài khoản: tài khoản email nhập mật khẩu; tài khoản Google/Facebook (không có mật
+ * khẩu) gõ lại email của mình
+ */
+export const deleteAccountSchema = (user: { email: string; provider: string }) =>
+  user.provider === 'email'
+    ? z.object({ password: z.string().min(1, 'Nhập mật khẩu để xác nhận'), confirm: z.string() })
+    : z.object({
+        password: z.string(),
+        confirm: z
+          .string()
+          .trim()
+          .refine(
+            (v) => v.toLowerCase() === user.email.toLowerCase(),
+            'Email nhập vào chưa khớp với tài khoản',
+          ),
+      })
+
+export type DeleteAccountValues = { password: string; confirm: string }

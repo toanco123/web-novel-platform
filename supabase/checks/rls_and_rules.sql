@@ -445,6 +445,85 @@ select pg_temp.expect(
 
 reset role;
 
+-- ── Chống spam: lượt đọc, bình luận, liên hệ ────────────────────────────
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Truyện Chống Spam', 'Truyện để kiểm tra giới hạn tần suất.', 'ongoing', array['co-dai'], null,
+  '{"title": "Một", "content": "Nội dung chương một."}', true);
+
+-- C đọc cùng một chương nhiều lần trong ngày chỉ tính 1 lượt
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated"}', true);
+set local role authenticated;
+select public.record_chapter_view('truyen-chong-spam', 1);
+select public.record_chapter_view('truyen-chong-spam', 1);
+select pg_temp.expect(
+  (select view_count = 1 from public.story_cards where slug = 'truyen-chong-spam'),
+  'một người đọc lại cùng chương trong ngày chỉ tính 1 lượt');
+
+-- Bình luận: gửi lại y hệt bị chặn; quá 3 bình luận / phút bị chặn
+insert into public.comments (story_id, content)
+values (pg_temp.story_id('truyen-chong-spam'), 'Hay quá');
+select pg_temp.expect_error(
+  $$insert into public.comments (story_id, content)
+    values (pg_temp.story_id('truyen-chong-spam'), 'Hay quá')$$,
+  'duplicate_comment');
+insert into public.comments (story_id, content)
+values (pg_temp.story_id('truyen-chong-spam'), 'Chờ chương mới'),
+  (pg_temp.story_id('truyen-chong-spam'), 'Cảm ơn tác giả');
+select pg_temp.expect_error(
+  $$insert into public.comments (story_id, content)
+    values (pg_temp.story_id('truyen-chong-spam'), 'Bình luận thứ tư')$$,
+  'rate_limited');
+
+-- Khách: mỗi IP 1 lượt / chương / ngày, IP khác thì tính thêm
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+select set_config('request.headers', '{"x-forwarded-for": "203.0.113.7, 10.0.0.1"}', true);
+set local role anon;
+select public.record_chapter_view('truyen-chong-spam', 1);
+select public.record_chapter_view('truyen-chong-spam', 1);
+select set_config('request.headers', '{"x-forwarded-for": "198.51.100.9"}', true);
+select public.record_chapter_view('truyen-chong-spam', 1);
+select pg_temp.expect(
+  (select view_count = 3 from public.story_cards where slug = 'truyen-chong-spam'),
+  'khách tính theo IP: cùng IP 1 lượt, IP khác thêm 1 lượt');
+
+-- Liên hệ: tối đa 3 tin / giờ cho một email
+insert into public.contact_messages (name, email, topic, message) values
+  ('Khách', 'spam@example.com', 'general', 'Tin nhắn thứ nhất.'),
+  ('Khách', 'spam@example.com', 'general', 'Tin nhắn thứ hai.'),
+  ('Khách', 'SPAM@example.com', 'general', 'Tin nhắn thứ ba.');
+select pg_temp.expect_error(
+  $$insert into public.contact_messages (name, email, topic, message)
+    values ('Khách', 'spam@example.com', 'general', 'Tin nhắn thứ tư.')$$,
+  'rate_limited');
+select pg_temp.expect_error($$select public.delete_account()$$, '42501');
+
+-- ── Tự xóa tài khoản ────────────────────────────────────────────────────
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated"}', true);
+set local role authenticated;
+select public.delete_account();
+
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from auth.users where id = '00000000-0000-4000-8000-00000000000c')
+    and not exists (select 1 from public.profiles
+      where id = '00000000-0000-4000-8000-00000000000c')
+    and not exists (select 1 from public.comments
+      where user_id = '00000000-0000-4000-8000-00000000000c'),
+  'delete_account xóa tài khoản, hồ sơ và bình luận của chính người gọi');
+select pg_temp.expect(
+  exists (select 1 from auth.users where id = '00000000-0000-4000-8000-00000000000a'),
+  'delete_account không đụng tới tài khoản khác');
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

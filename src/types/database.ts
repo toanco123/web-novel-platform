@@ -220,6 +220,7 @@ export type Database = {
           created_at: string
           email: string
           id: number
+          ip_hash: string | null
           message: string
           name: string
           topic: Database["public"]["Enums"]["contact_topic"]
@@ -229,6 +230,7 @@ export type Database = {
           created_at?: string
           email: string
           id?: never
+          ip_hash?: string | null
           message: string
           name: string
           topic: Database["public"]["Enums"]["contact_topic"]
@@ -238,6 +240,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: never
+          ip_hash?: string | null
           message?: string
           name?: string
           topic?: Database["public"]["Enums"]["contact_topic"]
@@ -855,6 +858,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      delete_account: { Args: never; Returns: undefined }
       get_library: {
         Args: never
         Returns: {

@@ -1,8 +1,9 @@
 // Góp ý giả lưu trong localStorage (báo lỗi ở src/mocks/activity.ts): dùng cho test tự động và khi
 // chạy không có Supabase (xem api.ts). Bản thật: api.remote.ts.
-import { requireUser } from '@/features/auth/api'
+import { rateLimited, requireUser } from '@/features/auth/api'
 import { mockDelay as delay, readMock, writeMock } from '@/lib/mockStorage'
 import { loadReports, saveReports } from '@/mocks/activity'
+import { countSince, HOUR } from '@/mocks/rateLimit'
 import type { ChapterReport } from '@/types/report'
 import type { ContactValues } from './schemas'
 import type { ReportChapterInput } from './shared'
@@ -12,6 +13,15 @@ const CONTACT_KEY = 'mock-contact-messages'
 export async function sendContactMessage(input: ContactValues) {
   await delay(600)
   const messages = readMock<(ContactValues & { sentAt: string })[]>(CONTACT_KEY, [])
+  const email = input.email.trim().toLowerCase()
+  const sameEmail = messages.filter((m) => m.email.trim().toLowerCase() === email)
+  if (
+    countSince(
+      sameEmail.map((m) => m.sentAt),
+      HOUR,
+    ) >= 3
+  )
+    throw rateLimited()
   writeMock(CONTACT_KEY, [...messages, { ...input, sentAt: new Date().toISOString() }])
 }
 
@@ -23,6 +33,8 @@ export async function reportChapter(input: ReportChapterInput): Promise<ChapterR
   await delay(400)
   const user = await requireUser()
   const reports = loadReports()
+  const mine = reports.filter((r) => r.reporter.id === user.id).map((r) => r.createdAt)
+  if (countSince(mine, HOUR) >= 10) throw rateLimited()
   const existing = reports.find(
     (r) =>
       r.status === 'open' &&

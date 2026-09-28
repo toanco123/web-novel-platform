@@ -1,7 +1,7 @@
 // Góp ý trên Supabase: tin nhắn liên hệ (bảng contact_messages, chỉ ghi, xem trên Dashboard) và báo
 // lỗi chương (RPC report_chapter). Báo lỗi hiện ở khu Sáng tác của chủ truyện.
 import type { PostgrestError } from '@supabase/supabase-js'
-import { AuthError, requireUser, unauthenticated } from '@/features/auth/api'
+import { AuthError, limitError, requireUser, unauthenticated } from '@/features/auth/api'
 import { businessCode, unwrap } from '@/lib/dbError'
 import { db } from '@/lib/supabase'
 import type { ChapterReport } from '@/types/report'
@@ -12,7 +12,10 @@ import type { ReportChapterInput } from './shared'
 export async function sendContactMessage(input: ContactValues) {
   const { name, email, topic, message } = input
   // Chỉ gửi các cột được cấp quyền ghi. Không kèm .select(): không ai có quyền đọc lại bảng này
-  unwrap(await db().from('contact_messages').insert({ name, email, topic, message }))
+  // Quá 3 tin / giờ cho một email (hoặc 5 / giờ cho một IP) thì DB báo rate_limited
+  unwrap(await db().from('contact_messages').insert({ name, email, topic, message }), (error) =>
+    limitError(businessCode(error)),
+  )
 }
 
 // Không thấy truyện, hoặc RLS chặn ghi vì chương không có/chưa xuất bản/truyện chưa công khai. Dùng
@@ -28,6 +31,8 @@ const reportClosed = () =>
 function reportError(error: PostgrestError) {
   const code = businessCode(error)
   if (code === 'unauthenticated') return unauthenticated()
+  const limit = limitError(code)
+  if (limit) return limit
   return code === 'not_found' || error.code === '42501' ? reportClosed() : null
 }
 

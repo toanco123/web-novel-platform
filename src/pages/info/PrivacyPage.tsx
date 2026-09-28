@@ -56,8 +56,9 @@ export default function PrivacyPage() {
           <Link to={paths.readingHistory}>Tủ truyện</Link>.
         </li>
         <li>
-          Yêu cầu xóa tài khoản và dữ liệu liên quan qua trang{' '}
-          <Link to={paths.contact}>Liên hệ</Link>.
+          Tự xóa tài khoản cùng toàn bộ dữ liệu liên quan (truyện đã đăng, bình luận, tủ truyện) ở
+          cuối trang <Link to={paths.account}>Tài khoản</Link>. Việc xóa có hiệu lực ngay và không
+          khôi phục được.
         </li>
       </ul>
 

@@ -2,9 +2,9 @@
 // sơ hiện tại (profiles). Điểm của truyện đọc từ story_cards: trigger của ratings cập nhật
 // story_stats ngay khi chấm. RLS chỉ cho viết vào truyện công khai và chương đã xuất bản.
 import type { PostgrestError } from '@supabase/supabase-js'
-import { AuthError, requireUser } from '@/features/auth/api'
+import { AuthError, limitError, requireUser } from '@/features/auth/api'
 import { storyIdBySlug } from '@/features/stories/cards.remote'
-import { unwrap } from '@/lib/dbError'
+import { businessCode, unwrap } from '@/lib/dbError'
 import { db } from '@/lib/supabase'
 import type { Comment, RatingSummary, Score } from '@/types/comment'
 import { COMMENTS_PER_PAGE, type CommentPage } from './shared'
@@ -95,7 +95,7 @@ export async function addComment(
       .insert({ story_id: storyId, chapter_number: chapter, content: content.trim() })
       .select(COMMENT_COLUMNS)
       .single(),
-    whenBlocked(commentsClosed),
+    (error) => limitError(businessCode(error)) ?? whenBlocked(commentsClosed)(error),
   )
   return toComment(row, slug)
 }

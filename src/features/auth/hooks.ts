@@ -79,6 +79,18 @@ export function useUpdateProfile() {
 
 export const useChangePassword = () => useMutation({ mutationFn: api.changePassword })
 
+/** Xóa tài khoản: xong thì bỏ mọi dữ liệu đã tải của người này và về trạng thái khách */
+export function useDeleteAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: api.deleteAccount,
+    onSuccess: () => {
+      queryClient.removeQueries()
+      queryClient.setQueryData(authKeys.session, null)
+    },
+  })
+}
+
 export const useSendPasswordReset = () => useMutation({ mutationFn: api.sendPasswordReset })
 export const useUpdatePassword = () => useMutation({ mutationFn: api.updatePassword })
 

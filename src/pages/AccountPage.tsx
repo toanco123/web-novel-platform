@@ -3,8 +3,10 @@ import { Container } from '@/components/common/Container'
 import { RequireAuth } from '@/components/common/RequireAuth'
 import { SITE_NAME } from '@/config/site'
 import { ChangePasswordForm } from '@/features/auth/components/ChangePasswordForm'
+import { DeleteAccountForm } from '@/features/auth/components/DeleteAccountForm'
 import { ProfileForm } from '@/features/auth/components/ProfileForm'
 import { useSession } from '@/features/auth/hooks'
+import { cn } from '@/lib/utils'
 
 export default function AccountPage() {
   return (
@@ -33,14 +35,31 @@ function Account() {
         <Section id="password-title" title="Mật khẩu">
           <ChangePasswordForm user={user} />
         </Section>
+        <Section id="delete-title" title="Xóa tài khoản" danger>
+          <DeleteAccountForm user={user} />
+        </Section>
       </div>
     </Container>
   )
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+function Section({
+  id,
+  title,
+  danger = false,
+  children,
+}: {
+  id: string
+  title: string
+  /** Thao tác không hoàn tác được: viền đỏ */
+  danger?: boolean
+  children: ReactNode
+}) {
   return (
-    <section aria-labelledby={id} className="rounded-xl border bg-card/40 p-5 sm:p-6">
+    <section
+      aria-labelledby={id}
+      className={cn('rounded-xl border bg-card/40 p-5 sm:p-6', danger && 'border-destructive/40')}
+    >
       <h2 id={id} className="mb-5 font-heading text-2xl font-semibold">
         {title}
       </h2>

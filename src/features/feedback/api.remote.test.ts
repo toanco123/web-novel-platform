@@ -99,3 +99,11 @@ test('báo lỗi: lỗi khác giữ nguyên', async () => {
   fake.rpc.mockResolvedValue({ data: null, error })
   await expect(reportChapter(report)).rejects.toBe(error)
 })
+
+test('liên hệ: DB báo rate_limited thì đổi sang AuthError có lời báo', async () => {
+  fake.insert.mockResolvedValue({ data: null, error: { code: 'P0001', message: 'rate_limited' } })
+  await expect(sendContactMessage(contact)).rejects.toMatchObject({
+    code: 'rate_limited',
+    message: 'Bạn thao tác hơi nhanh. Đợi một lát rồi thử lại.',
+  })
+})

@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { FormAlert } from '@/features/auth/components/FormAlert'
 import { authInputClass, FormField } from '@/features/auth/components/FormField'
 import { SubmitButton } from '@/features/auth/components/SubmitButton'
+import { AuthError } from '@/features/auth/api'
 import { useSession } from '@/features/auth/hooks'
 import { cn } from '@/lib/utils'
 import { useSendContactMessage } from '../hooks'
@@ -64,7 +65,14 @@ export function ContactForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
-      {send.isError && <FormAlert>Chưa gửi được. Kiểm tra mạng rồi thử lại nhé.</FormAlert>}
+      {send.isError && (
+        <FormAlert>
+          {/* Gửi quá nhiều tin trong 1 giờ thì báo đợi; lỗi khác thường là mất mạng */}
+          {send.error instanceof AuthError
+            ? send.error.message
+            : 'Chưa gửi được. Kiểm tra mạng rồi thử lại nhé.'}
+        </FormAlert>
+      )}
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField id="contact-name" label="Tên của bạn" error={errors.name?.message}>
           {(c) => (
