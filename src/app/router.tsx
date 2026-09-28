@@ -66,6 +66,7 @@ export const routes: RouteObject[] = [
       { path: 'dang-ky', lazy: page(() => import('@/pages/RegisterPage')) },
       { path: 'quen-mat-khau', lazy: page(() => import('@/pages/ForgotPasswordPage')) },
       { path: 'dat-lai-mat-khau', lazy: page(() => import('@/pages/ResetPasswordPage')) },
+      { path: 'auth/callback', lazy: page(() => import('@/pages/AuthCallbackPage')) },
     ],
   },
 ]

@@ -6,7 +6,6 @@ import { paths } from '@/lib/routes'
 import { authErrorMessage, useSignIn } from '../hooks'
 import { loginSchema, type LoginValues } from '../schemas'
 import { useAuthRedirect } from '../useAuthRedirect'
-import { AuthDivider } from './AuthDivider'
 import { FormAlert } from './FormAlert'
 import { authInputClass, FormField } from './FormField'
 import { PasswordInput } from './PasswordInput'
@@ -31,7 +30,6 @@ export function LoginForm() {
   return (
     <div className="space-y-6">
       <SocialButtons verb="Đăng nhập" onSuccess={goNext} disabled={signIn.isPending} />
-      <AuthDivider />
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         {signIn.isError && <FormAlert>{authErrorMessage(signIn.error)}</FormAlert>}
         <FormField id="email" label="Email" error={errors.email?.message}>

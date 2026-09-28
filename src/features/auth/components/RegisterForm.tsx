@@ -9,7 +9,6 @@ import { paths } from '@/lib/routes'
 import { authErrorMessage, useSignUp } from '../hooks'
 import { registerSchema, type RegisterValues } from '../schemas'
 import { useAuthRedirect } from '../useAuthRedirect'
-import { AuthDivider } from './AuthDivider'
 import { FormAlert } from './FormAlert'
 import { authInputClass, FormField } from './FormField'
 import { PasswordInput } from './PasswordInput'
@@ -56,7 +55,6 @@ export function RegisterForm() {
   return (
     <div className="space-y-6">
       <SocialButtons verb="Đăng ký" onSuccess={goNext} disabled={signUp.isPending} />
-      <AuthDivider />
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         {signUp.isError && <FormAlert>{authErrorMessage(signUp.error)}</FormAlert>}
         <FormField id="displayName" label="Tên hiển thị" error={errors.displayName?.message}>

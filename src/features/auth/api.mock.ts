@@ -1,23 +1,13 @@
-// Nơi DUY NHẤT xử lý đăng nhập. Hiện là auth giả lưu trong localStorage (chỉ dùng khi dev);
-// khi nối Supabase chỉ thay ruột các hàm này (xem mục 6 trong documents/plan-dang-nhap-dang-ky.md).
+// Auth giả lưu trong localStorage: dùng cho test tự động và khi chạy không có Supabase
+// (xem api.ts). Bản thật: api.remote.ts.
 import {
   mockDelay as delay,
   readMock as read,
   writeMock as write,
   writeMockStrict,
 } from '@/lib/mockStorage'
-import type { AuthProvider, User } from '@/types/user'
-
-type AuthErrorCode = 'invalid_credentials' | 'email_taken' | 'unauthenticated'
-
-export class AuthError extends Error {
-  code: AuthErrorCode
-  constructor(code: AuthErrorCode, message: string) {
-    super(message)
-    this.name = 'AuthError'
-    this.code = code
-  }
-}
+import type { User } from '@/types/user'
+import { AuthError, type SignUpResult, type SocialProvider, unauthenticated } from './shared'
 
 type MockUser = User & { password: string | null }
 
@@ -54,8 +44,23 @@ export async function getSession(): Promise<User | null> {
 /** Dùng trong các api.ts khác cho thao tác cần đăng nhập (tủ truyện, bình luận...) */
 export async function requireUser(): Promise<User> {
   const user = await getSession()
-  if (!user) throw new AuthError('unauthenticated', 'Bạn cần đăng nhập để làm việc này.')
+  if (!user) throw unauthenticated()
   return user
+}
+
+/** Id người đang đăng nhập; null nếu là khách */
+export async function getUserId(): Promise<string | null> {
+  return (await getSession())?.id ?? null
+}
+
+/** Bản giả không có sự kiện đăng nhập từ nơi khác (tab khác, link trong email) */
+export function onAuthStateChange(_onChange: () => void): () => void {
+  return () => {}
+}
+
+/** Trang /auth/callback: bản giả không chuyển qua trang ngoài nên chỉ đọc phiên hiện tại */
+export async function completeAuthRedirect(): Promise<User | null> {
+  return getSession()
 }
 
 export async function signInWithPassword(input: { email: string; password: string }) {
@@ -67,7 +72,11 @@ export async function signInWithPassword(input: { email: string; password: strin
   return startSession(user)
 }
 
-export async function signUp(input: { displayName: string; email: string; password: string }) {
+export async function signUp(input: {
+  displayName: string
+  email: string
+  password: string
+}): Promise<SignUpResult> {
   await delay(700)
   const users = loadUsers()
   const email = normalizeEmail(input.email)
@@ -87,7 +96,7 @@ export async function signUp(input: { displayName: string; email: string; passwo
   return { user: startSession(user), needsEmailConfirmation: false }
 }
 
-export async function signInWithProvider(provider: Exclude<AuthProvider, 'email'>) {
+export async function signInWithProvider(provider: SocialProvider): Promise<User> {
   await delay(800)
   const users = loadUsers()
   const email = `ban-doc-${provider}@example.com`
