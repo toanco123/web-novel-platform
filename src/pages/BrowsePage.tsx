@@ -11,20 +11,20 @@ const lists: Record<
   string,
   { to: string; tab: string; title: string; description: string; status?: StoryStatus }
 > = {
-  'moi-cap-nhat': {
+  latest: {
     to: paths.latest,
     tab: 'Mới cập nhật',
     title: 'Truyện mới cập nhật',
     description: 'Truyện vừa có chương mới, xếp theo lần cập nhật gần nhất.',
   },
-  'dang-ra': {
+  ongoing: {
     to: paths.ongoing,
     tab: 'Đang ra',
     title: 'Truyện đang ra',
     description: 'Truyện còn đang ra chương mới. Theo dõi để biết ngay khi có chương.',
     status: 'ongoing',
   },
-  'hoan-thanh': {
+  completed: {
     to: paths.completed,
     tab: 'Truyện full',
     title: 'Truyện full',

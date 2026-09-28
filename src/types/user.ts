@@ -6,6 +6,6 @@ export type User = {
   displayName: string
   avatarUrl: string | null
   provider: AuthProvider
-  /** Quản trị viên: xem được trang /quan-tri */
+  /** Quản trị viên: xem được trang /admin */
   isAdmin: boolean
 }

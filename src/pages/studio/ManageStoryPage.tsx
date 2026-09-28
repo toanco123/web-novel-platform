@@ -29,13 +29,13 @@ export default function ManageStoryPage() {
   return <ManageStory story={story} />
 }
 
-const TABS = ['chuong', 'thong-ke', 'bao-loi', 'thong-tin']
+const TABS = ['chapters', 'stats', 'reports', 'info']
 
 function ManageStory({ story }: { story: MyStory }) {
-  // Tab nằm trên URL (?muc=) để link từ danh sách Sáng tác mở đúng tab
+  // Tab nằm trên URL (?tab=) để link từ danh sách Sáng tác mở đúng tab
   const [params, setParams] = useSearchParams()
-  const muc = params.get('muc') ?? ''
-  const tab = TABS.includes(muc) ? muc : 'chuong'
+  const tabParam = params.get('tab') ?? ''
+  const tab = TABS.includes(tabParam) ? tabParam : 'chapters'
   const [deleteOpen, setDeleteOpen] = useState(false)
   const navigate = useNavigate()
   const published = story.visibility === 'published'
@@ -69,7 +69,7 @@ function ManageStory({ story }: { story: MyStory }) {
       <Tabs
         value={tab}
         onValueChange={(value) =>
-          setParams(value === 'chuong' ? {} : { muc: value }, {
+          setParams(value === 'chapters' ? {} : { tab: value }, {
             replace: true,
             preventScrollReset: true,
           })
@@ -79,13 +79,13 @@ function ManageStory({ story }: { story: MyStory }) {
         {/* Màn hẹp: 4 tab cuộn ngang được */}
         <div className="relative -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
           <TabsList>
-            <TabsTrigger value="chuong" className="px-4">
+            <TabsTrigger value="chapters" className="px-4">
               Chương ({story.chapterCount})
             </TabsTrigger>
-            <TabsTrigger value="thong-ke" className="px-4">
+            <TabsTrigger value="stats" className="px-4">
               Thống kê
             </TabsTrigger>
-            <TabsTrigger value="bao-loi" className="px-4">
+            <TabsTrigger value="reports" className="px-4">
               Báo lỗi
               {story.openReports > 0 && (
                 <span className="rounded-full bg-neon px-1.5 text-[0.7rem] leading-4 font-semibold text-background">
@@ -94,21 +94,21 @@ function ManageStory({ story }: { story: MyStory }) {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="thong-tin" className="px-4">
+            <TabsTrigger value="info" className="px-4">
               Thông tin truyện
             </TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="chuong" className="mt-6">
+        <TabsContent value="chapters" className="mt-6">
           <ChapterTable storyId={story.id} />
         </TabsContent>
-        <TabsContent value="thong-ke" className="mt-6">
+        <TabsContent value="stats" className="mt-6">
           <StoryStatsPanel storyId={story.id} published={published} />
         </TabsContent>
-        <TabsContent value="bao-loi" className="mt-6">
+        <TabsContent value="reports" className="mt-6">
           <StoryReportsPanel storyId={story.id} />
         </TabsContent>
-        <TabsContent value="thong-tin" className="mt-6">
+        <TabsContent value="info" className="mt-6">
           <EditStoryInfo story={story} />
         </TabsContent>
       </Tabs>

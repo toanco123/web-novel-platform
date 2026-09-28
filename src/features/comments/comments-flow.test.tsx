@@ -13,7 +13,7 @@ test('có bình luận mới từ nơi khác giữa hai lần tải thì "Xem th
   const { total } = await getComments(SLUG)
   expect(total).toBeGreaterThan(COMMENTS_PER_PAGE)
 
-  const { user } = renderApp(`/truyen/${SLUG}`)
+  const { user } = renderApp(`/story/${SLUG}`)
   const list = await screen.findByRole('list', { name: 'Danh sách bình luận' }, slow)
   const items = () => within(list).getAllByRole('listitem')
   expect(items()).toHaveLength(COMMENTS_PER_PAGE)

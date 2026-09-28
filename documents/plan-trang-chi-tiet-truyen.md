@@ -1,4 +1,4 @@
-# Plan: Trang chi tiết truyện `/truyen/:slug`
+# Plan: Trang chi tiết truyện `/story/:slug`
 
 ## Context
 Trang chủ và đăng nhập/đăng ký đã xong, nhưng bấm vào bất kỳ truyện nào cũng ra 404. Bước này làm **trang chi tiết truyện**. Đây là trang người đọc xem trước khi bắt đầu đọc, và cũng là trang Google hay đánh chỉ mục nhất.
@@ -78,7 +78,7 @@ Desktop
 **Giới thiệu:** mô tả truyện, quá 6 dòng thì thu gọn, nút "Xem thêm" / "Thu gọn" (`aria-expanded`). Bên dưới là các thẻ thể loại.
 
 **Danh sách chương**
-- 50 chương/trang, trang và thứ tự nằm trên URL (`?trang=2&sap-xep=moi`) để chia sẻ được và nút Back hoạt động.
+- 50 chương/trang, trang và thứ tự nằm trên URL (`?page=2&sort=moi`) để chia sẻ được và nút Back hoạt động.
 - Đổi thứ tự "Cũ nhất / Mới nhất" (nút bật tắt, `aria-pressed`).
 - Ô "Đi tới chương" (số từ 1 tới `chapterCount`, báo lỗi nếu ngoài khoảng) → mở thẳng chương đó.
 - Mỗi dòng: "Chương n: tiêu đề" + ngày đăng; chương mới nhất có nhãn "Mới".
@@ -162,10 +162,10 @@ Desktop
   - `chapters/api.test.ts`: trang 1 có 50 chương, trang cuối đúng số dư, đảo thứ tự đúng, chương cuối trùng `latestChapter`.
   - `comments/api.test.ts`: điểm trung bình thay đổi đúng khi chấm; chưa đăng nhập thì không ghi được.
   - `story-detail.test.tsx` (qua `renderApp`):
-    - Mở `/truyen/truong-an-khong-tuyet` thấy `h1` tên truyện và "Chương 1".
-    - Bấm trang 2 thì URL có `?trang=2` và thấy "Chương 51"; đổi "Mới nhất" thì chương đầu là 412.
+    - Mở `/story/truong-an-khong-tuyet` thấy `h1` tên truyện và "Chương 1".
+    - Bấm trang 2 thì URL có `?page=2` và thấy "Chương 51"; đổi "Mới nhất" thì chương đầu là 412.
     - "Đi tới chương" 500 thì báo lỗi ngoài khoảng.
-    - Chưa đăng nhập bấm "Thêm vào tủ truyện" thì sang `/dang-nhap?next=...`. Đã đăng nhập bấm thì thành "Đã thêm vào tủ truyện", render lại vẫn giữ.
+    - Chưa đăng nhập bấm "Thêm vào tủ truyện" thì sang `/login?next=...`. Đã đăng nhập bấm thì thành "Đã thêm vào tủ truyện", render lại vẫn giữ.
     - Đăng nhập rồi gửi bình luận thì bình luận hiện đầu danh sách; xóa thì biến mất.
     - Slug sai thì hiện nội dung 404.
 - `npm run build`, `npm run lint` sạch.

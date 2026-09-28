@@ -2,7 +2,7 @@ import { Outlet } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { RequireAuth } from '@/components/common/RequireAuth'
 
-/** Khung chung cho mọi trang /sang-tac: bắt buộc đăng nhập */
+/** Khung chung cho mọi trang /studio: bắt buộc đăng nhập */
 export default function StudioShell() {
   return (
     <RequireAuth>

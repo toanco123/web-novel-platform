@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 export default function SearchPage() {
   const [params, setParams] = useSearchParams()
   const q = (params.get('q') ?? '').trim()
-  const page = Math.max(1, Number(params.get('trang')) || 1)
+  const page = Math.max(1, Number(params.get('page')) || 1)
 
   const submit = (value: string) => {
     const next = value.trim()
@@ -147,7 +147,7 @@ function Results({ q, page }: { q: string; page: number }) {
           <Pagination
             page={data.page}
             pageCount={data.pageCount}
-            searchFor={(p) => `?${new URLSearchParams({ q, ...(p > 1 && { trang: String(p) }) })}`}
+            searchFor={(p) => `?${new URLSearchParams({ q, ...(p > 1 && { page: String(p) }) })}`}
             label="Phân trang kết quả tìm kiếm"
           />
         </>

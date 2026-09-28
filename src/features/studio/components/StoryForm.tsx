@@ -120,7 +120,7 @@ export function StoryForm({
           error={errors.title?.message}
           below={
             <p className="text-xs break-all text-muted-foreground">
-              Đường dẫn: /truyen/{previewSlug}
+              Đường dẫn: /story/{previewSlug}
               {!slug && ' (tự thêm số nếu trùng; không đổi sau khi tạo)'}
             </p>
           }

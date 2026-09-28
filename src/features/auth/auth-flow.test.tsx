@@ -6,7 +6,7 @@ const slow = { timeout: 3000 }
 beforeEach(() => localStorage.clear())
 
 test('sai mật khẩu thì báo lỗi, đúng thì quay về trang ?next=', async () => {
-  const { router, user } = renderApp('/dang-nhap?next=%2Fkhong-co-trang-nay')
+  const { router, user } = renderApp('/login?next=%2Fkhong-co-trang-nay')
 
   await user.type(await screen.findByLabelText('Email'), 'demo@webtruyen.vn')
   await user.type(screen.getByLabelText('Mật khẩu'), 'saimatkhau')
@@ -26,7 +26,7 @@ test('sai mật khẩu thì báo lỗi, đúng thì quay về trang ?next=', asy
 })
 
 test('báo lỗi ngay tại ô khi rời ô với dữ liệu sai', async () => {
-  const { user } = renderApp('/dang-ky')
+  const { user } = renderApp('/register')
 
   await user.type(await screen.findByLabelText('Email'), 'linh@')
   await user.tab()
@@ -39,7 +39,7 @@ test('báo lỗi ngay tại ô khi rời ô với dữ liệu sai', async () => 
 })
 
 test('đăng ký: email trùng báo lỗi, email mới thì đăng nhập luôn rồi đăng xuất được', async () => {
-  const { router, user } = renderApp('/dang-ky')
+  const { router, user } = renderApp('/register')
 
   async function fill(email: string) {
     for (const [label, value] of [
@@ -73,7 +73,7 @@ test('đăng ký: email trùng báo lỗi, email mới thì đăng nhập luôn 
 
 test('đã đăng nhập mà mở trang đăng nhập thì bị chuyển đi', async () => {
   localStorage.setItem('mock-auth-session', JSON.stringify('demo'))
-  const { router } = renderApp('/dang-nhap')
+  const { router } = renderApp('/login')
   await screen.findByRole('button', { name: 'Tài khoản của Bạn đọc Demo' }, slow)
   expect(router.state.location.pathname).toBe('/')
 })

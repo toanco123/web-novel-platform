@@ -5,7 +5,7 @@ import { unwrap } from './dbError'
 
 /**
  * Một trang của truy vấn có đếm tổng (`count: 'exact'`), kẹp số trang như paginate() (vd link
- * ?trang= cũ khi danh sách đã ngắn lại). Thường trang được hỏi hợp lệ nên chỉ cần 1 lần gọi; trang
+ * ?page= cũ khi danh sách đã ngắn lại). Thường trang được hỏi hợp lệ nên chỉ cần 1 lần gọi; trang
  * ngoài khoảng thì gọi lại trang gần nhất.
  */
 export async function loadPage<T>(
@@ -24,7 +24,7 @@ export async function loadPage<T>(
     return { items, total, page: p, pageCount: Math.max(1, Math.ceil(total / perPage)) }
   }
   const wanted = Math.max(1, Math.floor(page) || 1)
-  // Số trang lớn tới mức offset không còn là số nguyên chính xác (vd ?trang=Infinity, ?trang=1e18)
+  // Số trang lớn tới mức offset không còn là số nguyên chính xác (vd ?page=Infinity, ?page=1e18)
   // thì đọc trang 1 trước để biết tổng
   const first = await read(Number.isSafeInteger(wanted * perPage) ? wanted : 1)
   const current = Math.min(wanted, first.pageCount)

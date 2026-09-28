@@ -69,7 +69,7 @@ describe('browseStories', () => {
     fake.queries = []
   })
 
-  test('kẹp số trang giống paginate(), kể cả ?trang= quá lớn (Infinity, 1e18...)', async () => {
+  test('kẹp số trang giống paginate(), kể cả ?page= quá lớn (Infinity, 1e18...)', async () => {
     for (const count of [60, 0]) {
       fake.rows = cards(count)
       for (const page of [1, 2, 3, 4, 99, 0, -2, 2.7, NaN, Infinity, 1e16, 1e18, 1e25]) {

@@ -1,4 +1,4 @@
-# Plan: Trang quản trị `/quan-tri` (chỉ xem)
+# Plan: Trang quản trị `/admin` (chỉ xem)
 
 Trạng thái: ✅ xong (28/09/2026).
 
@@ -9,7 +9,7 @@ Quản trị viên xem được tình hình của web ở một chỗ: số li�
 ## Thư viện
 
 - **Ant Design** (`antd` v6) cho khung trang, bảng, ô số liệu; biểu đồ bằng `@ant-design/plots` (G2).
-- Chỉ dùng trong `/quan-tri`. Route lazy-load nên antd và G2 nằm ở chunk riêng, không có trong các trang đọc truyện.
+- Chỉ dùng trong `/admin`. Route lazy-load nên antd và G2 nằm ở chunk riêng, không có trong các trang đọc truyện.
 - Theme antd lấy màu từ token của web (`features/admin/components/adminTheme.ts`), đổi sáng/tối theo `useTheme`.
 - Style của antd không nằm trong `@layer` nên thắng class Tailwind cùng thuộc tính (vd `.ant-layout` có `min-height: 0`). Muốn đè thì dùng `style` hoặc class có `!`.
 
@@ -25,9 +25,9 @@ Quản trị viên xem được tình hình của web ở một chỗ: số li�
 
 | Đường dẫn | Trang | Tham số URL |
 |---|---|---|
-| `/quan-tri` | Tổng quan | `?ky=7\|90` (mặc định 30 ngày) |
-| `/quan-tri/nguoi-dung` | Người dùng | `?q=`, `?trang=` |
-| `/quan-tri/truyen` | Truyện | `?q=`, `?hien-thi=cong-khai\|nhap`, `?sap-xep=luot-doc\|moi-tao`, `?tac-gia=<id>`, `?trang=` |
+| `/admin` | Tổng quan | `?period=7\|90` (mặc định 30 ngày) |
+| `/admin/users` | Người dùng | `?q=`, `?page=` |
+| `/admin/stories` | Truyện | `?q=`, `?visibility=published\|draft`, `?sort=views\|created`, `?owner=<id>`, `?page=` |
 
 ## Nội dung từng trang
 

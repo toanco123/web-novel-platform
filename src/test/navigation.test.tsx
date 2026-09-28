@@ -29,7 +29,7 @@ test.each(linked)('%s không còn là trang 404', async (path) => {
 })
 
 test('danh sách không có thật thì báo 404', async () => {
-  renderApp('/danh-sach/khong-co')
+  renderApp('/list/khong-co')
   expect(await screen.findByText('Không có danh sách truyện này.', {}, slow)).toBeInTheDocument()
 })
 
@@ -43,9 +43,7 @@ test('gõ ở ô tìm kiếm header: gợi ý truyện, ↓ rồi Enter mở tru
   ).toBeInTheDocument()
 
   await user.keyboard('{ArrowDown}{Enter}')
-  await expect
-    .poll(() => router.state.location.pathname, slow)
-    .toBe('/truyen/truong-an-khong-tuyet')
+  await expect.poll(() => router.state.location.pathname, slow).toBe('/story/truong-an-khong-tuyet')
 })
 
 test('Enter không chọn gợi ý thì sang trang kết quả tìm kiếm', async () => {
@@ -56,25 +54,25 @@ test('Enter không chọn gợi ý thì sang trang kết quả tìm kiếm', asy
   )
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe('/tim-kiem?q=mac%20ninh')
+    .toBe('/search?q=mac%20ninh')
   const results = await screen.findByRole('list', { name: 'Kết quả tìm kiếm' }, slow)
   // Tìm theo tên tác giả Mặc Ninh (gõ không dấu)
   expect(within(results).getByRole('link', { name: 'Gió Thổi Qua Ngõ Nhỏ' })).toBeInTheDocument()
 })
 
 test('bảng xếp hạng đổi tiêu chí qua URL', async () => {
-  const { router, user } = renderApp('/bang-xep-hang')
+  const { router, user } = renderApp('/ranking')
   await user.click(await screen.findByRole('link', { name: 'Điểm cao' }, slow))
-  await expect.poll(() => router.state.location.search, slow).toBe('?theo=danh-gia')
+  await expect.poll(() => router.state.location.search, slow).toBe('?by=rating')
   expect(await screen.findAllByText(/lượt chấm/, {}, slow)).not.toHaveLength(0)
   // Kỳ (tuần/tháng) chỉ có ở tiêu chí lượt đọc
   expect(screen.queryByRole('navigation', { name: 'Kỳ xếp hạng' })).toBeNull()
 })
 
 test('danh sách truyện full lọc được và giữ bộ lọc trên URL', async () => {
-  const { router, user } = renderApp('/danh-sach/hoan-thanh')
+  const { router, user } = renderApp('/list/completed')
   expect(await screen.findByRole('heading', { level: 1, name: 'Truyện full' }, slow))
   await user.click(await screen.findByRole('combobox', { name: 'Sắp xếp' }, slow))
   await user.click(await screen.findByRole('option', { name: 'Đọc nhiều' }, slow))
-  await expect.poll(() => router.state.location.search, slow).toBe('?sap-xep=doc-nhieu')
+  await expect.poll(() => router.state.location.search, slow).toBe('?sort=views')
 })

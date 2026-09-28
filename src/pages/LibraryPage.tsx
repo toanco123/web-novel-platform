@@ -11,7 +11,7 @@ import { useLibraryUpdateCount } from '@/features/library/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
 
-type Tab = 'theo-doi' | 'lich-su'
+type Tab = 'following' | 'history'
 
 export default function LibraryPage() {
   const { data: user, isPending } = useSession()
@@ -22,9 +22,9 @@ export default function LibraryPage() {
   if (isPending) return <PageLoader />
   // Khách mặc định xem lịch sử (tab theo dõi cần tài khoản)
   const tab: Tab =
-    params.get('muc') === 'lich-su' || (!user && params.get('muc') !== 'theo-doi')
-      ? 'lich-su'
-      : 'theo-doi'
+    params.get('tab') === 'history' || (!user && params.get('tab') !== 'following')
+      ? 'history'
+      : 'following'
 
   return (
     <Container className="py-10">
@@ -41,9 +41,9 @@ export default function LibraryPage() {
           replace
           items={[
             {
-              key: 'theo-doi',
-              to: { search: '?muc=theo-doi' },
-              active: tab === 'theo-doi',
+              key: 'following',
+              to: { search: '?tab=following' },
+              active: tab === 'following',
               label: (
                 <>
                   Đang theo dõi
@@ -57,9 +57,9 @@ export default function LibraryPage() {
               ),
             },
             {
-              key: 'lich-su',
-              to: { search: '?muc=lich-su' },
-              active: tab === 'lich-su',
+              key: 'history',
+              to: { search: '?tab=history' },
+              active: tab === 'history',
               label: 'Lịch sử đọc',
             },
           ]}
@@ -67,7 +67,7 @@ export default function LibraryPage() {
       </div>
 
       <div className="mt-8">
-        {tab === 'lich-su' ? (
+        {tab === 'history' ? (
           <>
             {!user && (
               <p className="mb-4 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">

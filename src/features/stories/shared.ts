@@ -3,7 +3,7 @@ import { slugify } from '@/lib/slugify'
 import type { Page } from '@/types/page'
 import type { Genre, Story, StoryStatus } from '@/types/story'
 
-// ── Danh sách có bộ lọc (/danh-sach/:loai, /the-loai/:slug) ──────────────
+// ── Danh sách có bộ lọc (/list/:type, /genres/:slug) ──────────────
 
 export type StoryLength = 'short' | 'medium' | 'long'
 export type StorySort = 'updated' | 'views' | 'rating' | 'newest'

@@ -218,11 +218,11 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 - ~~Thay ruột các `api.ts` theo mục 8~~ (xong: mọi feature có `api.remote.ts`). Còn chạy thử bản remote trên project thật (test tích hợp với Supabase).
 - **Cấu hình Auth trên Dashboard:**
   - Site URL.
-  - Redirect URL (`/auth/callback`, `/dat-lai-mat-khau`; localhost và domain Vercel).
+  - Redirect URL (`/auth/callback`, `/reset-password`; localhost và domain Vercel).
   - Bật Google/Facebook.
   - Mẫu email tiếng Việt.
 - **Chống spam:** giới hạn tần suất lượt đọc (hiện chỉ chống trùng ở client), bình luận và liên hệ.
-- **Vai trò quản trị:** đã có trang `/quan-tri` chỉ để xem (tổng quan, người dùng, truyện; plan: `plan-trang-quan-tri.md`). Xử lý báo lỗi, quản lý thể loại và `curated_stories` vẫn làm qua Dashboard.
+- **Vai trò quản trị:** đã có trang `/admin` chỉ để xem (tổng quan, người dùng, truyện; plan: `plan-trang-quan-tri.md`). Xử lý báo lỗi, quản lý thể loại và `curated_stories` vẫn làm qua Dashboard.
   - Cấp quyền (chạy trong SQL editor hoặc `supabase db query --linked`), rồi người đó đăng xuất và đăng nhập lại để JWT có vai trò mới:
     `update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role": "admin"}' where email = '...';`
   - Thu hồi: `raw_app_meta_data - 'role'`. JWT cũ vẫn còn quyền tới khi hết hạn (mặc định 1 giờ).

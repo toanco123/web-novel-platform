@@ -59,7 +59,7 @@ export default function AdminUsersPage() {
               pageSize: ADMIN_PAGE_SIZE,
               showSizeChanger: false,
               hideOnSinglePage: true,
-              onChange: (p) => update({ trang: String(p) }),
+              onChange: (p) => update({ page: String(p) }),
             }}
             columns={[
               {

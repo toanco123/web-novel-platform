@@ -25,7 +25,7 @@ import { StoryCard, StoryCardSkeleton } from './StoryCard'
 const ALL = 'tat-ca'
 
 type Props = {
-  /** Bộ lọc cố định theo trang (vd /danh-sach/hoan-thanh, /the-loai/:slug); không hiện ô chọn */
+  /** Bộ lọc cố định theo trang (vd /list/completed, /genres/:slug); không hiện ô chọn */
   fixed: Pick<BrowseFilters, 'status' | 'genre'>
   /** Câu báo khi không có truyện nào (chưa lọc gì) */
   emptyMessage?: string

@@ -13,8 +13,8 @@ export default function NewStoryPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const genres = useGenres()
-  // ?the-loai=ngon-tinh (từ nút "Đăng truyện" ở trang thể loại): chọn sẵn nếu thể loại có thật
-  const preset = params.get('the-loai')
+  // ?genre=ngon-tinh (từ nút "Đăng truyện" ở trang thể loại): chọn sẵn nếu thể loại có thật
+  const preset = params.get('genre')
   const presetGenres = genres.data?.some((g) => g.slug === preset) ? [preset!] : []
 
   // Chờ danh sách thể loại để form khởi tạo đúng giá trị chọn sẵn

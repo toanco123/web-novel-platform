@@ -28,9 +28,9 @@ import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import type { ChapterContent } from '@/types/chapter'
 
-// Router không hỗ trợ tham số nằm giữa đoạn URL ("chuong-:number") nên tự tách ở đây
+// Router không hỗ trợ tham số nằm giữa đoạn URL ("chapter-:number") nên tự tách ở đây
 const parseChapterSegment = (segment: string) => {
-  const match = /^chuong-(\d{1,6})$/.exec(segment)
+  const match = /^chapter-(\d{1,6})$/.exec(segment)
   return match ? Number(match[1]) : null
 }
 

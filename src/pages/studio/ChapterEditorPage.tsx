@@ -30,8 +30,8 @@ export default function ChapterEditorPage() {
   }
 
   const all = chapters.data ?? []
-  // ?so=2 (từ dòng "chưa viết" trong danh sách chương): điền sẵn nếu hợp lệ và còn trống
-  const preset = Number(params.get('so'))
+  // ?number=2 (từ dòng "chưa viết" trong danh sách chương): điền sẵn nếu hợp lệ và còn trống
+  const preset = Number(params.get('number'))
   const defaultNumber =
     Number.isInteger(preset) &&
     preset >= 1 &&

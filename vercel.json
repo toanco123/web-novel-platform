@@ -1,10 +1,127 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "redirects": [
+    {
+      "source": "/truyen/:slug/chuong-:number",
+      "destination": "/story/:slug/chapter-:number",
+      "permanent": true
+    },
+    {
+      "source": "/truyen/:slug",
+      "destination": "/story/:slug",
+      "permanent": true
+    },
+    {
+      "source": "/the-loai/:slug",
+      "destination": "/genres/:slug",
+      "permanent": true
+    },
+    {
+      "source": "/the-loai",
+      "destination": "/genres",
+      "permanent": true
+    },
+    {
+      "source": "/danh-sach/moi-cap-nhat",
+      "destination": "/list/latest",
+      "permanent": true
+    },
+    {
+      "source": "/danh-sach/hoan-thanh",
+      "destination": "/list/completed",
+      "permanent": true
+    },
+    {
+      "source": "/danh-sach/dang-ra",
+      "destination": "/list/ongoing",
+      "permanent": true
+    },
+    {
+      "source": "/bang-xep-hang",
+      "destination": "/ranking",
+      "permanent": true
+    },
+    {
+      "source": "/tim-kiem",
+      "destination": "/search",
+      "permanent": true
+    },
+    {
+      "source": "/dang-nhap",
+      "destination": "/login",
+      "permanent": true
+    },
+    {
+      "source": "/dang-ky",
+      "destination": "/register",
+      "permanent": true
+    },
+    {
+      "source": "/quen-mat-khau",
+      "destination": "/forgot-password",
+      "permanent": true
+    },
+    {
+      "source": "/dat-lai-mat-khau",
+      "destination": "/reset-password",
+      "permanent": true
+    },
+    {
+      "source": "/tai-khoan",
+      "destination": "/account",
+      "permanent": true
+    },
+    {
+      "source": "/tu-truyen",
+      "destination": "/library",
+      "permanent": true
+    },
+    {
+      "source": "/gioi-thieu",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/lien-he",
+      "destination": "/contact",
+      "permanent": true
+    },
+    {
+      "source": "/dieu-khoan",
+      "destination": "/terms",
+      "permanent": true
+    },
+    {
+      "source": "/bao-mat",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/sang-tac/:path*",
+      "destination": "/studio",
+      "permanent": true
+    },
+    {
+      "source": "/quan-tri/:path*",
+      "destination": "/admin",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }

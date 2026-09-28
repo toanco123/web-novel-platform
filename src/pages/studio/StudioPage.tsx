@@ -124,7 +124,7 @@ export default function StudioPage() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem asChild>
-                      <Link to={paths.studioStory(s.id, 'thong-tin')}>
+                      <Link to={paths.studioStory(s.id, 'info')}>
                         <PenLine />
                         Sửa thông tin
                       </Link>

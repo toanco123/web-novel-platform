@@ -2,7 +2,7 @@
 
 ## Context
 Dự án mới từ đầu (thư mục `web-truyen` đang trống). Mục tiêu: web đọc **truyện chữ** (kiểu TruyenFull/Wattpad), làm **UI trước** bằng React + Tailwind với dữ liệu giả (mock), sau đó nối **Supabase** làm backend.
-Phạm vi giai đoạn đầu: đọc truyện, đăng nhập, tủ truyện + lịch sử đọc, bình luận/đánh giá. Trang Admin `/quan-tri` (28/09/2026) chỉ để xem số liệu, người dùng và truyện (chi tiết ở `plan-trang-quan-tri.md`); các thao tác quản trị khác vẫn làm qua Supabase Dashboard.
+Phạm vi giai đoạn đầu: đọc truyện, đăng nhập, tủ truyện + lịch sử đọc, bình luận/đánh giá. Trang Admin `/admin` (28/09/2026) chỉ để xem số liệu, người dùng và truyện (chi tiết ở `plan-trang-quan-tri.md`); các thao tác quản trị khác vẫn làm qua Supabase Dashboard.
 
 ---
 
@@ -63,7 +63,7 @@ Có 2 layout:
 └────────────────────────────┴─────────────────┘
 ```
 
-### 3.2 Chi tiết truyện `/truyen/:slug`
+### 3.2 Chi tiết truyện `/story/:slug`
 ```
 ┌──────────┬───────────────────────────────────┐
 │ Ảnh bìa  │ Tên truyện                        │
@@ -78,7 +78,7 @@ Tabs: [Giới thiệu] [Danh sách chương] [Bình luận]
 Sidebar: Truyện cùng tác giả, Truyện cùng thể loại
 ```
 
-### 3.3 Trang đọc chương `/truyen/:slug/chuong-:number` (quan trọng nhất)
+### 3.3 Trang đọc chương `/story/:slug/chapter-:number` (quan trọng nhất)
 ```
 [ Thanh trên: ← Tên truyện | Chương 12: Tiêu đề | ⚙ Cài đặt ]
 [ ‹ Chương trước ]  [ Chọn chương ▾ ]  [ Chương sau › ]
@@ -94,7 +94,7 @@ Sidebar: Truyện cùng tác giả, Truyện cùng thể loại
 - Tự lưu **lịch sử đọc** (chương + vị trí cuộn).
 
 **Đã làm UI (25/09/2026)**, dữ liệu giả:
-- Route `truyen/:slug/:chapter` dưới `ReaderLayout` (React Router không nhận tham số giữa đoạn kiểu `chuong-:number`, nên `ChapterReaderPage` tự tách số chương; sai dạng thì báo "Đường dẫn chương không hợp lệ").
+- Route `story/:slug/:chapter` dưới `ReaderLayout` (React Router không nhận tham số giữa đoạn kiểu `chapter-:number`, nên `ChapterReaderPage` tự tách số chương; sai dạng thì báo "Đường dẫn chương không hợp lệ").
 - Thanh công cụ trên cùng: ← về trang truyện, trang chủ, tên truyện + chương, nút **Mục lục** và **Cài đặt**. Thanh tự ẩn khi cuộn xuống, hiện lại khi cuộn lên hoặc tới đầu/cuối trang; chạm vào vùng chữ để ẩn/hiện (tiện trên điện thoại). Có thanh tiến độ đọc mỏng ở mép trên.
 - Đầu chương: tên truyện, "Chương N", tiêu đề, ngày đăng, số chữ, thời gian đọc ước tính. Thanh chuyển chương nằm ở đầu và cuối chương. Chữ cái đầu chương viết hoa lớn, bỏ qua khi đoạn đầu là lời thoại.
 - Cuối chương: thẻ "Đọc tiếp chương N + tiêu đề". Nếu hết chương thì báo "đã đọc hết truyện" hoặc "đã tới chương mới nhất" (kèm nút Thêm vào tủ truyện).
@@ -116,16 +116,16 @@ Sidebar: Truyện cùng tác giả, Truyện cùng thể loại
 
 Với Supabase: 1 query lấy chương `status = 'published'`; chương trước/sau lấy bằng `order by number` + `limit 1` hai phía (hoặc một hàm RPC). Giao diện giữ nguyên.
 
-### 3.4 Danh sách / lọc `/the-loai/:slug`, `/danh-sach/:type` (hot, mới, hoàn thành)
+### 3.4 Danh sách / lọc `/genres/:slug`, `/list/:type` (hot, mới, hoàn thành)
 Bộ lọc (thể loại, trạng thái, số chương, sắp xếp) + grid/list truyện + phân trang.
 
-### 3.5 Tìm kiếm `/tim-kiem?q=`
+### 3.5 Tìm kiếm `/search?q=`
 Gợi ý nhanh dạng dropdown ngay ở header (debounce) + trang kết quả đầy đủ.
 
 ### 3.6 Tài khoản
-- `/dang-nhap`, `/dang-ky`, `/quen-mat-khau`
-- `/tu-truyen`: tab **Đang theo dõi** / **Lịch sử đọc**
-- `/tai-khoan`: đổi tên, avatar, mật khẩu
+- `/login`, `/register`, `/forgot-password`
+- `/library`: tab **Đang theo dõi** / **Lịch sử đọc**
+- `/account`: đổi tên, avatar, mật khẩu
 
 ### 3.7 Trang 404
 
@@ -176,7 +176,7 @@ Thiết kế chi tiết (bảng, luật nghiệp vụ, RLS, RPC, storage, bảng
 4c. **Tính năng đọc & tác giả** ✅ (25/09/2026): nghe truyện, cuộn liên tục, bình luận chương, báo lỗi chương, thống kê + báo lỗi trong khu Sáng tác.
 4b. **Sáng tác & thể loại** ✅ (25/09/2026, chi tiết ở `plan-sang-tac-va-the-loai.md`): tạo thể loại, đăng truyện, soạn/nhập chương, xuất bản.
 5. **Nối Supabase**: schema + RLS + trigger + RPC + storage ✅ (28/09/2026, chi tiết ở `thiet-ke-database.md`, không seed dữ liệu) → cấu hình Auth → thay `api.ts` từng feature.
-5b. **Trang quản trị** ✅ (28/09/2026, chi tiết ở `plan-trang-quan-tri.md`): `/quan-tri` chỉ xem, Ant Design + biểu đồ `@ant-design/plots`.
+5b. **Trang quản trị** ✅ (28/09/2026, chi tiết ở `plan-trang-quan-tri.md`): `/admin` chỉ xem, Ant Design + biểu đồ `@ant-design/plots`.
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---

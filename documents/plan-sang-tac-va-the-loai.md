@@ -13,25 +13,25 @@ Vẫn giữ quy tắc dự án: làm UI với **dữ liệu giả** (`localStora
 **Trạng thái:** ✅ Hoàn thành cả 3 giai đoạn A, B, C với dữ liệu giả (25/09/2026).
 
 Khác với plan:
-- Thêm trang `/the-loai/:slug` (danh sách truyện theo thể loại) để thể loại vừa tạo không dẫn tới trang 404.
+- Thêm trang `/genres/:slug` (danh sách truyện theo thể loại) để thể loại vừa tạo không dẫn tới trang 404.
 - `parseChapters` đặt ở `src/features/studio/parseChapters.ts` (thay vì `src/lib/`) vì dùng giới hạn độ dài chương của khu Sáng tác.
 - `HeroShowcase` không cần sửa: banner chỉ hiện truyện đề cử có sẵn, luôn có đánh giá.
 - Danh sách gợi ý thể loại tự đóng sau mỗi lần chọn (để không che phần form bên dưới).
 - Bổ sung sau (25/09/2026), theo phản hồi "đăng truyện chỉ thấy ở trang tạo thể loại":
   - Header có nút **"Đăng truyện"** (desktop: icon + chữ; tablet: icon; mobile: trong menu trượt).
-  - **Mọi** trang thể loại có nút "Đăng truyện {thể loại}", mở form với thể loại đó chọn sẵn (`/sang-tac/truyen-moi?the-loai=slug`; slug không có thật thì bỏ qua). Trang `/the-loai` cũng có nút "Đăng truyện".
+  - **Mọi** trang thể loại có nút "Đăng truyện {thể loại}", mở form với thể loại đó chọn sẵn (`/studio/new-story?genre=slug`; slug không có thật thì bỏ qua). Trang `/genres` cũng có nút "Đăng truyện".
 - Tiêu đề `h1–h3` dùng số đều hàng (`lining-nums`) vì font Cormorant mặc định cho số "1" trông như chữ "I".
 - Bổ sung sau (25/09/2026), theo phản hồi "tạo truyện chưa có chỗ nhập nội dung":
   - Form tạo truyện có phần **Chương đầu tiên** (không bắt buộc) và 2 nút **"Lưu nháp"** / **"Đăng truyện"** (xem mục 1.3).
-  - Danh sách `/sang-tac` có menu **⋯** cho từng truyện (xem mục 1.2).
-  - Tab trang quản lý nằm trên URL (`?muc=`) để link mở đúng tab (xem mục 1.4).
+  - Danh sách `/studio` có menu **⋯** cho từng truyện (xem mục 1.2).
+  - Tab trang quản lý nằm trên URL (`?tab=`) để link mở đúng tab (xem mục 1.4).
 - Bổ sung sau (25/09/2026), theo phản hồi "viết xong chương 1, chưa biết viết gì cho chương 2, muốn viết chương 3":
   - Tác giả **chọn được số chương**, được bỏ trống số ở giữa (xem mục 1.5).
   - Danh sách chương hiện chỗ trống "Chưa viết" kèm nút viết bù (xem mục 1.4).
 - Bổ sung sau (28/09/2026): phần chương đầu tiên của form tạo truyện cũng **chọn được số chương** (mặc định 1), cho truyện đăng tiếp từ nơi khác (xem mục 1.3).
 
 **Chia 3 giai đoạn**, mỗi giai đoạn xong là dùng được:
-- **A. Thể loại:** trang `/the-loai` và tạo thể loại.
+- **A. Thể loại:** trang `/genres` và tạo thể loại.
 - **B. Đăng truyện:** khu Sáng tác, tạo/sửa truyện kèm ảnh bìa, soạn chương, xuất bản, hiển thị công khai.
 - **C. Nhập file `.txt`:** tự tách chương.
 
@@ -41,21 +41,21 @@ Khác với plan:
 
 | Route | Màn hình | Cần đăng nhập |
 |---|---|---|
-| `/the-loai` | Tất cả thể loại + nút "Tạo thể loại" | Chỉ khi tạo |
-| `/sang-tac` | **Khu Sáng tác**: danh sách truyện của tôi | ✔ |
-| `/sang-tac/truyen-moi` | Form đăng truyện mới | ✔ |
-| `/sang-tac/truyen/:storyId` | Quản lý một truyện: thông tin, chương, xuất bản | ✔ (chủ truyện) |
-| `/sang-tac/truyen/:storyId/chuong-moi` | Soạn chương mới | ✔ |
-| `/sang-tac/truyen/:storyId/chuong/:number` | Sửa chương | ✔ |
-| `/sang-tac/truyen/:storyId/nhap-file` | Nhập file `.txt` (giai đoạn C) | ✔ |
+| `/genres` | Tất cả thể loại + nút "Tạo thể loại" | Chỉ khi tạo |
+| `/studio` | **Khu Sáng tác**: danh sách truyện của tôi | ✔ |
+| `/studio/new-story` | Form đăng truyện mới | ✔ |
+| `/studio/story/:storyId` | Quản lý một truyện: thông tin, chương, xuất bản | ✔ (chủ truyện) |
+| `/studio/story/:storyId/new-chapter` | Soạn chương mới | ✔ |
+| `/studio/story/:storyId/chapter/:number` | Sửa chương | ✔ |
+| `/studio/story/:storyId/import` | Nhập file `.txt` (giai đoạn C) | ✔ |
 
-- Các route `/sang-tac/*` bọc trong `RequireAuth`: chưa đăng nhập thì chuyển tới `paths.login(trang hiện tại)`. Truyện không phải của mình thì hiện `NotFound`.
+- Các route `/studio/*` bọc trong `RequireAuth`: chưa đăng nhập thì chuyển tới `paths.login(trang hiện tại)`. Truyện không phải của mình thì hiện `NotFound`.
 - **Lối vào:**
   - Menu avatar (desktop và mobile) thêm mục **"Sáng tác"**.
-  - Dropdown "Thể loại" ở header thêm dòng "Xem tất cả thể loại" trỏ tới `/the-loai`.
+  - Dropdown "Thể loại" ở header thêm dòng "Xem tất cả thể loại" trỏ tới `/genres`.
   - Footer thêm link "Đăng truyện".
 
-### 1.1 Trang Thể loại `/the-loai`
+### 1.1 Trang Thể loại `/genres`
 ```
 Thể loại                                  [+ Tạo thể loại]
 [ô lọc nhanh: "Tìm thể loại…"]
@@ -71,7 +71,7 @@ Thể loại                                  [+ Tạo thể loại]
   - Trùng tên thì báo: "Thể loại **Ngôn tình** đã có." kèm link tới thể loại đó.
   - Chưa đăng nhập mà bấm nút thì chuyển sang trang đăng nhập.
 
-### 1.2 Khu Sáng tác `/sang-tac`
+### 1.2 Khu Sáng tác `/studio`
 ```
 Sáng tác của bạn                          [+ Đăng truyện mới]
 ┌───────┬──────────────────────────────┬──────────┬─────────┐
@@ -81,14 +81,14 @@ Sáng tác của bạn                          [+ Đăng truyện mới]
 ```
 - Mỗi dòng dẫn tới trang quản lý. Trên mobile, mỗi truyện là một thẻ.
 - Nút **⋯** cuối mỗi dòng (nằm ngoài link của dòng):
-  - "Sửa thông tin" mở trang quản lý ở tab Thông tin truyện (`paths.studioStory(id, 'thong-tin')`).
+  - "Sửa thông tin" mở trang quản lý ở tab Thông tin truyện (`paths.studioStory(id, 'info')`).
   - "Viết chương mới".
   - "Xóa truyện" mở cùng `DeleteStoryDialog` (phải gõ đúng tên); xóa xong ở lại danh sách và báo "Đã xóa truyện “…”".
 - Chưa có truyện: "Bạn chưa đăng truyện nào. Bắt đầu với truyện đầu tiên." kèm nút.
 
 ### 1.3 Form truyện (tạo mới và sửa dùng chung `StoryForm`)
 - **Tên truyện** (2–120 ký tự).
-- **Đường dẫn** tự sinh từ tên (`slugify`), hiện dạng `…/truyen/ten-truyen`; nếu trùng thì thêm `-2`, `-3`.
+- **Đường dẫn** tự sinh từ tên (`slugify`), hiện dạng `…/story/ten-truyen`; nếu trùng thì thêm `-2`, `-3`.
 - **Giới thiệu** (30–3000 ký tự, có bộ đếm).
 - **Thể loại** (chọn 1–5) qua `GenrePicker`:
   - Ô tìm kèm danh sách gợi ý; các thể loại đã chọn hiện thành thẻ, có nút ✕ để bỏ.
@@ -108,7 +108,7 @@ Sáng tác của bạn                          [+ Đăng truyện mới]
 - Lưu xong thì chuyển sang trang quản lý.
 - Bố cục desktop: form bên trái, cột xem trước bên phải (bìa + `StoryCard` như người đọc sẽ thấy). Mobile: một cột.
 
-### 1.4 Quản lý truyện `/sang-tac/truyen/:storyId`
+### 1.4 Quản lý truyện `/studio/story/:storyId`
 ```
 [bìa] Tên truyện   [Nháp]            [Xem trang truyện] [Xuất bản truyện]
 Thông tin | Chương (12)                                  (tabs)
@@ -118,13 +118,13 @@ Thông tin | Chương (12)                                  (tabs)
 ── Vùng nguy hiểm ──  [Ẩn truyện] [Xóa truyện]
 ```
 - **Tab "Thông tin":** `StoryForm` để sửa. **Tab "Chương":** danh sách chương kèm trạng thái.
-- Tab đang mở nằm trên URL: `?muc=thong-ke|bao-loi|thong-tin` (tab Chương thì không có tham số), đổi tab dùng `replace`.
-- **Số chương còn trống:** giữa hai chương không liền số có dòng "2 · Chưa viết" (hoặc "4–6 · Chưa viết 3 chương") với nút "Viết chương N", mở trình soạn điền sẵn số đó (`paths.studioNewChapter(id, n)` → `?so=n`).
+- Tab đang mở nằm trên URL: `?tab=stats|reports|info` (tab Chương thì không có tham số), đổi tab dùng `replace`.
+- **Số chương còn trống:** giữa hai chương không liền số có dòng "2 · Chưa viết" (hoặc "4–6 · Chưa viết 3 chương") với nút "Viết chương N", mở trình soạn điền sẵn số đó (`paths.studioNewChapter(id, n)` → `?number=n`).
 - **Quy tắc xuất bản:**
   - Truyện chỉ xuất bản được khi có **≥ 1 chương đã xuất bản**; nút bị khóa kèm lý do.
   - Truyện đang công khai thì không được ẩn hoặc xóa chương đã xuất bản cuối cùng, phải ẩn truyện trước.
 - **Thao tác phá hủy** (xóa chương, xóa truyện) hỏi xác nhận bằng dialog. Xóa truyện phải gõ đúng tên truyện.
-- **Xem trước:** chủ truyện mở được `/truyen/:slug` kể cả khi truyện còn nháp; đầu trang có dải "Bản nháp, chỉ bạn thấy trang này".
+- **Xem trước:** chủ truyện mở được `/story/:slug` kể cả khi truyện còn nháp; đầu trang có dải "Bản nháp, chỉ bạn thấy trang này".
 
 ### 1.5 Soạn chương
 - Tiêu đề chương (không bắt buộc, ≤ 120 ký tự) và nội dung là `textarea` lớn tự giãn, các đoạn cách nhau bằng dòng trống.
@@ -188,7 +188,7 @@ Thông tin | Chương (12)                                  (tabs)
 - **Chỗ dùng `latestChapter`** (`LatestUpdates`, `StoryHero`, `ChapterList`): xử lý trường hợp `null`. Truyện chưa có chương thì ẩn nút đọc và hiện "Chưa có chương nào".
 - **Truyện chưa có đánh giá** (`ratingCount = 0`): `StoryHero`, `HeroShowcase`, `RatingSummary` hiện "Chưa có đánh giá" thay vì "0.0".
 - **Ảnh bìa:** `StoryCover` đã hỗ trợ `coverUrl`, nên ảnh dạng data URL dùng được ngay.
-- **Trang chi tiết:** thêm dải "Bản nháp" khi chủ truyện xem trước. Chủ truyện thấy thêm nút "Quản lý truyện" trỏ tới `/sang-tac/truyen/:id`.
+- **Trang chi tiết:** thêm dải "Bản nháp" khi chủ truyện xem trước. Chủ truyện thấy thêm nút "Quản lý truyện" trỏ tới `/studio/story/:id`.
 
 ## 4. File chính
 
@@ -238,11 +238,11 @@ Thông tin | Chương (12)                                  (tabs)
   - Truyện nháp không xuất hiện ở `getLatestUpdated`/`getStory` với người lạ, nhưng chủ truyện vẫn thấy.
   - Không xuất bản truyện 0 chương được; không sửa được truyện của người khác.
 - **Test luồng** (`renderApp`, `prepareCover` được mock vì jsdom không có canvas):
-  - Chưa đăng nhập vào `/sang-tac` thì bị chuyển sang đăng nhập.
+  - Chưa đăng nhập vào `/studio` thì bị chuyển sang đăng nhập.
   - Tạo thể loại trong dialog, và tạo ngay trong `GenrePicker`.
-  - Đăng truyện → viết chương → xuất bản chương → xuất bản truyện → truyện hiện ở "Mới cập nhật" và mở được `/truyen/:slug`.
+  - Đăng truyện → viết chương → xuất bản chương → xuất bản truyện → truyện hiện ở "Mới cập nhật" và mở được `/story/:slug`.
   - Tạo truyện kèm chương đầu tiên (đổi số thành 50) rồi "Đăng truyện" → công khai ngay với chương 50; bấm khi chưa viết chương thì báo lỗi.
-  - Menu ⋯ ở `/sang-tac`: "Sửa thông tin" mở đúng tab, "Xóa truyện" ngay từ danh sách.
+  - Menu ⋯ ở `/studio`: "Sửa thông tin" mở đúng tab, "Xóa truyện" ngay từ danh sách.
   - Chọn số chương: trùng số thì báo lỗi, bỏ trống chương 2 để viết chương 3 rồi viết bù từ dòng "Chưa viết"; đổi số chương nháp rồi lưu thì về trang quản lý (không thoáng hiện trang "không tìm thấy").
 - **Test api số chương:** chọn số và viết bù, chặn trùng số, chương đã từng xuất bản không đổi số được, xóa chương thì xóa bình luận/báo lỗi của chương.
   - Nhập file `.txt` → bảng xem trước đúng số chương → "Thêm N chương".

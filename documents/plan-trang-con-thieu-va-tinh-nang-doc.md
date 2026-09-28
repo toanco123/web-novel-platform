@@ -48,7 +48,7 @@ Gom mọi dữ liệu "hoạt động của người đọc" vào một chỗ, �
 
 ## 2. Nhóm 1: Trang còn thiếu
 
-### 2.1 Tìm kiếm `/tim-kiem?q=&trang=`
+### 2.1 Tìm kiếm `/search?q=&page=`
 - **Cách tìm:** không phân biệt dấu (dùng `slugify`), khớp tên truyện hoặc tác giả.
   - Xếp hạng kết quả: tên bắt đầu bằng từ khóa > tên chứa từ khóa > tác giả khớp, rồi tới lượt đọc.
   - Có thêm các chip thể loại khớp từ khóa.
@@ -60,20 +60,20 @@ Gom mọi dữ liệu "hoạt động của người đọc" vào một chỗ, �
   - Ô trống thì vẫn gợi ý thể loại như cũ.
 - Link tên tác giả ở trang chi tiết truyện dẫn về đây.
 
-### 2.2 Danh sách `/danh-sach/:loai`
-- **Ba loại:** `moi-cap-nhat`, `dang-ra`, `hoan-thanh`. Loại khác thì báo 404.
+### 2.2 Danh sách `/list/:type`
+- **Ba loại:** `latest`, `ongoing`, `completed`. Loại khác thì báo 404.
 - **Bộ lọc** (giữ trên URL):
-  - Thể loại (`the-loai`).
-  - Độ dài (`do-dai`: `ngan` < 50 chương, `vua` 50–200, `dai` > 200).
-  - Sắp xếp (`sap-xep`: `moi-cap-nhat` mặc định, `doc-nhieu`, `danh-gia`, `moi-dang`).
-  - Trang (`trang`).
+  - Thể loại (`genre`).
+  - Độ dài (`length`: `short` < 50 chương, `medium` 50–200, `long` > 200).
+  - Sắp xếp (`sort`: `updated` mặc định, `views`, `rating`, `newest`).
+  - Trang (`page`).
 - **Hiển thị:** lưới `StoryCard`, 24 truyện/trang.
-- **Dùng lại:** component `StoryBrowser`. Trang `/the-loai/:slug` cũng dùng nó, với thể loại cố định và thêm bộ lọc trạng thái.
-- "Mới cập nhật" ở trang chủ trỏ về `/danh-sach/moi-cap-nhat`.
+- **Dùng lại:** component `StoryBrowser`. Trang `/genres/:slug` cũng dùng nó, với thể loại cố định và thêm bộ lọc trạng thái.
+- "Mới cập nhật" ở trang chủ trỏ về `/list/latest`.
 - **Phân trang:** tách từ `ChapterList` thành `components/common/Pagination.tsx` (dùng `Link` + `hrefFor`) để dùng chung.
 
-### 2.3 Bảng xếp hạng `/bang-xep-hang?theo=&ky=`
-- **Tiêu chí:** Đọc nhiều (`luot-doc`, có kỳ Tuần / Tháng / Tất cả), Đánh giá cao (`danh-gia`), Theo dõi nhiều (`theo-doi`).
+### 2.3 Bảng xếp hạng `/ranking?by=&period=`
+- **Tiêu chí:** Đọc nhiều (`views`, có kỳ `week` / `month` / `all`), Đánh giá cao (`rating`), Theo dõi nhiều (`follows`).
 - **Top 50:** số thứ hạng lớn, top 3 tô màu; mỗi dòng có bìa, tên, tác giả, thể loại, chỉ số.
 - **Dữ liệu giả:**
   - Lượt đọc tuần/tháng của truyện có sẵn sinh cố định theo slug (truyện mới cập nhật được cộng thêm), cộng lượt đọc thật đã ghi trong kỳ.
@@ -81,7 +81,7 @@ Gom mọi dữ liệu "hoạt động của người đọc" vào một chỗ, �
   - Người theo dõi = số giả theo slug + lượt theo dõi thật.
 - "Top tuần" ở trang chủ dùng chung số liệu tuần này (`getRanking`).
 
-### 2.4 Tủ truyện `/tu-truyen?muc=theo-doi|lich-su`
+### 2.4 Tủ truyện `/library?tab=following|history`
 - **Tab "Đang theo dõi"** (cần đăng nhập, chưa đăng nhập thì hiện lời mời):
   - Mỗi dòng có bìa, tên, "Đọc tới chương X/Y" hoặc "Chưa đọc", nhãn **"N chương mới"**, chương mới nhất và thời gian.
   - Nút: Đọc tiếp / Đọc, Bỏ theo dõi.
@@ -90,7 +90,7 @@ Gom mọi dữ liệu "hoạt động của người đọc" vào một chỗ, �
   - Mỗi dòng có chương đang đọc, % đã đọc, thời gian, nút Đọc tiếp và Xóa khỏi lịch sử.
   - Có nút "Xóa toàn bộ lịch sử" (hỏi lại trước khi xóa).
 
-### 2.5 Tài khoản `/tai-khoan` (bọc `RequireAuth`)
+### 2.5 Tài khoản `/account` (bọc `RequireAuth`)
 - **Hồ sơ:**
   - Ảnh đại diện: tải ảnh, cắt vuông 128px WebP. `prepareCover` tách thành `prepareImage`, dùng chung với bìa.
   - Tên hiển thị.
@@ -100,7 +100,7 @@ Gom mọi dữ liệu "hoạt động của người đọc" vào một chỗ, �
 - **Bình luận:** tên và ảnh của người viết lấy lại từ hồ sơ khi đọc, nên đổi tên hay ảnh thì bình luận cũ cũng đổi theo. Ảnh không chép vào từng bình luận.
 
 ### 2.6 Trang thông tin
-- `/gioi-thieu`, `/lien-he`, `/dieu-khoan`, `/bao-mat` dùng khung chung `InfoPage`: tiêu đề, ngày cập nhật, nội dung dạng prose, menu chuyển giữa 4 trang.
+- `/about`, `/contact`, `/terms`, `/privacy` dùng khung chung `InfoPage`: tiêu đề, ngày cập nhật, nội dung dạng prose, menu chuyển giữa 4 trang.
 - **Liên hệ:** form gồm họ tên, email, chủ đề, nội dung (zod), gửi qua `features/feedback/api.ts` (bản giả).
 - **Điều khoản và Bảo mật:** nội dung mẫu cho nền tảng đọc/đăng truyện, ghi rõ bản thử nghiệm đang lưu dữ liệu trên trình duyệt.
 

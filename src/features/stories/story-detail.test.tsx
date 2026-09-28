@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { renderApp } from '@/test/renderApp'
 
 const slow = { timeout: 3000 }
-const URL = '/truyen/truong-an-khong-tuyet'
+const URL = '/story/truong-an-khong-tuyet'
 
 beforeEach(() => localStorage.clear())
 const signIn = () => localStorage.setItem('mock-auth-session', JSON.stringify('demo'))
@@ -22,11 +22,11 @@ test('hiển thị thông tin truyện và danh sách chương', async () => {
 test('phân trang và đổi thứ tự chương đều ghi lên URL', async () => {
   const { router, user } = renderApp(URL)
   await user.click(await screen.findByRole('link', { name: 'Trang 2' }, slow))
-  expect(router.state.location.search).toBe('?trang=2')
+  expect(router.state.location.search).toBe('?page=2')
   await screen.findByRole('link', { name: /^Chương 51: / }, slow)
 
   await user.click(screen.getByRole('link', { name: 'Mới nhất' }))
-  expect(router.state.location.search).toBe('?sap-xep=moi')
+  expect(router.state.location.search).toBe('?sort=newest')
   await screen.findByRole('link', { name: /^Chương 412: / }, slow)
   expect(getChapters()[0]).toHaveTextContent('Chương 412:')
 })
@@ -41,7 +41,7 @@ test('đi tới chương ngoài khoảng thì báo lỗi, trong khoảng thì m�
   await user.clear(input)
   await user.type(input, '12{Enter}')
   // Trang đích lazy-load nên URL đổi sau khi module tải xong
-  await expect.poll(() => router.state.location.pathname, slow).toBe(`${URL}/chuong-12`)
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`${URL}/chapter-12`)
 })
 
 test('chưa đăng nhập bấm thêm vào tủ thì sang trang đăng nhập kèm next', async () => {
@@ -49,7 +49,7 @@ test('chưa đăng nhập bấm thêm vào tủ thì sang trang đăng nhập k�
   await user.click(await screen.findByRole('button', { name: 'Thêm vào tủ truyện' }, slow))
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe(`/dang-nhap?next=${encodeURIComponent(URL)}`)
+    .toBe(`/login?next=${encodeURIComponent(URL)}`)
 })
 
 test('đã đăng nhập: thêm vào tủ được lưu theo tài khoản', async () => {
@@ -87,6 +87,6 @@ test('đăng nhập rồi gửi và xóa bình luận', async () => {
 })
 
 test('slug không tồn tại thì hiện trang 404', async () => {
-  renderApp('/truyen/khong-co-truyen-nay')
+  renderApp('/story/khong-co-truyen-nay')
   expect(await screen.findByText(/Không tìm thấy truyện này/, {}, slow)).toBeInTheDocument()
 })
