@@ -1,8 +1,9 @@
 // Thể loại giả: thể loại có sẵn + do người dùng tạo (localStorage). Dùng cho test tự động và khi
 // chạy không có Supabase (xem api.ts). Bản thật: api.remote.ts.
-import { requireUser } from '@/features/auth/api'
+import { rateLimited, requireUser } from '@/features/auth/api'
 import { mockDelay as delay } from '@/lib/mockStorage'
 import { allGenres, catalog } from '@/mocks/catalog'
+import { countSince, DAY } from '@/mocks/rateLimit'
 import { loadUserGenres, saveUserGenres } from '@/mocks/userContent'
 import type { Genre } from '@/types/story'
 import { GenreExistsError, type GenreWithCount, normalizeGenreName } from './shared'
@@ -23,6 +24,14 @@ export async function createGenre(input: { name: string; description?: string })
   const { name, slug } = normalizeGenreName(input.name)
   const existing = allGenres().find((g) => g.slug === slug)
   if (existing) throw new GenreExistsError(existing)
+  const mine = loadUserGenres().filter((g) => g.createdBy?.id === user.id)
+  if (
+    countSince(
+      mine.map((g) => g.createdAt),
+      DAY,
+    ) >= 10
+  )
+    throw rateLimited()
 
   const genre = {
     slug,

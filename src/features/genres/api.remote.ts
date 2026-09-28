@@ -1,7 +1,7 @@
 // Thể loại trên Supabase: thêm vào bảng genres, đọc từ view genre_cards (kèm số truyện công khai).
 // slug là khóa chính, do trigger đặt = slugify(name), nên tạo trùng tên là lỗi 23505.
-import { requireUser } from '@/features/auth/api'
-import { isUniqueViolation, unwrap } from '@/lib/dbError'
+import { limitError, requireUser } from '@/features/auth/api'
+import { businessCode, isUniqueViolation, unwrap } from '@/lib/dbError'
 import { db } from '@/lib/supabase'
 import type { Database } from '@/types/database'
 import type { Genre } from '@/types/story'
@@ -70,7 +70,8 @@ export async function createGenre(input: { name: string; description?: string })
     const existing = await genreBySlug(slug)
     if (existing) throw new GenreExistsError(existing)
   }
-  const row = unwrap(result)
+  // Quá 10 thể loại / ngày thì DB báo rate_limited
+  const row = unwrap(result, (error) => limitError(businessCode(error)))
   return {
     slug: row.slug,
     name: row.name,

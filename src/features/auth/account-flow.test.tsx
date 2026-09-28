@@ -1,5 +1,7 @@
 import { screen, within } from '@testing-library/react'
-import { signInAs } from '@/test/helpers'
+import { getStory } from '@/features/stories/api'
+import { publishStory, registerUser, signInAs } from '@/test/helpers'
+import { getSession, signInWithPassword, signInWithProvider } from './api'
 import { renderApp } from '@/test/renderApp'
 
 const slow = { timeout: 3000 }
@@ -53,4 +55,51 @@ test('đổi mật khẩu: sai mật khẩu hiện tại thì báo, đúng thì 
   await expect(
     signInWithPassword({ email: 'demo@webtruyen.vn', password: 'matkhaumoi456' }),
   ).resolves.toMatchObject({ id: 'demo' })
+})
+
+test('xóa tài khoản email: sai mật khẩu thì báo, đúng thì xóa luôn truyện và về trang chủ', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const { router, user } = renderApp('/account')
+  const section = (await screen.findByRole('heading', { name: 'Xóa tài khoản' }, slow)).closest(
+    'section',
+  )!
+  expect(await within(section).findByText(/Bạn đang có 1 truyện/, {}, slow)).toBeInTheDocument()
+
+  const password = within(section).getByLabelText('Nhập mật khẩu để xác nhận')
+  await user.type(password, 'saimatkhau1')
+  await user.click(within(section).getByRole('button', { name: 'Xóa tài khoản vĩnh viễn' }))
+  expect(await within(section).findByText('Mật khẩu không đúng.', {}, slow)).toBeInTheDocument()
+
+  await user.clear(password)
+  await user.type(password, 'matkhau123')
+  await user.click(within(section).getByRole('button', { name: 'Xóa tài khoản vĩnh viễn' }))
+  await expect.poll(() => router.state.location.pathname, slow).toBe('/')
+  expect(await screen.findByText(/Đã xóa tài khoản/, {}, slow)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Đăng nhập' })).toBeInTheDocument()
+
+  expect(await getStory(story.slug)).toBeNull()
+  await expect(
+    signInWithPassword({ email: 'linh@gmail.com', password: 'matkhau123' }),
+  ).rejects.toMatchObject({ code: 'invalid_credentials' })
+})
+
+test('xóa tài khoản Google: gõ đúng email mới xóa được', async () => {
+  await signInWithProvider('google')
+  const { router, user } = renderApp('/account')
+  const section = (await screen.findByRole('heading', { name: 'Xóa tài khoản' }, slow)).closest(
+    'section',
+  )!
+  const confirm = within(section).getByLabelText(/Gõ email ban-doc-google@example.com/)
+  await user.type(confirm, 'nguoi-khac@example.com')
+  await user.click(within(section).getByRole('button', { name: 'Xóa tài khoản vĩnh viễn' }))
+  expect(
+    await within(section).findByText('Email nhập vào chưa khớp với tài khoản'),
+  ).toBeInTheDocument()
+
+  await user.clear(confirm)
+  await user.type(confirm, 'Ban-Doc-Google@example.com')
+  await user.click(within(section).getByRole('button', { name: 'Xóa tài khoản vĩnh viễn' }))
+  await expect.poll(() => router.state.location.pathname, slow).toBe('/')
+  expect(await getSession()).toBeNull()
 })

@@ -1,6 +1,7 @@
 // Auth giả lưu trong localStorage: dùng cho test tự động và khi chạy không có Supabase
 // (xem api.ts). Bản thật: api.remote.ts.
 import { mockDelay as delay, readMock as read, writeMock as write } from '@/lib/mockStorage'
+import { purgeUser } from '@/mocks/accounts'
 import {
   loadUsers,
   type MockUser,
@@ -147,6 +148,21 @@ export async function changePassword(input: { currentPassword: string; newPasswo
     throw new AuthError('invalid_credentials', 'Mật khẩu hiện tại không đúng.')
   }
   saveUsers(users.map((u) => (u.id === user.id ? { ...u, password: input.newPassword } : u)))
+}
+
+/**
+ * Xóa hẳn tài khoản đang đăng nhập cùng truyện, bình luận, tủ truyện... của họ, rồi đăng xuất.
+ * password: bắt buộc với tài khoản email (tài khoản Google/Facebook truyền null)
+ */
+export async function deleteAccount(password: string | null) {
+  await delay(500)
+  const current = await requireUser()
+  const user = loadUsers().find((u) => u.id === current.id)!
+  if (user.password !== null && user.password !== password) {
+    throw new AuthError('invalid_credentials', 'Mật khẩu không đúng.')
+  }
+  purgeUser(user.id)
+  write(SESSION_KEY, null)
 }
 
 export async function signOut() {

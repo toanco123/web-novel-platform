@@ -7,6 +7,7 @@ import {
   isDataUrl,
   publicImageUrl,
   removeImage,
+  removeUserImages,
   uploadImage,
 } from '@/lib/imageUpload'
 import { paths } from '@/lib/routes'
@@ -263,6 +264,35 @@ export async function changePassword(input: { currentPassword: string; newPasswo
   }
   const { error } = await db().auth.updateUser({ password: input.newPassword })
   if (error) throw authError(error)
+}
+
+/**
+ * Xóa hẳn tài khoản đang đăng nhập (RPC delete_account: DB xóa theo truyện, bình luận, tủ truyện...),
+ * rồi bỏ phiên trên máy. password: bắt buộc với tài khoản email, kiểm tra bằng cách đăng nhập lại.
+ */
+export async function deleteAccount(password: string | null) {
+  const user = await requireUser()
+  if (user.provider === 'email') {
+    const { error } = await db().auth.signInWithPassword({
+      email: user.email,
+      password: password ?? '',
+    })
+    if (error) {
+      throw isAuthApiError(error) && error.code === 'invalid_credentials'
+        ? new AuthError('invalid_credentials', 'Mật khẩu không đúng.')
+        : authError(error)
+    }
+  }
+  // Ảnh trong Storage không tự xóa theo tài khoản; xóa không được thì vẫn xóa tài khoản
+  // (chỉ để lại file thừa)
+  await Promise.allSettled([
+    removeUserImages('avatars', user.id),
+    removeUserImages('covers', user.id),
+  ])
+  unwrap(await db().rpc('delete_account'))
+  cachedProfile = null
+  // Tài khoản đã mất nên máy chủ có thể báo lỗi khi đăng xuất; chỉ cần xóa phiên trên máy
+  await db().auth.signOut({ scope: 'local' })
 }
 
 /** Chỉ đăng xuất trên máy này */

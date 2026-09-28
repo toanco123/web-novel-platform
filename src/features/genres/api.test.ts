@@ -31,3 +31,11 @@ test('tạo mới: chuẩn hóa tên, ghi người tạo, hiện trong danh sác
   expect(all.find((g) => g.slug === 'he-thong')).toMatchObject({ storyCount: 0 })
   await expect(createGenre({ name: 'He Thong' })).rejects.toBeInstanceOf(GenreExistsError)
 })
+
+test('chống spam: mỗi người tạo tối đa 10 thể loại / ngày', async () => {
+  signIn()
+  for (let i = 1; i <= 10; i++) await createGenre({ name: `Thể loại thử ${i}` })
+  await expect(createGenre({ name: 'Thể loại thử 11' })).rejects.toMatchObject({
+    code: 'rate_limited',
+  })
+})

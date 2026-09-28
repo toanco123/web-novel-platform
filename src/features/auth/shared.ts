@@ -24,6 +24,22 @@ export class AuthError extends Error {
 export const unauthenticated = () =>
   new AuthError('unauthenticated', 'Bạn cần đăng nhập để làm việc này.')
 
+export const rateLimited = () =>
+  new AuthError('rate_limited', 'Bạn thao tác hơi nhanh. Đợi một lát rồi thử lại.')
+
+export const duplicateComment = () =>
+  new AuthError('rate_limited', 'Bạn vừa gửi bình luận này rồi.')
+
+/**
+ * Mã lỗi chống spam của DB (bình luận, liên hệ, báo lỗi, tạo thể loại; mục 4
+ * documents/thiet-ke-database.md) → AuthError để form hiện lời báo; mã khác trả null
+ */
+export function limitError(code: string | null): AuthError | null {
+  if (code === 'rate_limited') return rateLimited()
+  if (code === 'duplicate_comment') return duplicateComment()
+  return null
+}
+
 /** Bật xác nhận email thì đăng ký xong chưa có phiên: user = null, needsEmailConfirmation = true */
 export type SignUpResult = { user: User | null; needsEmailConfirmation: boolean }
 

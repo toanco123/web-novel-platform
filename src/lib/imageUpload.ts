@@ -30,6 +30,17 @@ export async function uploadImage(bucket: ImageBucket, userId: string, dataUrl: 
   return path
 }
 
+/** Xóa mọi ảnh trong thư mục của người dùng (khi xóa tài khoản) */
+export async function removeUserImages(bucket: ImageBucket, userId: string) {
+  const { data, error } = await db().storage.from(bucket).list(userId, { limit: 1000 })
+  if (error) throw error
+  const paths = data.map((file) => `${userId}/${file.name}`)
+  if (paths.length) {
+    const { error: removeError } = await db().storage.from(bucket).remove(paths)
+    if (removeError) throw removeError
+  }
+}
+
 /** Xóa ảnh cũ; lỗi thì bỏ qua (chỉ để lại file thừa, không ảnh hưởng dữ liệu) */
 export async function removeImage(bucket: ImageBucket, path: string | null | undefined) {
   if (!path) return

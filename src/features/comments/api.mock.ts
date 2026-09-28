@@ -1,6 +1,6 @@
 // Bình luận và chấm điểm giả (bình luận mẫu + localStorage): dùng cho test tự động và khi chạy không
 // có Supabase (xem api.ts). Bản thật: api.remote.ts.
-import { getProfiles, requireUser } from '@/features/auth/api'
+import { duplicateComment, getProfiles, rateLimited, requireUser } from '@/features/auth/api'
 import { mockDelay as delay } from '@/lib/mockStorage'
 import {
   loadRatings,
@@ -10,6 +10,7 @@ import {
   saveUserComments,
 } from '@/mocks/activity'
 import { findStory } from '@/mocks/catalog'
+import { countSince, HOUR, MINUTE } from '@/mocks/rateLimit'
 import { seedChapterComments, seedComments } from '@/mocks/comments'
 import type { Comment, RatingSummary, Score } from '@/types/comment'
 import { COMMENTS_PER_PAGE, type CommentPage } from './shared'
@@ -63,6 +64,21 @@ export async function addComment(
 ): Promise<Comment> {
   await delay(400)
   const user = await requireUser()
+  const all = loadUserComments()
+  const mine = all.filter((c) => c.user.id === user.id)
+  if (
+    mine.some(
+      (c) =>
+        c.storySlug === slug &&
+        c.chapterNumber === chapter &&
+        c.content === content.trim() &&
+        countSince([c.createdAt], 10 * MINUTE) > 0,
+    )
+  ) {
+    throw duplicateComment()
+  }
+  const times = mine.map((c) => c.createdAt)
+  if (countSince(times, MINUTE) >= 3 || countSince(times, HOUR) >= 30) throw rateLimited()
   const comment: Comment = {
     id: crypto.randomUUID(),
     storySlug: slug,
@@ -72,7 +88,7 @@ export async function addComment(
     content: content.trim(),
     createdAt: new Date().toISOString(),
   }
-  saveUserComments([comment, ...loadUserComments()])
+  saveUserComments([comment, ...all])
   return comment
 }
 

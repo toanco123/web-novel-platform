@@ -28,6 +28,7 @@ export const {
   getProfiles,
   updateProfile,
   changePassword,
+  deleteAccount,
   signOut,
 } = api
 

@@ -59,3 +59,18 @@ test('bình luận hiện tên mới nhất của người viết', async () => 
   await updateProfile({ displayName: 'Tên Mới', avatarUrl: null })
   expect((await getComments(story.slug)).items[0].user.displayName).toBe('Tên Mới')
 })
+
+test('chống spam: gửi lại y hệt bị chặn, quá 3 bình luận / phút bị chặn', async () => {
+  signIn()
+  await addComment(story.slug, 'Hay quá')
+  await expect(addComment(story.slug, ' Hay quá ')).rejects.toMatchObject({
+    code: 'rate_limited',
+    message: 'Bạn vừa gửi bình luận này rồi.',
+  })
+  // Cùng nội dung nhưng ở chương khác thì vẫn gửi được
+  await addComment(story.slug, 'Hay quá', 1)
+  await addComment(story.slug, 'Chờ chương mới')
+  await expect(addComment(story.slug, 'Bình luận thứ tư')).rejects.toMatchObject({
+    code: 'rate_limited',
+  })
+})
