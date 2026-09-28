@@ -59,7 +59,14 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
 - **Feature-based**: `src/features/<feature>/` (stories, chapters, reader, auth, library, comments, genres, studio, feedback) chứa component + hooks + `api.ts` của feature đó. `src/components/ui/` là code shadcn sinh ra; `src/components/common/` là component dùng chung tự viết.
 - **Quy tắc dữ liệu (quan trọng)**: component không bao giờ gọi Supabase hay đọc `src/mocks/` trực tiếp. Mọi lấy/ghi dữ liệu đi qua `features/<x>/api.ts`, bọc bằng hook TanStack Query. Giai đoạn UI `api.ts` trả mock; khi nối backend chỉ thay ruột `api.ts`.
 - **State client**: Zustand (+ persist localStorage) cho cài đặt đọc (font, cỡ chữ, màu nền, theme). Dữ liệu server luôn ở TanStack Query, không đưa vào Zustand.
-- **Supabase client**: `src/lib/supabase.ts` export `supabase` có thể là `null` khi chưa cấu hình `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` — cần xử lý trường hợp này. Migration SQL để ở `supabase/migrations/`.
+- **Supabase client**: `src/lib/supabase.ts` export `supabase` (kiểu `Database` sinh ở `src/types/database.ts`) có thể là `null` khi chưa cấu hình `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` — cần xử lý trường hợp này.
+- **Database** (project `zsbyjxaaxtylgmxybzpf`, CLI đã `link`). Thiết kế và bảng tra "hàm api.ts → bảng/RPC" ở `documents/thiet-ke-database.md`; `api.ts` vẫn chạy mock cho tới khi nối từng feature.
+  - **Migration:** tạo bằng `supabase migration new <ten>` (không tự đặt tên file), rồi `supabase db push --dry-run` → `supabase db push` → `supabase db advisors --linked`.
+  - **Sau khi đổi schema:** sinh lại kiểu bằng `supabase gen types typescript --linked --schema public > src/types/database.ts` (file sinh ra, không format bằng prettier). Chạy `supabase db query --linked -f supabase/checks/rls_and_rules.sql` (chạy trong transaction rồi rollback, không lỗi = qua) và thêm ca kiểm tra mới vào file này.
+  - **Quyền:** bảng mới luôn `revoke all … from anon, authenticated` rồi `grant` đúng quyền, vì Supabase không còn tự mở bảng ra Data API và grant theo cột chỉ có tác dụng khi không có quyền mức bảng. Policy dùng `(select auth.uid())` và ghi rõ `to anon`/`to authenticated`.
+  - **Hàm:** hàm `security definer` để ở schema `private` với `set search_path = ''`. Khách cũng cần gọi thì làm lớp vỏ `security invoker` ở `public` gọi sang (như `record_chapter_view`). `supabase db advisors` không được còn cảnh báo mức WARN.
+  - **Luật nghiệp vụ** nằm ở trigger, ném lỗi có mã trong `error.message` (`no_published_chapters`, `last_published_chapter`, `chapter_number_locked`, `too_many_genres`, `not_found`, `unauthenticated`); trùng số chương/thể loại là `23505`.
+  - **Số liệu:** `story_stats` do trigger/RPC ghi, client chỉ đọc. Danh sách công khai lấy từ view `story_cards`, lọc `visibility = 'published'` và `chapter_count > 0`.
 - **SEO**: dùng thẻ `<title>`/`<meta>` native của React 19 đặt thẳng trong component trang (không dùng react-helmet).
 
 ## Quy ước
