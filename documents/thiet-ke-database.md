@@ -70,6 +70,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `too_many_genres` | Chọn quá 5 thể loại | `StudioError('too_many_genres')` ("Chọn tối đa 5 thể loại."); form cũng chặn trước |
 | `not_found` | RPC không thấy truyện, hoặc truyện không phải của mình | `StudioError('not_found')` |
 | `unauthenticated` | Gọi RPC cần đăng nhập khi chưa đăng nhập | `AuthError('unauthenticated')` |
+| `forbidden` | Gọi RPC quản trị (`admin_*`) mà không phải quản trị viên | `AdminError` |
 | `23505` (unique) | Trùng số chương / trùng thể loại | `chapter_exists` / `GenreExistsError` |
 | `42501` | Không có quyền (RLS hoặc grant) | Lỗi chung |
 
@@ -103,6 +104,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 - Hàm `security definer` đặt ở schema `private` (không lộ ra API) và luôn có `set search_path = ''`.
   - Hàm quyền cao mà khách cũng cần gọi (hiện chỉ có `record_chapter_view`) chia làm hai: `public.record_chapter_view` là lớp vỏ `security invoker`, gọi sang `private.record_chapter_view` (definer).
   - `anon`/`authenticated` có USAGE trên `private`, nhưng chỉ được EXECUTE đúng hàm đó.
+  - Các RPC quản trị (`admin_overview`, `admin_users`, `admin_stories`) cũng làm như vậy (cần đọc `auth.users` và truyện nháp của mọi người); chỉ `authenticated` được EXECUTE, và hàm ở `private` tự kiểm tra `private.is_admin()`.
+- **Quản trị viên** = `auth.users.raw_app_meta_data.role = 'admin'` (có trong JWT, người dùng không tự sửa được). Cách cấp quyền ở mục 10.
 - Sau mỗi migration chạy `supabase db advisors --linked`. Không được còn cảnh báo mức WARN; "unused index" (INFO) khi DB còn ít dữ liệu thì bỏ qua được.
 
 ## 6. View và RPC
@@ -129,6 +132,9 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `story_ranking(by, period, limit)` | mọi người | `(story_id, value)`. `by`: `views` \| `rating` \| `follows`; `period`: `week` \| `month` \| `all` |
 | `related_stories(slug, limit)` | mọi người | `(story_id, overlap)` |
 | `slugify(text)` | mọi người | Giống `src/lib/slugify.ts` |
+| `admin_overview(days)` | quản trị viên | jsonb giống kiểu `AdminOverview`: tổng số, chuỗi theo ngày (người dùng mới, lượt đọc, truyện mới, chương mới; giờ Việt Nam), truyện theo thể loại, top 10 lượt đọc |
+| `admin_users(query?)` | quản trị viên | Mọi tài khoản kèm email, provider, lần đăng nhập cuối, số truyện/bình luận/theo dõi; tìm tên/email không dấu |
+| `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp. `sort`: `updated` \| `views` \| `created` |
 
 ## 7. Storage
 
@@ -195,6 +201,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | comments | `getMyRating`, `rateStory` | `ratings` select / `upsert({ story_id, score }, { onConflict: 'user_id,story_id' })` |
 | feedback | `sendContactMessage` | `contact_messages.insert(...)` (không gọi `.select()`) |
 | feedback | `reportChapter` | `rpc('report_chapter')` |
+| admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |
+| admin | `getAdminUsers`, `getAdminStories` | `rpc('admin_users' / 'admin_stories', {...}, { count: 'exact' }).range()` qua `loadPage` |
 
 ## 9. Quy trình
 
@@ -214,5 +222,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
   - Bật Google/Facebook.
   - Mẫu email tiếng Việt.
 - **Chống spam:** giới hạn tần suất lượt đọc (hiện chỉ chống trùng ở client), bình luận và liên hệ.
-- **Vai trò quản trị:** xử lý báo lỗi, quản lý thể loại và `curated_stories`. Tạm thời làm qua Dashboard.
+- **Vai trò quản trị:** đã có trang `/quan-tri` chỉ để xem (tổng quan, người dùng, truyện; plan: `plan-trang-quan-tri.md`). Xử lý báo lỗi, quản lý thể loại và `curated_stories` vẫn làm qua Dashboard.
+  - Cấp quyền (chạy trong SQL editor hoặc `supabase db query --linked`), rồi người đó đăng xuất và đăng nhập lại để JWT có vai trò mới:
+    `update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role": "admin"}' where email = '...';`
+  - Thu hồi: `raw_app_meta_data - 'role'`. JWT cũ vẫn còn quyền tới khi hết hạn (mặc định 1 giờ).
 - **Hiệu năng:** khi số truyện lớn, thêm prefilter trigram cho `search_stories`; xếp hạng theo kỳ có thể chuyển sang materialized view.

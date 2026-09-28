@@ -35,6 +35,12 @@ export const paths = {
   contact: '/lien-he',
   terms: '/dieu-khoan',
   privacy: '/bao-mat',
+  /** Trang quản trị (chỉ quản trị viên) */
+  admin: '/quan-tri',
+  adminUsers: '/quan-tri/nguoi-dung',
+  /** ownerId: chỉ hiện truyện của một người dùng */
+  adminStories: (ownerId?: string) =>
+    ownerId ? `/quan-tri/truyen?tac-gia=${encodeURIComponent(ownerId)}` : '/quan-tri/truyen',
 }
 
 function withNext(path: string, next?: string) {

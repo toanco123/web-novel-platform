@@ -1,37 +1,25 @@
 // Auth giả lưu trong localStorage: dùng cho test tự động và khi chạy không có Supabase
 // (xem api.ts). Bản thật: api.remote.ts.
+import { mockDelay as delay, readMock as read, writeMock as write } from '@/lib/mockStorage'
 import {
-  mockDelay as delay,
-  readMock as read,
-  writeMock as write,
-  writeMockStrict,
-} from '@/lib/mockStorage'
+  loadUsers,
+  type MockUser,
+  saveUsers,
+  saveUsersStrict,
+  toPublicUser as toPublic,
+} from '@/mocks/users'
 import type { User } from '@/types/user'
 import { AuthError, type SignUpResult, type SocialProvider, unauthenticated } from './shared'
 
-type MockUser = User & { password: string | null }
-
-const USERS_KEY = 'mock-auth-users'
 const SESSION_KEY = 'mock-auth-session'
 
-const demoUser: MockUser = {
-  id: 'demo',
-  email: 'demo@webtruyen.vn',
-  displayName: 'Bạn đọc Demo',
-  avatarUrl: null,
-  provider: 'email',
-  password: 'matkhau123',
-}
-
-const loadUsers = () => read<MockUser[]>(USERS_KEY, [demoUser])
-const saveUsers = (users: MockUser[]) => write(USERS_KEY, users)
-// Ảnh đại diện là data URL, có thể làm đầy bộ nhớ: báo lỗi thay vì âm thầm bỏ qua
-const saveUsersStrict = (users: MockUser[]) => writeMockStrict(USERS_KEY, users)
-const toPublic = ({ password: _password, ...user }: MockUser): User => user
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
 function startSession(user: MockUser) {
   write(SESSION_KEY, user.id)
+  // Trang quản trị hiện lần đăng nhập cuối
+  const lastSignInAt = new Date().toISOString()
+  saveUsers(loadUsers().map((u) => (u.id === user.id ? { ...u, lastSignInAt } : u)))
   return toPublic(user)
 }
 
@@ -90,6 +78,7 @@ export async function signUp(input: {
     avatarUrl: null,
     provider: 'email',
     password: input.password,
+    createdAt: new Date().toISOString(),
   }
   saveUsers([...users, user])
   // Supabase có thể bật xác nhận email: khi đó needsEmailConfirmation = true và user = null
@@ -109,6 +98,7 @@ export async function signInWithProvider(provider: SocialProvider): Promise<User
       avatarUrl: null,
       provider,
       password: null,
+      createdAt: new Date().toISOString(),
     }
     saveUsers([...users, user])
   }

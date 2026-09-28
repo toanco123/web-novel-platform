@@ -79,6 +79,8 @@ function toUser(session: Session, profile: Profile): User {
     displayName: profile.displayName,
     avatarUrl: profile.avatarUrl,
     provider: provider === 'google' || provider === 'facebook' ? provider : 'email',
+    // app_metadata chỉ sửa được bằng quyền quản trị DB (cách cấp: thiet-ke-database.md)
+    isAdmin: session.user.app_metadata.role === 'admin',
   }
 }
 
