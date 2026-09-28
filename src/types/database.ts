@@ -1,0 +1,1079 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      chapter_reports: {
+        Row: {
+          chapter_number: number
+          created_at: string
+          id: string
+          note: string
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["report_status"]
+          story_id: string
+        }
+        Insert: {
+          chapter_number: number
+          created_at?: string
+          id?: string
+          note?: string
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["report_status"]
+          story_id: string
+        }
+        Update: {
+          chapter_number?: number
+          created_at?: string
+          id?: string
+          note?: string
+          reason?: Database["public"]["Enums"]["report_reason"]
+          reporter_id?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["report_status"]
+          story_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapter_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chapter_reports_story_id_chapter_number_fkey"
+            columns: ["story_id", "chapter_number"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["story_id", "number"]
+          },
+        ]
+      }
+      chapter_views: {
+        Row: {
+          chapter_number: number
+          day: string
+          story_id: string
+          views: number
+        }
+        Insert: {
+          chapter_number: number
+          day: string
+          story_id: string
+          views?: number
+        }
+        Update: {
+          chapter_number?: number
+          day?: string
+          story_id?: string
+          views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapter_views_story_id_chapter_number_fkey"
+            columns: ["story_id", "chapter_number"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["story_id", "number"]
+          },
+        ]
+      }
+      chapters: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          number: number
+          published_at: string | null
+          status: Database["public"]["Enums"]["publication_status"]
+          story_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          number: number
+          published_at?: string | null
+          status?: Database["public"]["Enums"]["publication_status"]
+          story_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          number?: number
+          published_at?: string | null
+          status?: Database["public"]["Enums"]["publication_status"]
+          story_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapters_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chapters_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chapters_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          chapter_number: number | null
+          content: string
+          created_at: string
+          id: string
+          story_id: string
+          user_id: string
+        }
+        Insert: {
+          chapter_number?: number | null
+          content: string
+          created_at?: string
+          id?: string
+          story_id: string
+          user_id?: string
+        }
+        Update: {
+          chapter_number?: number | null
+          content?: string
+          created_at?: string
+          id?: string
+          story_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_story_id_chapter_number_fkey"
+            columns: ["story_id", "chapter_number"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["story_id", "number"]
+          },
+          {
+            foreignKeyName: "comments_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_messages: {
+        Row: {
+          created_at: string
+          email: string
+          id: number
+          message: string
+          name: string
+          topic: Database["public"]["Enums"]["contact_topic"]
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: never
+          message: string
+          name: string
+          topic: Database["public"]["Enums"]["contact_topic"]
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: never
+          message?: string
+          name?: string
+          topic?: Database["public"]["Enums"]["contact_topic"]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      curated_stories: {
+        Row: {
+          list: string
+          position: number
+          story_id: string
+        }
+        Insert: {
+          list: string
+          position?: number
+          story_id: string
+        }
+        Update: {
+          list?: string
+          position?: number
+          story_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curated_stories_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curated_stories_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curated_stories_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follows: {
+        Row: {
+          followed_at: string
+          seen_chapter: number
+          story_id: string
+          user_id: string
+        }
+        Insert: {
+          followed_at?: string
+          seen_chapter?: number
+          story_id: string
+          user_id?: string
+        }
+        Update: {
+          followed_at?: string
+          seen_chapter?: number
+          story_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follows_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follows_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follows_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      genres: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          name?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "genres_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ratings: {
+        Row: {
+          created_at: string
+          score: number
+          story_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          score: number
+          story_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          score?: number
+          story_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reading_history: {
+        Row: {
+          chapter_number: number
+          chapter_title: string
+          progress: number
+          read_at: string
+          story_id: string
+          user_id: string
+        }
+        Insert: {
+          chapter_number: number
+          chapter_title?: string
+          progress?: number
+          read_at?: string
+          story_id: string
+          user_id?: string
+        }
+        Update: {
+          chapter_number?: number
+          chapter_title?: string
+          progress?: number
+          read_at?: string
+          story_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_history_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_history_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_history_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stories: {
+        Row: {
+          cover_path: string | null
+          created_at: string
+          description: string
+          id: string
+          owner_id: string
+          published_at: string | null
+          search_title: string | null
+          slug: string
+          status: Database["public"]["Enums"]["story_status"]
+          title: string
+          updated_at: string
+          visibility: Database["public"]["Enums"]["publication_status"]
+        }
+        Insert: {
+          cover_path?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          owner_id?: string
+          published_at?: string | null
+          search_title?: string | null
+          slug: string
+          status?: Database["public"]["Enums"]["story_status"]
+          title: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["publication_status"]
+        }
+        Update: {
+          cover_path?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          owner_id?: string
+          published_at?: string | null
+          search_title?: string | null
+          slug?: string
+          status?: Database["public"]["Enums"]["story_status"]
+          title?: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["publication_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stories_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_genres: {
+        Row: {
+          genre_slug: string
+          position: number
+          story_id: string
+        }
+        Insert: {
+          genre_slug: string
+          position?: number
+          story_id: string
+        }
+        Update: {
+          genre_slug?: string
+          position?: number
+          story_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_genres_genre_slug_fkey"
+            columns: ["genre_slug"]
+            isOneToOne: false
+            referencedRelation: "genre_cards"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "story_genres_genre_slug_fkey"
+            columns: ["genre_slug"]
+            isOneToOne: false
+            referencedRelation: "genres"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "story_genres_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_genres_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_genres_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_stats: {
+        Row: {
+          chapter_count: number
+          first_chapter_number: number | null
+          follower_count: number
+          last_chapter_at: string | null
+          latest_chapter_number: number | null
+          latest_chapter_title: string | null
+          rating_avg: number | null
+          rating_count: number | null
+          rating_counts: number[]
+          rating_sum: number | null
+          story_id: string
+          view_count: number
+        }
+        Insert: {
+          chapter_count?: number
+          first_chapter_number?: number | null
+          follower_count?: number
+          last_chapter_at?: string | null
+          latest_chapter_number?: number | null
+          latest_chapter_title?: string | null
+          rating_avg?: number | null
+          rating_count?: number | null
+          rating_counts?: number[]
+          rating_sum?: number | null
+          story_id: string
+          view_count?: number
+        }
+        Update: {
+          chapter_count?: number
+          first_chapter_number?: number | null
+          follower_count?: number
+          last_chapter_at?: string | null
+          latest_chapter_number?: number | null
+          latest_chapter_title?: string | null
+          rating_avg?: number | null
+          rating_count?: number | null
+          rating_counts?: number[]
+          rating_sum?: number | null
+          story_id?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_stats_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: true
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_stats_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: true
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_stats_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: true
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      genre_cards: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          created_by_name: string | null
+          description: string | null
+          name: string | null
+          slug: string | null
+          story_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "genres_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_cards: {
+        Row: {
+          author_name: string | null
+          chapter_count: number | null
+          cover_path: string | null
+          created_at: string | null
+          description: string | null
+          first_chapter_number: number | null
+          follower_count: number | null
+          genre_slugs: string[] | null
+          genres: Json | null
+          id: string | null
+          latest_chapter_number: number | null
+          latest_chapter_title: string | null
+          owner_id: string | null
+          rating_avg: number | null
+          rating_count: number | null
+          rating_counts: number[] | null
+          slug: string | null
+          status: Database["public"]["Enums"]["story_status"] | null
+          title: string | null
+          updated_at: string | null
+          view_count: number | null
+          visibility: Database["public"]["Enums"]["publication_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stories_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_stories: {
+        Row: {
+          chapter_count: number | null
+          cover_path: string | null
+          created_at: string | null
+          description: string | null
+          draft_count: number | null
+          followers: number | null
+          genre_slugs: string[] | null
+          id: string | null
+          open_reports: number | null
+          owner_id: string | null
+          owner_name: string | null
+          published_at: string | null
+          published_count: number | null
+          slug: string | null
+          status: Database["public"]["Enums"]["story_status"] | null
+          title: string | null
+          updated_at: string | null
+          views: number | null
+          visibility: Database["public"]["Enums"]["publication_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stories_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Functions: {
+      create_story: {
+        Args: {
+          p_cover_path?: string
+          p_description: string
+          p_first_chapter?: Json
+          p_genres: string[]
+          p_publish?: boolean
+          p_status: Database["public"]["Enums"]["story_status"]
+          p_title: string
+        }
+        Returns: {
+          chapter_count: number | null
+          cover_path: string | null
+          created_at: string | null
+          description: string | null
+          draft_count: number | null
+          followers: number | null
+          genre_slugs: string[] | null
+          id: string | null
+          open_reports: number | null
+          owner_id: string | null
+          owner_name: string | null
+          published_at: string | null
+          published_count: number | null
+          slug: string | null
+          status: Database["public"]["Enums"]["story_status"] | null
+          title: string | null
+          updated_at: string | null
+          views: number | null
+          visibility: Database["public"]["Enums"]["publication_status"] | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "studio_stories"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_library: {
+        Args: never
+        Returns: {
+          followed_at: string
+          new_chapters: number
+          seen_chapter: number
+          slug: string
+          story_id: string
+        }[]
+      }
+      library_update_count: { Args: never; Returns: number }
+      merge_guest_history: { Args: { p_entries: Json }; Returns: undefined }
+      record_chapter_view: {
+        Args: { p_number: number; p_slug: string }
+        Returns: undefined
+      }
+      related_stories: {
+        Args: { p_limit?: number; p_slug: string }
+        Returns: {
+          overlap: number
+          story_id: string
+        }[]
+      }
+      report_chapter: {
+        Args: {
+          p_chapter: number
+          p_note?: string
+          p_reason: Database["public"]["Enums"]["report_reason"]
+          p_slug: string
+        }
+        Returns: {
+          chapter_number: number
+          created_at: string
+          id: string
+          note: string
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["report_status"]
+          story_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "chapter_reports"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_reading_progress: {
+        Args: {
+          p_chapter: number
+          p_chapter_title: string
+          p_progress?: number
+          p_slug: string
+        }
+        Returns: {
+          chapter_number: number
+          chapter_title: string
+          progress: number
+          read_at: string
+          story_id: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "reading_history"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      search_stories: {
+        Args: { p_query: string }
+        Returns: {
+          score: number
+          story_id: string
+          view_count: number
+        }[]
+      }
+      slugify: { Args: { value: string }; Returns: string }
+      story_ranking: {
+        Args: { p_by?: string; p_limit?: number; p_period?: string }
+        Returns: {
+          story_id: string
+          value: number
+        }[]
+      }
+      studio_story_stats: { Args: { p_story_id: string }; Returns: Json }
+      update_story: {
+        Args: {
+          p_cover_path?: string
+          p_description: string
+          p_genres: string[]
+          p_id: string
+          p_status: Database["public"]["Enums"]["story_status"]
+          p_title: string
+        }
+        Returns: {
+          chapter_count: number | null
+          cover_path: string | null
+          created_at: string | null
+          description: string | null
+          draft_count: number | null
+          followers: number | null
+          genre_slugs: string[] | null
+          id: string | null
+          open_reports: number | null
+          owner_id: string | null
+          owner_name: string | null
+          published_at: string | null
+          published_count: number | null
+          slug: string | null
+          status: Database["public"]["Enums"]["story_status"] | null
+          title: string | null
+          updated_at: string | null
+          views: number | null
+          visibility: Database["public"]["Enums"]["publication_status"] | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "studio_stories"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+    }
+    Enums: {
+      contact_topic: "general" | "bug" | "copyright" | "partnership"
+      publication_status: "draft" | "published"
+      report_reason: "typo" | "missing" | "order" | "violation" | "other"
+      report_status: "open" | "resolved"
+      story_status: "ongoing" | "completed"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      contact_topic: ["general", "bug", "copyright", "partnership"],
+      publication_status: ["draft", "published"],
+      report_reason: ["typo", "missing", "order", "violation", "other"],
+      report_status: ["open", "resolved"],
+      story_status: ["ongoing", "completed"],
+    },
+  },
+} as const

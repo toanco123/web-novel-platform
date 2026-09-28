@@ -77,7 +77,7 @@ function ShowcasePanel() {
       {quoted && (
         <figure className="max-w-md">
           <blockquote className="font-heading text-2xl leading-snug text-balance italic">
-            “{quoted.description.split('. ')[0]}.”
+            “{firstSentence(quoted.description)}”
           </blockquote>
           <figcaption className="mt-3 text-sm text-[#d9a68f]">
             {quoted.title}, {quoted.author.name}
@@ -86,4 +86,13 @@ function ShowcasePanel() {
       )}
     </aside>
   )
+}
+
+/** Câu đầu của phần giới thiệu, luôn có dấu kết câu (giới thiệu người dùng viết có thể chỉ một câu) */
+function firstSentence(text: string) {
+  const first = text
+    .trim()
+    .split(/(?<=[.!?…])\s+|\n/)[0]
+    .trim()
+  return /[.!?…]$/.test(first) ? first : `${first}.`
 }

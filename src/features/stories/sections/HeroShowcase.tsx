@@ -23,9 +23,11 @@ export function HeroShowcase() {
   if (isPending) return <HeroSkeleton />
   if (isError || stories.length === 0) return null
 
-  const story = stories[index]
+  // Danh sách tải lại có thể ít đi (vd truyện bị ẩn) khi đang ở slide cuối: kẹp về slide cuối mới
+  const current = Math.min(index, stories.length - 1)
+  const story = stories[current]
   const p = coverPalette(story.slug)
-  const next = () => setIndex((i) => (i + 1) % stories.length)
+  const next = () => setIndex((current + 1) % stories.length)
 
   return (
     <section
@@ -56,7 +58,7 @@ export function HeroShowcase() {
         <div
           key={story.slug}
           aria-roledescription="slide"
-          aria-label={`${index + 1} / ${stories.length}`}
+          aria-label={`${current + 1} / ${stories.length}`}
           className="motion-safe:animate-in motion-safe:duration-700 motion-safe:fade-in"
         >
           <p className="flex flex-wrap gap-x-3 text-sm text-[#d9a68f]">
@@ -106,9 +108,9 @@ export function HeroShowcase() {
               asChild
               className="h-11 rounded-full bg-[#ff3d8b] px-6 text-[#1a0f1d] shadow-[0_0_30px_rgb(255_61_139/0.45)] hover:bg-[#ff5c9e]"
             >
-              <Link to={paths.chapter(story.slug, 1)}>
+              <Link to={paths.chapter(story.slug, story.firstChapterNumber ?? 1)}>
                 <BookOpen />
-                Đọc từ chương 1
+                Đọc từ chương {story.firstChapterNumber ?? 1}
               </Link>
             </Button>
             <FollowButton slug={story.slug} onDark />
@@ -133,7 +135,7 @@ export function HeroShowcase() {
       <Container className="pb-8">
         <div className="flex gap-3" role="tablist" aria-label="Chọn truyện nổi bật">
           {stories.map((s, i) => {
-            const active = i === index
+            const active = i === current
             return (
               <button
                 key={s.slug}

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { StorageFullError } from '@/lib/mockStorage'
 import type { User } from '@/types/user'
 import * as api from './api'
@@ -9,6 +10,34 @@ export const authKeys = {
 
 export const useSession = () =>
   useQuery({ queryKey: authKeys.session, queryFn: api.getSession, staleTime: Infinity })
+
+/** Tải lại phiên khi đăng nhập/đăng xuất xảy ra ngoài các hook ở đây (tab khác, link email, hết hạn) */
+export function useAuthSync() {
+  const queryClient = useQueryClient()
+  useEffect(
+    () =>
+      api.onAuthStateChange(
+        () => void queryClient.invalidateQueries({ queryKey: authKeys.session }),
+      ),
+    [queryClient],
+  )
+}
+
+/** Trang /auth/callback: lấy phiên vừa tạo từ link quay về, rồi lưu vào cache phiên */
+export function useCompleteAuthRedirect() {
+  const queryClient = useQueryClient()
+  return useQuery({
+    queryKey: ['auth', 'callback'],
+    queryFn: async () => {
+      const user = await api.completeAuthRedirect()
+      queryClient.setQueryData(authKeys.session, user)
+      return user
+    },
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+  })
+}
 
 function useSetSession() {
   const queryClient = useQueryClient()

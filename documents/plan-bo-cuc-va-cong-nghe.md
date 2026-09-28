@@ -161,19 +161,9 @@ web-truyen/
 
 ---
 
-## 5. Phác thảo database Supabase (cho giai đoạn BE)
+## 5. Database Supabase
 
-- `profiles` (id → auth.users, username, avatar_url)
-- `authors`, `genres`
-- `stories` (slug, title, author_id, cover_url, description, status, view_count, rating_avg, updated_at)
-- `story_genres` (story_id, genre_id)
-- `chapters` (story_id, number, title, content, created_at) — index (story_id, number)
-- `bookmarks` (user_id, story_id)
-- `reading_history` (user_id, story_id, chapter_id, scroll_pos, updated_at)
-- `comments` (user_id, story_id, chapter_id nullable, content, parent_id)
-- `ratings` (user_id, story_id, score 1–5)
-- RLS: truyện/chương đọc công khai; bookmark/history/comment/rating chỉ chủ sở hữu được ghi.
-- Tìm kiếm: Postgres full-text search (`unaccent` để tìm không dấu).
+Thiết kế chi tiết (bảng, luật nghiệp vụ, RLS, RPC, storage, bảng tra khi nối `api.ts`) ở [thiet-ke-database.md](thiet-ke-database.md); SQL ở `supabase/migrations/`. Bản phác thảo ban đầu ở đây đã được thay bằng thiết kế đó (bỏ bảng `authors` vì mọi truyện đều có chủ, thêm `story_stats`, chương nháp, báo lỗi, lượt đọc theo ngày).
 
 ---
 
@@ -185,7 +175,7 @@ web-truyen/
 4. **UI tài khoản**: đăng nhập/đăng ký ✅ (25/09/2026, chi tiết ở `plan-dang-nhap-dang-ky.md`), nút tủ truyện + bình luận/đánh giá ✅ (trên trang chi tiết), trang Tủ truyện + lịch sử đọc + báo chương mới ✅, trang Tài khoản ✅, trang thông tin (giới thiệu/liên hệ/điều khoản/bảo mật) ✅ (25/09/2026, vẫn mock).
 4c. **Tính năng đọc & tác giả** ✅ (25/09/2026): nghe truyện, cuộn liên tục, bình luận chương, báo lỗi chương, thống kê + báo lỗi trong khu Sáng tác.
 4b. **Sáng tác & thể loại** ✅ (25/09/2026, chi tiết ở `plan-sang-tac-va-the-loai.md`): tạo thể loại, đăng truyện, soạn/nhập chương, xuất bản.
-5. **Nối Supabase**: tạo schema + RLS + seed, Auth, thay `api.ts` từng feature.
+5. **Nối Supabase**: schema + RLS + trigger + RPC + storage ✅ (28/09/2026, chi tiết ở `thiet-ke-database.md`, không seed dữ liệu) → cấu hình Auth → thay `api.ts` từng feature.
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---

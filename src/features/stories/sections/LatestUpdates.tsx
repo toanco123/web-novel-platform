@@ -14,6 +14,10 @@ export function LatestUpdates() {
       </SectionHeading>
       {isError ? (
         <SectionError />
+      ) : data?.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+          Chưa có truyện nào được đăng.
+        </p>
       ) : (
         <ul className="divide-y rounded-xl border bg-card/50">
           {isPending

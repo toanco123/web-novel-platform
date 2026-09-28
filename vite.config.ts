@@ -29,6 +29,8 @@ export default defineConfig(({ mode }) => {
       setupFiles: './src/test/setup.ts',
       // Test luồng đi qua nhiều trang, mỗi lần gọi api giả có độ trễ; chạy song song dễ quá 5s mặc định
       testTimeout: 10_000,
+      // Test luôn chạy trên dữ liệu giả (api.mock.ts), không gọi Supabase thật dù .env có cấu hình
+      env: { VITE_USE_MOCK: 'true' },
     },
   }
 })

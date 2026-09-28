@@ -13,6 +13,8 @@ export const paths = {
   register: (next?: string) => withNext('/dang-ky', next),
   forgotPassword: '/quen-mat-khau',
   resetPassword: '/dat-lai-mat-khau',
+  /** Đích quay về sau khi đăng nhập Google/Facebook hoặc bấm link xác nhận email */
+  authCallback: '/auth/callback',
   account: '/tai-khoan',
   genres: '/the-loai',
   studio: '/sang-tac',

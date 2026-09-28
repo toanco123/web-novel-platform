@@ -1,15 +1,18 @@
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { User } from '@/types/user'
+import { type SocialProvider, socialProviders } from '../api'
 import { authErrorMessage, useSignInWithProvider } from '../hooks'
+import { AuthDivider } from './AuthDivider'
 import { FormAlert } from './FormAlert'
 
-type Provider = 'google' | 'facebook'
-
-const providers: { id: Provider; name: string; Logo: () => React.JSX.Element }[] = [
-  { id: 'google', name: 'Google', Logo: GoogleLogo },
-  { id: 'facebook', name: 'Facebook', Logo: FacebookLogo },
-]
+// Chỉ hiện provider đã bật (xem socialProviders trong api.ts)
+const providers = (
+  [
+    { id: 'google', name: 'Google', Logo: GoogleLogo },
+    { id: 'facebook', name: 'Facebook', Logo: FacebookLogo },
+  ] satisfies { id: SocialProvider; name: string; Logo: () => React.JSX.Element }[]
+).filter((p) => socialProviders.includes(p.id))
 
 type Props = {
   verb: 'Đăng nhập' | 'Đăng ký'
@@ -17,7 +20,18 @@ type Props = {
   disabled?: boolean
 }
 
-export function SocialButtons({ verb, onSuccess, disabled }: Props) {
+/** Các nút đăng nhập mạng xã hội kèm vạch "hoặc"; không có provider nào thì không hiện gì */
+export function SocialButtons(props: Props) {
+  if (!providers.length) return null
+  return (
+    <>
+      <ProviderButtons {...props} />
+      <AuthDivider />
+    </>
+  )
+}
+
+function ProviderButtons({ verb, onSuccess, disabled }: Props) {
   const mutation = useSignInWithProvider()
 
   return (
