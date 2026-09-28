@@ -1,46 +1,46 @@
 // Tập trung mọi đường dẫn để không viết URL cứng rải rác trong component
 export const paths = {
   home: '/',
-  story: (slug: string) => `/truyen/${slug}`,
-  chapter: (slug: string, number: number) => `/truyen/${slug}/chuong-${number}`,
-  genre: (slug: string) => `/the-loai/${slug}`,
-  latest: '/danh-sach/moi-cap-nhat',
-  completed: '/danh-sach/hoan-thanh',
-  ongoing: '/danh-sach/dang-ra',
-  ranking: '/bang-xep-hang',
-  search: (q?: string) => (q ? `/tim-kiem?q=${encodeURIComponent(q)}` : '/tim-kiem'),
-  login: (next?: string) => withNext('/dang-nhap', next),
-  register: (next?: string) => withNext('/dang-ky', next),
-  forgotPassword: '/quen-mat-khau',
-  resetPassword: '/dat-lai-mat-khau',
+  story: (slug: string) => `/story/${slug}`,
+  chapter: (slug: string, number: number) => `/story/${slug}/chapter-${number}`,
+  genre: (slug: string) => `/genres/${slug}`,
+  latest: '/list/latest',
+  completed: '/list/completed',
+  ongoing: '/list/ongoing',
+  ranking: '/ranking',
+  search: (q?: string) => (q ? `/search?q=${encodeURIComponent(q)}` : '/search'),
+  login: (next?: string) => withNext('/login', next),
+  register: (next?: string) => withNext('/register', next),
+  forgotPassword: '/forgot-password',
+  resetPassword: '/reset-password',
   /** Đích quay về sau khi đăng nhập Google/Facebook hoặc bấm link xác nhận email */
   authCallback: '/auth/callback',
-  account: '/tai-khoan',
-  genres: '/the-loai',
-  studio: '/sang-tac',
+  account: '/account',
+  genres: '/genres',
+  studio: '/studio',
   /** genre: chọn sẵn thể loại trong form đăng truyện */
   studioNewStory: (genre?: string) =>
-    genre ? `/sang-tac/truyen-moi?the-loai=${encodeURIComponent(genre)}` : '/sang-tac/truyen-moi',
+    genre ? `/studio/new-story?genre=${encodeURIComponent(genre)}` : '/studio/new-story',
   /** tab: mở sẵn tab của trang quản lý truyện (mặc định tab Chương) */
-  studioStory: (id: string, tab?: 'thong-ke' | 'bao-loi' | 'thong-tin') =>
-    tab ? `/sang-tac/truyen/${id}?muc=${tab}` : `/sang-tac/truyen/${id}`,
+  studioStory: (id: string, tab?: 'stats' | 'reports' | 'info') =>
+    tab ? `/studio/story/${id}?tab=${tab}` : `/studio/story/${id}`,
   /** number: điền sẵn số chương (viết bù chương còn trống) */
   studioNewChapter: (id: string, number?: number) =>
-    number ? `/sang-tac/truyen/${id}/chuong-moi?so=${number}` : `/sang-tac/truyen/${id}/chuong-moi`,
-  studioChapter: (id: string, number: number) => `/sang-tac/truyen/${id}/chuong/${number}`,
-  studioImport: (id: string) => `/sang-tac/truyen/${id}/nhap-file`,
-  library: '/tu-truyen',
-  readingHistory: '/tu-truyen?muc=lich-su',
-  about: '/gioi-thieu',
-  contact: '/lien-he',
-  terms: '/dieu-khoan',
-  privacy: '/bao-mat',
+    number ? `/studio/story/${id}/new-chapter?number=${number}` : `/studio/story/${id}/new-chapter`,
+  studioChapter: (id: string, number: number) => `/studio/story/${id}/chapter/${number}`,
+  studioImport: (id: string) => `/studio/story/${id}/import`,
+  library: '/library',
+  readingHistory: '/library?tab=history',
+  about: '/about',
+  contact: '/contact',
+  terms: '/terms',
+  privacy: '/privacy',
   /** Trang quản trị (chỉ quản trị viên) */
-  admin: '/quan-tri',
-  adminUsers: '/quan-tri/nguoi-dung',
+  admin: '/admin',
+  adminUsers: '/admin/users',
   /** ownerId: chỉ hiện truyện của một người dùng */
   adminStories: (ownerId?: string) =>
-    ownerId ? `/quan-tri/truyen?tac-gia=${encodeURIComponent(ownerId)}` : '/quan-tri/truyen',
+    ownerId ? `/admin/stories?owner=${encodeURIComponent(ownerId)}` : '/admin/stories',
 }
 
 function withNext(path: string, next?: string) {

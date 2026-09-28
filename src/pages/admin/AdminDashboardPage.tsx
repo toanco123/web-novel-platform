@@ -25,15 +25,15 @@ const parsePeriod = (value: string | null): AdminPeriod =>
 
 export default function AdminDashboardPage() {
   const [params, setParams] = useSearchParams()
-  const period = parsePeriod(params.get('ky'))
+  const period = parsePeriod(params.get('period'))
   const { data, isPending, isError } = useAdminOverview(period)
 
   const setPeriod = (value: AdminPeriod) =>
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev)
-        if (value === DEFAULT_PERIOD) next.delete('ky')
-        else next.set('ky', String(value))
+        if (value === DEFAULT_PERIOD) next.delete('period')
+        else next.set('period', String(value))
         return next
       },
       { replace: true },

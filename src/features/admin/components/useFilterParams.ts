@@ -6,14 +6,14 @@ import { useSearchParams } from 'react-router'
  */
 export function useFilterParams() {
   const [params, setParams] = useSearchParams()
-  const page = Math.max(1, Math.floor(Number(params.get('trang'))) || 1)
+  const page = Math.max(1, Math.floor(Number(params.get('page'))) || 1)
 
   const update = (changes: Record<string, string | null>) =>
     setParams((prev) => {
       const next = new URLSearchParams(prev)
-      if (!('trang' in changes)) next.delete('trang')
+      if (!('page' in changes)) next.delete('page')
       for (const [key, value] of Object.entries(changes)) {
-        if (value && !(key === 'trang' && value === '1')) next.set(key, value)
+        if (value && !(key === 'page' && value === '1')) next.set(key, value)
         else next.delete(key)
       }
       return next

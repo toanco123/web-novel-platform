@@ -8,7 +8,7 @@ const slow = { timeout: 3000 }
 beforeEach(() => localStorage.clear())
 
 test('khách vào tủ truyện: mặc định xem lịch sử, tab theo dõi mời đăng nhập', async () => {
-  const { user } = renderApp('/tu-truyen')
+  const { user } = renderApp('/library')
   expect(await screen.findByText('Chưa có lịch sử đọc', {}, slow)).toBeInTheDocument()
   expect(screen.getByText(/Lịch sử đang lưu trên trình duyệt này/)).toBeInTheDocument()
   await user.click(screen.getByRole('link', { name: 'Đang theo dõi' }))
@@ -29,7 +29,7 @@ test('có chương mới: chấm trên avatar, số trong tab, nhãn trên truy�
   )
   signInAs(reader)
 
-  const { user } = renderApp('/tu-truyen')
+  const { user } = renderApp('/library')
   expect(
     await screen.findByRole('button', { name: /1 truyện có chương mới/ }, slow),
   ).toBeInTheDocument()
@@ -53,12 +53,12 @@ test('lịch sử: xóa một truyện, xóa toàn bộ phải xác nhận', asy
       ],
     }),
   )
-  const { user } = renderApp('/tu-truyen?muc=lich-su')
+  const { user } = renderApp('/library?tab=history')
   const list = await screen.findByRole('list', { name: 'Lịch sử đọc' }, slow)
   expect(within(list).getByText('50%')).toBeInTheDocument()
   expect(within(list).getAllByRole('link', { name: 'Đọc tiếp' })[0]).toHaveAttribute(
     'href',
-    '/truyen/mong-hoa-luc/chuong-2',
+    '/story/mong-hoa-luc/chapter-2',
   )
 
   await user.click(within(list).getByRole('button', { name: 'Xóa Mộng Hoa Lục khỏi lịch sử' }))

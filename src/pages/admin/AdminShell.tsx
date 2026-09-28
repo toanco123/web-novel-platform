@@ -4,7 +4,7 @@ import { RequireAuth } from '@/components/common/RequireAuth'
 import { AdminLayout } from '@/features/admin/components/AdminLayout'
 import { useSession } from '@/features/auth/hooks'
 
-/** Khung chung cho mọi trang /quan-tri: bắt buộc đăng nhập và là quản trị viên */
+/** Khung chung cho mọi trang /admin: bắt buộc đăng nhập và là quản trị viên */
 export default function AdminShell() {
   return (
     <RequireAuth>

@@ -85,7 +85,7 @@ export async function getRelatedStories(slug: string, limit = 6): Promise<Story[
     .slice(0, limit)
 }
 
-// ── Danh sách có bộ lọc (/danh-sach/:loai, /the-loai/:slug) ──────────────
+// ── Danh sách có bộ lọc (/list/:type, /genres/:slug) ──────────────
 
 const lengthMatches: Record<StoryLength, (chapters: number) => boolean> = {
   short: (n) => n < 50,

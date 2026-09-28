@@ -123,7 +123,7 @@ export async function getRelatedStories(slug: string, limit = 6): Promise<Story[
   return storiesByIds(rows.map((r) => r.story_id))
 }
 
-// ── Danh sách có bộ lọc (/danh-sach/:loai, /the-loai/:slug) ──────────────
+// ── Danh sách có bộ lọc (/list/:type, /genres/:slug) ──────────────
 
 /** Cột sắp xếp (giảm dần); cột sau để phân định khi cột trước bằng nhau */
 const sortColumns: Record<StorySort, (keyof StoryCardRow & string)[]> = {

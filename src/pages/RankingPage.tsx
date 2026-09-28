@@ -14,42 +14,42 @@ import { cn } from '@/lib/utils'
 const criteria: { value: RankingCriterion; param: string; label: string; hint: string }[] = [
   {
     value: 'views',
-    param: 'luot-doc',
+    param: 'views',
     label: 'Đọc nhiều',
     hint: 'Xếp theo lượt đọc chương trong kỳ.',
   },
   {
     value: 'rating',
-    param: 'danh-gia',
+    param: 'rating',
     label: 'Điểm cao',
     hint: 'Xếp theo điểm, có tính cả số lượt chấm để truyện ít lượt chấm không lên đầu.',
   },
   {
     value: 'follows',
-    param: 'theo-doi',
+    param: 'follows',
     label: 'Theo dõi nhiều',
     hint: 'Xếp theo số người thêm truyện vào tủ.',
   },
 ]
 
 const periods: { value: RankingPeriod; param: string; label: string }[] = [
-  { value: 'week', param: 'tuan', label: 'Tuần' },
-  { value: 'month', param: 'thang', label: 'Tháng' },
-  { value: 'all', param: 'tat-ca', label: 'Mọi lúc' },
+  { value: 'week', param: 'week', label: 'Tuần' },
+  { value: 'month', param: 'month', label: 'Tháng' },
+  { value: 'all', param: 'all', label: 'Mọi lúc' },
 ]
 
 const rankColor = ['text-neon', 'text-rose-gold', 'text-rose-gold/80']
 
 export default function RankingPage() {
   const [params] = useSearchParams()
-  const criterion = criteria.find((c) => c.param === params.get('theo')) ?? criteria[0]
-  const period = periods.find((p) => p.param === params.get('ky')) ?? periods[0]
+  const criterion = criteria.find((c) => c.param === params.get('by')) ?? criteria[0]
+  const period = periods.find((p) => p.param === params.get('period')) ?? periods[0]
   const { data, isPending, isError, isPlaceholderData } = useRanking(criterion.value, period.value)
 
-  const search = (theo: string, ky?: string) => {
+  const search = (by: string, period?: string) => {
     const next = new URLSearchParams()
-    if (theo !== criteria[0].param) next.set('theo', theo)
-    if (ky && ky !== periods[0].param) next.set('ky', ky)
+    if (by !== criteria[0].param) next.set('by', by)
+    if (period && period !== periods[0].param) next.set('period', period)
     const s = next.toString()
     return s ? `?${s}` : ''
   }

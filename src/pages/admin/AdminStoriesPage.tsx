@@ -10,26 +10,25 @@ import type { StoryVisibility } from '@/types/story'
 
 const number = new Intl.NumberFormat('vi-VN')
 
-// Giá trị trên URL (tiếng Việt không dấu) ↔ giá trị của api
-const visibilityParams: Record<string, StoryVisibility> = {
-  'cong-khai': 'published',
-  nhap: 'draft',
-}
-const sortParams: Record<string, AdminStorySort> = { 'luot-doc': 'views', 'moi-tao': 'created' }
+// Giá trị hợp lệ trên URL (?visibility=, ?sort=); giá trị khác coi như mặc định
+const VISIBILITIES: StoryVisibility[] = ['published', 'draft']
+const SORTS: AdminStorySort[] = ['views', 'created']
+const pick = <T extends string>(options: T[], value: string | null) =>
+  options.find((o) => o === value)
 
 export default function AdminStoriesPage() {
   const { params, page, update } = useFilterParams()
   // Màn hẹp không ghim cột đầu, nếu không nó chiếm hết chiều ngang và che các cột khác
   const pinFirst = Grid.useBreakpoint().md ?? false
   const q = params.get('q') ?? ''
-  const visibilityParam = params.get('hien-thi') ?? ''
-  const sortParam = params.get('sap-xep') ?? ''
-  const ownerId = params.get('tac-gia') ?? undefined
+  const visibility = pick(VISIBILITIES, params.get('visibility'))
+  const sort = pick(SORTS, params.get('sort'))
+  const ownerId = params.get('owner') ?? undefined
   const { data, isPending, isFetching, isError } = useAdminStories({
     q,
-    visibility: visibilityParams[visibilityParam],
+    visibility,
     ownerId,
-    sort: sortParams[sortParam] ?? 'updated',
+    sort: sort ?? 'updated',
     page,
   })
   const ownerName = ownerId && data?.items[0]?.ownerName
@@ -56,28 +55,28 @@ export default function AdminStoriesPage() {
             onSearch={(value) => update({ q: value.trim() })}
           />
           <Segmented
-            value={visibilityParams[visibilityParam] ? visibilityParam : ''}
-            onChange={(value) => update({ 'hien-thi': value })}
+            value={visibility ?? ''}
+            onChange={(value) => update({ visibility: value })}
             options={[
               { label: 'Tất cả', value: '' },
-              { label: 'Công khai', value: 'cong-khai' },
-              { label: 'Nháp', value: 'nhap' },
+              { label: 'Công khai', value: 'published' },
+              { label: 'Nháp', value: 'draft' },
             ]}
             aria-label="Lọc theo hiển thị"
           />
           <Select
-            value={sortParams[sortParam] ? sortParam : ''}
-            onChange={(value) => update({ 'sap-xep': value })}
+            value={sort ?? ''}
+            onChange={(value) => update({ sort: value })}
             className="w-44"
             aria-label="Sắp xếp"
             options={[
               { label: 'Mới cập nhật', value: '' },
-              { label: 'Nhiều lượt đọc', value: 'luot-doc' },
-              { label: 'Mới tạo', value: 'moi-tao' },
+              { label: 'Nhiều lượt đọc', value: 'views' },
+              { label: 'Mới tạo', value: 'created' },
             ]}
           />
           {ownerId && (
-            <Tag closable onClose={() => update({ 'tac-gia': null })} closeIcon aria-live="polite">
+            <Tag closable onClose={() => update({ owner: null })} closeIcon aria-live="polite">
               Tác giả: {ownerName || 'đã chọn'}
             </Tag>
           )}
@@ -98,7 +97,7 @@ export default function AdminStoriesPage() {
               pageSize: ADMIN_PAGE_SIZE,
               showSizeChanger: false,
               hideOnSinglePage: true,
-              onChange: (p) => update({ trang: String(p) }),
+              onChange: (p) => update({ page: String(p) }),
             }}
             columns={[
               {

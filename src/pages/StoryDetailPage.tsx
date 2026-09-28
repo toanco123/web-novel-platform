@@ -44,8 +44,8 @@ export default function StoryDetailPage() {
 
 function StoryDetail({ story }: { story: Story }) {
   const [params] = useSearchParams()
-  const page = Math.max(1, Number(params.get('trang')) || 1)
-  const order: ChapterOrder = params.get('sap-xep') === 'moi' ? 'desc' : 'asc'
+  const page = Math.max(1, Number(params.get('page')) || 1)
+  const order: ChapterOrder = params.get('sort') === 'newest' ? 'desc' : 'asc'
   const comments = useComments(story.slug)
   const byAuthor = useStoriesByAuthor(story.author.slug, story.slug)
   const related = useRelatedStories(story.slug)
@@ -53,8 +53,8 @@ function StoryDetail({ story }: { story: Story }) {
 
   const searchFor = (p: number, o: ChapterOrder) => {
     const next = new URLSearchParams()
-    if (p > 1) next.set('trang', String(p))
-    if (o === 'desc') next.set('sap-xep', 'moi')
+    if (p > 1) next.set('page', String(p))
+    if (o === 'desc') next.set('sort', 'newest')
     const s = next.toString()
     return s ? `?${s}` : ''
   }

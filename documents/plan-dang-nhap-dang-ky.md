@@ -1,7 +1,7 @@
 # Plan: Màn hình Đăng nhập & Tạo tài khoản
 
 ## Context
-Trang chủ đã xong (theme Mộng Truyện tối, header có nút "Đăng nhập" trỏ tới `/dang-nhap` nhưng đang ra 404). Bước này làm **UI đăng nhập / đăng ký / quên mật khẩu** với **auth giả (mock)**, đúng giai đoạn UI hiện tại. Mọi gọi auth đi qua `src/features/auth/api.ts` để sau này thay ruột bằng Supabase Auth mà không phải sửa component.
+Trang chủ đã xong (theme Mộng Truyện tối, header có nút "Đăng nhập" trỏ tới `/login` nhưng đang ra 404). Bước này làm **UI đăng nhập / đăng ký / quên mật khẩu** với **auth giả (mock)**, đúng giai đoạn UI hiện tại. Mọi gọi auth đi qua `src/features/auth/api.ts` để sau này thay ruột bằng Supabase Auth mà không phải sửa component.
 
 Đã chốt với người dùng:
 - **Mức độ:** giao diện + auth giả.
@@ -17,10 +17,10 @@ Trang chủ đã xong (theme Mộng Truyện tối, header có nút "Đăng nh�
 
 | Route | Trang |
 |---|---|
-| `/dang-nhap?next=/...` | Đăng nhập |
-| `/dang-ky?next=/...` | Tạo tài khoản |
-| `/quen-mat-khau` | Nhập email để nhận link đặt lại |
-| `/dat-lai-mat-khau` | Đặt mật khẩu mới (trang đích của link trong email) |
+| `/login?next=/...` | Đăng nhập |
+| `/register?next=/...` | Tạo tài khoản |
+| `/forgot-password` | Nhập email để nhận link đặt lại |
+| `/reset-password` | Đặt mật khẩu mới (trang đích của link trong email) |
 
 Các trang này dùng **`AuthLayout`** riêng, không có header/footer đầy đủ, để người dùng tập trung vào form:
 
@@ -97,10 +97,10 @@ Kiểu dữ liệu `User = { id, email, displayName, avatarUrl | null, provider 
 **Chuyển hướng:**
 - Header truyền `?next=<trang hiện tại>` khi bấm "Đăng nhập". Đăng nhập hoặc đăng ký xong thì `navigate(next, { replace: true })`.
 - Hàm `safeNext()` chỉ chấp nhận đường dẫn bắt đầu bằng `/` và không phải `//`, để chặn chuyển hướng ra trang ngoài. Mặc định về `/`.
-- Người đã đăng nhập mà mở `/dang-nhap` hoặc `/dang-ky` thì tự chuyển sang `next`.
+- Người đã đăng nhập mà mở `/login` hoặc `/register` thì tự chuyển sang `next`.
 
 ## 4. Header khi đã đăng nhập
-- **Desktop:** nút "Đăng nhập" được thay bằng avatar (chữ cái đầu của tên, dùng `ui/avatar`) mở `DropdownMenu` gồm tên và email, "Tủ truyện" (`paths.library`), "Tài khoản" (`/tai-khoan`), "Đăng xuất".
+- **Desktop:** nút "Đăng nhập" được thay bằng avatar (chữ cái đầu của tên, dùng `ui/avatar`) mở `DropdownMenu` gồm tên và email, "Tủ truyện" (`paths.library`), "Tài khoản" (`/account`), "Đăng xuất".
 - **Mobile:** icon đăng nhập được thay bằng avatar tương tự; trong menu trượt thêm mục Tủ truyện và Đăng xuất.
 - Trong lúc `useSession` đang tải, hiện một khung chờ tròn cùng kích thước để header không bị giật.
 
@@ -129,7 +129,7 @@ Kiểu dữ liệu `User = { id, email, displayName, avatarUrl | null, provider 
   - `signInWithPassword` → `supabase.auth.signInWithPassword`
   - `signUp` → `auth.signUp({ options: { data: { display_name }, emailRedirectTo } })`
   - `signInWithProvider` → `auth.signInWithOAuth({ provider, options: { redirectTo: origin + '/auth/callback?next=…' } })`
-  - `sendPasswordReset` → `auth.resetPasswordForEmail(email, { redirectTo: origin + '/dat-lai-mat-khau' })`
+  - `sendPasswordReset` → `auth.resetPasswordForEmail(email, { redirectTo: origin + '/reset-password' })`
   - `updatePassword` → `auth.updateUser({ password })`
 - `useSession` sẽ lắng nghe `onAuthStateChange` rồi `setQueryData`.
 - Cần thêm route `/auth/callback`, trigger tạo `profiles` khi có user mới, và bật provider Google/Facebook trong Supabase Dashboard.

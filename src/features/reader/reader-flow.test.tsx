@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react'
 import { renderApp } from '@/test/renderApp'
 import { useReaderSettings, READER_DEFAULTS } from './useReaderSettings'
 
-const base = '/truyen/truong-an-khong-tuyet' // 412 chương
+const base = '/story/truong-an-khong-tuyet' // 412 chương
 
 beforeEach(() => {
   localStorage.clear()
@@ -10,36 +10,36 @@ beforeEach(() => {
 })
 
 test('mở chương: có tiêu đề, nội dung và nút chuyển chương đúng', async () => {
-  renderApp(`${base}/chuong-12`)
+  renderApp(`${base}/chapter-12`)
   expect(await screen.findByRole('heading', { level: 1 }, { timeout: 3000 })).toBeInTheDocument()
   expect(screen.getAllByText('Chương 12').length).toBeGreaterThan(0)
 
   const [top] = screen.getAllByRole('navigation', { name: /Chuyển chương/ })
   expect(within(top).getByRole('link', { name: /Chương trước|Trước/ })).toHaveAttribute(
     'href',
-    `${base}/chuong-11`,
+    `${base}/chapter-11`,
   )
   expect(within(top).getByRole('link', { name: /Chương sau|Sau/ })).toHaveAttribute(
     'href',
-    `${base}/chuong-13`,
+    `${base}/chapter-13`,
   )
   expect(screen.getByRole('link', { name: /Đọc tiếp chương 13/ })).toBeInTheDocument()
 })
 
 test('phím → và ← chuyển chương', async () => {
-  const { router, user } = renderApp(`${base}/chuong-12`)
+  const { router, user } = renderApp(`${base}/chapter-12`)
   await screen.findByRole('heading', { level: 1 }, { timeout: 3000 })
 
   await user.keyboard('{ArrowRight}')
-  await expect.poll(() => router.state.location.pathname).toBe(`${base}/chuong-13`)
+  await expect.poll(() => router.state.location.pathname).toBe(`${base}/chapter-13`)
   await screen.findByRole('link', { name: /Đọc tiếp chương 14/ }, { timeout: 3000 })
 
   await user.keyboard('{ArrowLeft}')
-  await expect.poll(() => router.state.location.pathname).toBe(`${base}/chuong-12`)
+  await expect.poll(() => router.state.location.pathname).toBe(`${base}/chapter-12`)
 })
 
 test('chương đầu không có "chương trước", chương cuối báo đã đọc tới chương mới nhất', async () => {
-  renderApp(`${base}/chuong-412`)
+  renderApp(`${base}/chapter-412`)
   expect(
     await screen.findByText('Bạn đã đọc tới chương mới nhất', undefined, { timeout: 3000 }),
   ).toBeInTheDocument()
@@ -49,14 +49,14 @@ test('chương đầu không có "chương trước", chương cuối báo đã 
 })
 
 test('đường dẫn sai hoặc chương không tồn tại thì báo không tìm thấy', async () => {
-  renderApp(`${base}/chuong-abc`)
+  renderApp(`${base}/chapter-abc`)
   expect(
     await screen.findByText('Đường dẫn chương không hợp lệ.', undefined, { timeout: 3000 }),
   ).toBeInTheDocument()
 })
 
 test('chương vượt quá số chương thì có link về trang truyện', async () => {
-  renderApp(`${base}/chuong-9999`)
+  renderApp(`${base}/chapter-9999`)
   expect(
     await screen.findByText(/Không tìm thấy chương 9999/, undefined, { timeout: 3000 }),
   ).toBeInTheDocument()
@@ -64,7 +64,7 @@ test('chương vượt quá số chương thì có link về trang truyện', as
 })
 
 test('cài đặt đọc áp dụng ngay và được lưu lại', async () => {
-  const { user } = renderApp(`${base}/chuong-1`)
+  const { user } = renderApp(`${base}/chapter-1`)
   await screen.findByRole('heading', { level: 1 }, { timeout: 3000 })
 
   await user.click(screen.getByRole('button', { name: 'Cài đặt đọc' }))
@@ -85,16 +85,16 @@ test('cài đặt đọc áp dụng ngay và được lưu lại', async () => {
 })
 
 test('mục lục mở sẵn chương đang đọc và chọn chương thì chuyển trang', async () => {
-  const { router, user } = renderApp(`${base}/chuong-60`)
+  const { router, user } = renderApp(`${base}/chapter-60`)
   await screen.findByRole('heading', { level: 1 }, { timeout: 3000 })
 
   await user.click(screen.getByRole('button', { name: 'Mục lục' }))
   const dialog = await screen.findByRole('dialog', { name: 'Mục lục' })
   // Chương 60 nằm ở trang 51–100
   const current = await within(dialog).findByRole('link', { current: 'page' }, { timeout: 3000 })
-  expect(current).toHaveAttribute('href', `${base}/chuong-60`)
+  expect(current).toHaveAttribute('href', `${base}/chapter-60`)
 
   await user.click(within(dialog).getAllByRole('link')[0])
-  await expect.poll(() => router.state.location.pathname).toBe(`${base}/chuong-51`)
+  await expect.poll(() => router.state.location.pathname).toBe(`${base}/chapter-51`)
   await expect.poll(() => screen.queryByRole('dialog', { name: 'Mục lục' })).toBeNull()
 })

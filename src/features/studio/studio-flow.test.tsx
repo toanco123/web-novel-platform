@@ -7,15 +7,15 @@ const signIn = () => localStorage.setItem('mock-auth-session', JSON.stringify('d
 const content = 'Mùa hạ năm ấy, lớp mười một chuyển chỗ ngồi. '.repeat(5)
 
 test('chưa đăng nhập vào khu Sáng tác thì chuyển sang đăng nhập', async () => {
-  const { router } = renderApp('/sang-tac/truyen-moi')
+  const { router } = renderApp('/studio/new-story')
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe('/dang-nhap?next=%2Fsang-tac%2Ftruyen-moi')
+    .toBe('/login?next=%2Fstudio%2Fnew-story')
 })
 
 test('đăng truyện → viết chương → xuất bản → truyện hiện công khai', async () => {
   signIn()
-  const { router, user } = renderApp('/sang-tac/truyen-moi')
+  const { router, user } = renderApp('/studio/new-story')
 
   // Form truyện: báo lỗi khi thiếu, rồi điền đủ
   await user.click(await screen.findByRole('button', { name: 'Lưu nháp' }, slow))
@@ -65,7 +65,7 @@ test('đăng truyện → viết chương → xuất bản → truyện hiện c
 
 test('tạo truyện kèm chương đầu tiên (chọn số chương) rồi bấm Đăng truyện thì công khai ngay', async () => {
   signIn()
-  const { router, user } = renderApp('/sang-tac/truyen-moi?the-loai=ngon-tinh')
+  const { router, user } = renderApp('/studio/new-story?genre=ngon-tinh')
   await user.type(await screen.findByLabelText('Tên truyện', {}, slow), 'Gió Mùa Thu')
   await user.type(
     screen.getByLabelText('Giới thiệu'),
@@ -75,7 +75,7 @@ test('tạo truyện kèm chương đầu tiên (chọn số chương) rồi b�
   // Chưa viết chương thì chưa đăng được
   await user.click(screen.getByRole('button', { name: 'Đăng truyện' }))
   expect(await screen.findByText(/Viết nội dung chương để đăng truyện/)).toBeInTheDocument()
-  expect(router.state.location.pathname).toBe('/sang-tac/truyen-moi')
+  expect(router.state.location.pathname).toBe('/studio/new-story')
 
   // Truyện đăng tiếp từ nơi khác: bắt đầu từ chương 50
   const number = screen.getByLabelText('Số chương')
@@ -112,20 +112,20 @@ test('rời trình soạn chương khi chưa lưu thì hỏi lại', async () =>
     status: 'ongoing',
     coverUrl: null,
   })
-  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}/chuong-moi`)
+  const { router, user } = renderApp(`/studio/story/${story.id}/new-chapter`)
   await user.type(await screen.findByLabelText('Nội dung', {}, slow), 'Đang viết dở…')
   await user.click(screen.getByRole('link', { name: 'Hủy' }))
 
   const dialog = await screen.findByRole('dialog', {}, slow)
   expect(within(dialog).getByText('Rời trang khi chưa lưu?')).toBeInTheDocument()
   await user.click(within(dialog).getByRole('button', { name: 'Ở lại viết tiếp' }))
-  expect(router.state.location.pathname).toMatch(/chuong-moi$/)
+  expect(router.state.location.pathname).toMatch(/new-chapter$/)
 
   await user.click(screen.getByRole('link', { name: 'Hủy' }))
   await user.click(
     within(await screen.findByRole('dialog')).getByRole('button', { name: 'Rời trang' }),
   )
-  await expect.poll(() => router.state.location.pathname, slow).toBe(`/sang-tac/truyen/${story.id}`)
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`/studio/story/${story.id}`)
 })
 
 test('nhập file .txt: xem trước rồi thêm chương', async () => {
@@ -138,7 +138,7 @@ test('nhập file .txt: xem trước rồi thêm chương', async () => {
     status: 'ongoing',
     coverUrl: null,
   })
-  const { user } = renderApp(`/sang-tac/truyen/${story.id}/nhap-file`)
+  const { user } = renderApp(`/studio/story/${story.id}/import`)
   const file = new File([`Chương 1: Một\n${content}\nChương 2: Hai\n${content}`], 'truyen.txt', {
     type: 'text/plain',
   })
@@ -161,24 +161,24 @@ test('xóa truyện phải gõ đúng tên', async () => {
     status: 'ongoing',
     coverUrl: null,
   })
-  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}`)
+  const { router, user } = renderApp(`/studio/story/${story.id}`)
   await user.click(await screen.findByRole('button', { name: 'Xóa truyện' }, slow))
   const dialog = await screen.findByRole('dialog')
   const confirm = within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' })
   expect(confirm).toBeDisabled()
   await user.type(within(dialog).getByLabelText(/để xác nhận/), 'Truyện sẽ xóa')
   await user.click(confirm)
-  await expect.poll(() => router.state.location.pathname, slow).toBe('/sang-tac')
+  await expect.poll(() => router.state.location.pathname, slow).toBe('/studio')
   expect(await screen.findByText('Bạn chưa đăng truyện nào', {}, slow)).toBeInTheDocument()
 })
 
 test('trang thể loại có sẵn: nút đăng truyện mở form với thể loại được chọn sẵn', async () => {
   signIn()
-  const { router, user } = renderApp('/the-loai/ngon-tinh')
+  const { router, user } = renderApp('/genres/ngon-tinh')
   await user.click(await screen.findByRole('link', { name: 'Đăng truyện Ngôn tình' }, slow))
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe('/sang-tac/truyen-moi?the-loai=ngon-tinh')
+    .toBe('/studio/new-story?genre=ngon-tinh')
   expect(
     await screen.findByRole('button', { name: 'Bỏ thể loại Ngôn tình' }, slow),
   ).toBeInTheDocument()
@@ -186,7 +186,7 @@ test('trang thể loại có sẵn: nút đăng truyện mở form với thể l
 
 test('?the-loai không có thật thì bỏ qua, form để trống thể loại', async () => {
   signIn()
-  renderApp('/sang-tac/truyen-moi?the-loai=khong-co-that')
+  renderApp('/studio/new-story?genre=khong-co-that')
   expect(await screen.findByLabelText('Tên truyện', {}, slow)).toBeInTheDocument()
   expect(screen.queryByRole('list', { name: 'Thể loại đã chọn' })).not.toBeInTheDocument()
 })
@@ -202,20 +202,20 @@ test('danh sách Sáng tác: menu ⋯ mở tab sửa thông tin và xóa truyệ
     coverUrl: null,
   })
   const menu = { name: 'Thao tác cho truyện Truyện trong menu' }
-  const { router, user } = renderApp('/sang-tac')
+  const { router, user } = renderApp('/studio')
 
   await user.click(await screen.findByRole('button', menu, slow))
   await user.click(await screen.findByRole('menuitem', { name: 'Sửa thông tin' }))
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe(`/sang-tac/truyen/${story.id}?muc=thong-tin`)
+    .toBe(`/studio/story/${story.id}?tab=info`)
   expect(
     await screen.findByRole('tab', { name: 'Thông tin truyện', selected: true }, slow),
   ).toBeInTheDocument()
   expect(screen.getByLabelText('Tên truyện')).toHaveValue('Truyện trong menu')
 
   // Xóa ngay từ danh sách: vẫn ở trang Sáng tác, báo đã xóa
-  await router.navigate('/sang-tac')
+  await router.navigate('/studio')
   await user.click(await screen.findByRole('button', menu, slow))
   await user.click(await screen.findByRole('menuitem', { name: 'Xóa truyện' }))
   const dialog = await screen.findByRole('dialog')
@@ -223,7 +223,7 @@ test('danh sách Sáng tác: menu ⋯ mở tab sửa thông tin và xóa truyệ
   await user.click(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }))
   expect(await screen.findByText('Bạn chưa đăng truyện nào', {}, slow)).toBeInTheDocument()
   expect(screen.getByText('Đã xóa truyện “Truyện trong menu”.')).toBeInTheDocument()
-  expect(router.state.location.pathname).toBe('/sang-tac')
+  expect(router.state.location.pathname).toBe('/studio')
 })
 
 test('chọn số chương: bỏ trống chương 2 để viết chương 3, rồi viết bù từ dòng "chưa viết"', async () => {
@@ -237,7 +237,7 @@ test('chọn số chương: bỏ trống chương 2 để viết chương 3, r�
     coverUrl: null,
   })
   await saveChapter(story.id, { title: 'Một', content }, { publish: true })
-  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}/chuong-moi`)
+  const { router, user } = renderApp(`/studio/story/${story.id}/new-chapter`)
 
   const number = await screen.findByLabelText('Số chương', {}, slow)
   expect(number).toHaveValue(2)
@@ -256,7 +256,7 @@ test('chọn số chương: bỏ trống chương 2 để viết chương 3, r�
   // Trang quản lý: chương 2 hiện là chỗ trống, bấm để viết bù
   const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
   await user.click(await within(list).findByRole('link', { name: 'Viết chương 2' }, slow))
-  await expect.poll(() => router.state.location.search, slow).toBe('?so=2')
+  await expect.poll(() => router.state.location.search, slow).toBe('?number=2')
   expect(await screen.findByLabelText('Số chương', {}, slow)).toHaveValue(2)
 })
 
@@ -271,7 +271,7 @@ test('đổi số chương nháp rồi lưu thì quay về trang quản lý vớ
     coverUrl: null,
   })
   await saveChapter(story.id, { title: 'Nháp', content }) // chương 1, nháp
-  const { router, user } = renderApp(`/sang-tac/truyen/${story.id}/chuong/1`)
+  const { router, user } = renderApp(`/studio/story/${story.id}/chapter/1`)
 
   const number = await screen.findByLabelText('Số chương', {}, slow)
   await user.clear(number)
@@ -284,7 +284,7 @@ test('đổi số chương nháp rồi lưu thì quay về trang quản lý vớ
   observer.observe(document.body, { subtree: true, childList: true, characterData: true })
   await user.click(screen.getByRole('button', { name: 'Lưu nháp' }))
 
-  await expect.poll(() => router.state.location.pathname, slow).toBe(`/sang-tac/truyen/${story.id}`)
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`/studio/story/${story.id}`)
   const list = await screen.findByRole('list', { name: 'Danh sách chương' }, slow)
   observer.disconnect()
   expect(notFoundShown).toBe(false)

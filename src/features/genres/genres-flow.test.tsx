@@ -14,16 +14,16 @@ const enabledCreateButton = () =>
 const signIn = () => localStorage.setItem('mock-auth-session', JSON.stringify('demo'))
 
 test('chưa đăng nhập bấm "Tạo thể loại" thì sang trang đăng nhập', async () => {
-  const { router, user } = renderApp('/the-loai')
+  const { router, user } = renderApp('/genres')
   await user.click(await enabledCreateButton())
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe('/dang-nhap?next=%2Fthe-loai')
+    .toBe('/login?next=%2Fgenres')
 })
 
 test('tạo thể loại trong hộp thoại: trùng thì báo, mới thì chuyển tới trang thể loại', async () => {
   signIn()
-  const { router, user } = renderApp('/the-loai')
+  const { router, user } = renderApp('/genres')
   await user.click(await enabledCreateButton())
   const dialog = await screen.findByRole('dialog')
 
@@ -38,7 +38,7 @@ test('tạo thể loại trong hộp thoại: trùng thì báo, mới thì chuy�
   await user.type(name, 'Hệ thống')
   await user.click(within(dialog).getByRole('button', { name: 'Tạo thể loại' }))
 
-  await expect.poll(() => router.state.location.pathname, slow).toBe('/the-loai/he-thong')
+  await expect.poll(() => router.state.location.pathname, slow).toBe('/genres/he-thong')
   expect(
     await screen.findByRole('heading', { level: 1, name: 'Hệ thống' }, slow),
   ).toBeInTheDocument()
@@ -49,7 +49,7 @@ test('tạo thể loại trong hộp thoại: trùng thì báo, mới thì chuy�
 
 test('ô chọn: tạo trùng thể loại người khác vừa tạo thì chọn nó, với tên đúng', async () => {
   signIn()
-  const { user } = renderApp('/sang-tac/truyen-moi')
+  const { user } = renderApp('/studio/new-story')
   const picker = await screen.findByRole('combobox', { name: 'Thể loại (1–5)' }, slow)
   await user.click(picker)
   await screen.findByRole('listbox', { name: 'Gợi ý thể loại' }, slow)
@@ -65,7 +65,7 @@ test('ô chọn: tạo trùng thể loại người khác vừa tạo thì chọ
 
 test('lọc không thấy thì gợi ý tạo đúng tên vừa gõ', async () => {
   signIn()
-  const { user } = renderApp('/the-loai')
+  const { user } = renderApp('/genres')
   await user.type(await screen.findByLabelText('Tìm thể loại', {}, slow), 'Xuyên nhanh')
   await user.click(await screen.findByRole('button', { name: 'Tạo thể loại “Xuyên nhanh”' }))
   expect(within(await screen.findByRole('dialog')).getByLabelText('Tên thể loại')).toHaveValue(

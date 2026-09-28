@@ -11,16 +11,16 @@ vi.mock('@ant-design/plots', () => {
 const slow = { timeout: 4000 }
 beforeEach(() => localStorage.clear())
 
-test('khách vào /quan-tri thì chuyển sang đăng nhập', async () => {
-  const { router } = renderApp('/quan-tri')
+test('khách vào /admin thì chuyển sang đăng nhập', async () => {
+  const { router } = renderApp('/admin')
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe('/dang-nhap?next=%2Fquan-tri')
+    .toBe('/login?next=%2Fadmin')
 })
 
 test('người thường thấy trang không tồn tại, không có mục Quản trị trong menu', async () => {
   await registerUser()
-  const { user } = renderApp('/quan-tri')
+  const { user } = renderApp('/admin')
   expect(await screen.findByText('Trang bạn tìm không tồn tại.', {}, slow)).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Tổng quan' })).not.toBeInTheDocument()
 
@@ -64,7 +64,7 @@ test('quản trị viên xem tổng quan, người dùng và truyện của mộ
   await user.click(screen.getByRole('link', { name: '1 truyện của Linh' }))
   await expect
     .poll(() => router.state.location.pathname + router.state.location.search, slow)
-    .toBe(`/quan-tri/truyen?tac-gia=${linh}`)
+    .toBe(`/admin/stories?owner=${linh}`)
   expect(await screen.findByRole('link', { name: 'Mùa Hạ Năm Ấy' }, slow)).toBeInTheDocument()
   expect(await screen.findByText('Tác giả: Linh', {}, slow)).toBeInTheDocument()
   expect(screen.getByText('Công khai', { selector: '.ant-tag' })).toBeInTheDocument()

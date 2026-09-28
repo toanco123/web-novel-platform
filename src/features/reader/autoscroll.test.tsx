@@ -5,7 +5,7 @@ import { useSpeechSettings } from './speech/useSpeechSettings'
 import { READER_DEFAULTS, useReaderSettings } from './useReaderSettings'
 
 const slow = { timeout: 3000 }
-const base = '/truyen/truong-an-khong-tuyet'
+const base = '/story/truong-an-khong-tuyet'
 
 // requestAnimationFrame giả: khung hình chỉ chạy khi test gọi runFrames
 let now = 0
@@ -59,7 +59,7 @@ afterEach(() => {
 
 test('bấm Tự động cuộn: trang tự trôi xuống, chỉnh được tốc độ, tạm dừng và tắt được', async () => {
   withRoomToScroll()
-  const { user } = renderApp(`${base}/chuong-12`)
+  const { user } = renderApp(`${base}/chapter-12`)
   await screen.findByRole('heading', { level: 1 }, slow)
   await user.click(screen.getByRole('button', { name: 'Tự động cuộn' }))
   const bar = await screen.findByRole('region', { name: 'Tự động cuộn' })
@@ -89,7 +89,7 @@ test('bấm Tự động cuộn: trang tự trôi xuống, chỉnh được tố
 })
 
 test('hết chương thì dừng, bấm "Chương sau" để sang chương sau và cuộn tiếp', async () => {
-  const { router, user } = renderApp(`${base}/chuong-12`)
+  const { router, user } = renderApp(`${base}/chapter-12`)
   await screen.findByRole('heading', { level: 1 }, slow)
   await user.click(screen.getByRole('button', { name: 'Tự động cuộn' }))
   // Bố cục jsdom cao 0 nên đoạn cuối đã nằm trên thanh nổi: coi như hết chương
@@ -98,18 +98,18 @@ test('hết chương thì dừng, bấm "Chương sau" để sang chương sau v
   expect(within(bar).getByText('Hết chương 12')).toBeInTheDocument()
 
   await user.click(within(bar).getByRole('button', { name: /Chương sau/ }))
-  await expect.poll(() => router.state.location.pathname, slow).toBe(`${base}/chuong-13`)
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`${base}/chapter-13`)
   const next = await screen.findByRole('region', { name: 'Tự động cuộn' }, slow)
   expect(within(next).getByRole('button', { name: 'Tạm dừng' })).toBeInTheDocument()
 })
 
 test('tự chuyển chương bằng phím → khi đang tự cuộn thì tạm dừng', async () => {
   withRoomToScroll()
-  const { router, user } = renderApp(`${base}/chuong-12`)
+  const { router, user } = renderApp(`${base}/chapter-12`)
   await screen.findByRole('heading', { level: 1 }, slow)
   await user.click(screen.getByRole('button', { name: 'Tự động cuộn' }))
   await user.keyboard('{ArrowRight}')
-  await expect.poll(() => router.state.location.pathname, slow).toBe(`${base}/chuong-13`)
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`${base}/chapter-13`)
   const bar = await screen.findByRole('region', { name: 'Tự động cuộn' }, slow)
   await waitFor(() =>
     expect(within(bar).getByRole('button', { name: 'Cuộn tiếp' })).toBeInTheDocument(),
@@ -136,7 +136,7 @@ test('nghe truyện và tự động cuộn không chạy cùng lúc', async () 
   )
   useSpeechSettings.setState({ rate: 1, autoNext: true, voiceURI: null })
   withRoomToScroll()
-  const { user } = renderApp(`${base}/chuong-12`)
+  const { user } = renderApp(`${base}/chapter-12`)
   await screen.findByRole('heading', { level: 1 }, slow)
 
   await user.click(screen.getByRole('button', { name: 'Nghe truyện' }))

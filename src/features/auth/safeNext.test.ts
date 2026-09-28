@@ -1,7 +1,7 @@
 import { safeNext } from './safeNext'
 
 test('giữ đường dẫn nội bộ', () => {
-  expect(safeNext('/truyen/abc?x=1')).toBe('/truyen/abc?x=1')
+  expect(safeNext('/story/abc?x=1')).toBe('/story/abc?x=1')
 })
 
 test.each([null, '', 'https://evil.com', '//evil.com', '/\\evil.com', 'javascript:alert(1)'])(

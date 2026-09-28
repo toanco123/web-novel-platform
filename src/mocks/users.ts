@@ -13,7 +13,7 @@ export type MockUser = Omit<User, 'isAdmin'> & {
 
 const USERS_KEY = 'mock-auth-users'
 
-// Tài khoản demo là quản trị viên để xem thử trang /quan-tri ở bản giả
+// Tài khoản demo là quản trị viên để xem thử trang /admin ở bản giả
 const demoUser: MockUser = {
   id: 'demo',
   email: 'demo@webtruyen.vn',
