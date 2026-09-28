@@ -11,6 +11,8 @@ const item = 'w-[42%] shrink-0 snap-start sm:w-40 lg:w-44'
 export function EditorPicks() {
   const { data, isPending, isError } = useEditorPicks()
   const rowRef = useRef<HTMLUListElement>(null)
+  // Chỉ rỗng khi chưa có truyện công khai nào: ẩn cả khối như truyện nổi bật
+  if (data?.length === 0) return null
 
   const scroll = (dir: 1 | -1) =>
     rowRef.current?.scrollBy({ left: dir * rowRef.current.clientWidth * 0.8, behavior: 'smooth' })

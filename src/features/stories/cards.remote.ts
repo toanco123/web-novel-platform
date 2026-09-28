@@ -3,12 +3,11 @@
 import { unwrap } from '@/lib/dbError'
 import { publicImageUrl } from '@/lib/imageUpload'
 import { db } from '@/lib/supabase'
+import { isUuid } from '@/lib/uuid'
 import type { Database } from '@/types/database'
 import type { Genre, Story } from '@/types/story'
 
 export type StoryCardRow = Database['public']['Views']['story_cards']['Row']
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Tác giả chính là chủ truyện; đường dẫn tác giả giữ dạng tac-gia-<id> như bản giả */
 export const authorSlug = (ownerId: string) => `tac-gia-${ownerId}`
@@ -16,7 +15,7 @@ export const authorSlug = (ownerId: string) => `tac-gia-${ownerId}`
 /** 'tac-gia-<uuid>' → uuid; null nếu không đúng dạng (tránh gửi uuid hỏng lên máy chủ) */
 export function ownerIdFromAuthorSlug(slug: string) {
   const id = slug.replace(/^tac-gia-/, '')
-  return UUID.test(id) ? id : null
+  return isUuid(id) ? id : null
 }
 
 type GenreJson = { slug: string; name: string; description: string | null }

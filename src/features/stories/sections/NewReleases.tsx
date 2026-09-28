@@ -4,6 +4,8 @@ import { StoryCard, StoryCardSkeleton } from '../StoryCard'
 
 export function NewReleases() {
   const { data, isPending, isError } = useNewReleases()
+  // Chỉ rỗng khi chưa có truyện công khai nào: khối "Mới cập nhật" ngay trên đã báo
+  if (data?.length === 0) return null
 
   return (
     <section aria-labelledby="new-releases">

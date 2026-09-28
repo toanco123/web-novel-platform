@@ -1,4 +1,5 @@
-// Đọc/ghi localStorage cho dữ liệu giả (chỉ dùng trong các api.ts giai đoạn mock)
+// Đọc/ghi JSON trong localStorage: dữ liệu của bản giả (api.mock.ts) và dữ liệu chỉ nằm trên máy như
+// lịch sử đọc của khách (features/library/guestHistory.ts)
 
 export function readMock<T>(key: string, fallback: T): T {
   try {

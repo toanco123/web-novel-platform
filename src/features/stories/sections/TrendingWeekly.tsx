@@ -23,6 +23,10 @@ export function TrendingWeekly() {
       </SectionHeading>
       {isError ? (
         <SectionError />
+      ) : data?.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+          Tuần này chưa có lượt đọc nào.
+        </p>
       ) : (
         <ol className="grid gap-1 md:grid-cols-2 md:gap-x-6 lg:grid-cols-1">
           {isPending

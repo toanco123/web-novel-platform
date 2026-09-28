@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { renderApp } from '@/test/renderApp'
+import { createGenre } from './api'
 
 const slow = { timeout: 3000 }
 beforeEach(() => localStorage.clear())
@@ -43,6 +44,22 @@ test('tạo thể loại trong hộp thoại: trùng thì báo, mới thì chuy�
   ).toBeInTheDocument()
   expect(
     await screen.findByText('Chưa có truyện nào thuộc thể loại này.', {}, slow),
+  ).toBeInTheDocument()
+})
+
+test('ô chọn: tạo trùng thể loại người khác vừa tạo thì chọn nó, với tên đúng', async () => {
+  signIn()
+  const { user } = renderApp('/sang-tac/truyen-moi')
+  const picker = await screen.findByRole('combobox', { name: 'Thể loại (1–5)' }, slow)
+  await user.click(picker)
+  await screen.findByRole('listbox', { name: 'Gợi ý thể loại' }, slow)
+  // Có người tạo sau khi danh sách đã tải: danh sách trên trang chưa có "Hệ thống"
+  await createGenre({ name: 'Hệ thống' })
+
+  await user.type(picker, 'hệ thống')
+  await user.click(await screen.findByRole('option', { name: 'Tạo thể loại “hệ thống”' }))
+  expect(
+    await screen.findByRole('button', { name: 'Bỏ thể loại Hệ thống' }, slow),
   ).toBeInTheDocument()
 })
 

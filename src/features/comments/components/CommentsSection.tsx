@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useSession } from '@/features/auth/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
+import type { Comment } from '@/types/comment'
 import { useComments, useMyRating, useRateStory, useRatingSummary } from '../hooks'
 import { CommentForm } from './CommentForm'
 import { CommentItem } from './CommentItem'
@@ -21,7 +22,7 @@ export function CommentsSection({ slug, chapter = null }: Props) {
   const { data: user } = useSession()
   const current = useCurrentPath()
   const comments = useComments(slug, chapter)
-  const items = comments.data?.pages.flatMap((p) => p.items) ?? []
+  const items = uniqueById(comments.data?.pages.flatMap((p) => p.items) ?? [])
 
   const loginLink = (text: string) => (
     <Link
@@ -84,6 +85,20 @@ export function CommentsSection({ slug, chapter = null }: Props) {
       )}
     </div>
   )
+}
+
+/**
+ * Bỏ bình luận lặp lại, giữ lần xuất hiện đầu. Trang sau lấy theo vị trí: có người bình luận thêm
+ * giữa hai lần tải thì bình luận cũ lùi xuống, trang sau mở đầu bằng bình luận cuối của trang trước.
+ * (Ngược lại, có bình luận bị xóa thì trang sau sót một bình luận, tới lần tải lại mới hiện.)
+ */
+function uniqueById(comments: Comment[]) {
+  const seen = new Set<string>()
+  return comments.filter((c) => {
+    if (seen.has(c.id)) return false
+    seen.add(c.id)
+    return true
+  })
 }
 
 function RatingPanel({

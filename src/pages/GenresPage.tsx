@@ -97,7 +97,13 @@ export default function GenresPage() {
         </ul>
       )}
 
-      {shown?.length === 0 && (
+      {shown?.length === 0 && !query.trim() && (
+        <p className="mt-2 rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+          Chưa có thể loại nào. Hãy tạo thể loại đầu tiên.
+        </p>
+      )}
+
+      {shown?.length === 0 && query.trim() && (
         <div className="mt-2 rounded-xl border border-dashed p-6 text-center">
           <p className="text-sm text-muted-foreground">Không tìm thấy thể loại “{query}”.</p>
           <div className="mt-3 flex justify-center">

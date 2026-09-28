@@ -4,7 +4,7 @@ Schema cho giai đoạn nối backend, suy ra từ hành vi của các `features
 
 - **Project:** `zsbyjxaaxtylgmxybzpf`
 - **Dữ liệu:** DB bắt đầu trống, không seed. Thể loại do người dùng tạo bằng nút "Tạo thể loại".
-- **Trạng thái (28/09/2026):** đã có schema, RLS, trigger, RPC, storage và kiểu TypeScript. Các `api.ts` vẫn chạy mock; bảng tra ở mục 8 dùng cho lượt nối sau.
+- **Trạng thái (28/09/2026):** đã có schema, RLS, trigger, RPC, storage và kiểu TypeScript. Mọi feature đã nối: mỗi `features/<x>/` có `api.ts` (chọn backend lúc chạy: có `supabase` thì `api.remote.ts`, không thì `api.mock.ts`), `api.remote.ts`, `api.mock.ts` (test tự động, làm UI offline) và `shared.ts` (kiểu, hằng, lớp lỗi dùng chung). Mục 8 ghi cách nối.
 
 ## 1. Nguyên tắc
 
@@ -67,7 +67,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `no_published_chapters` | Công khai truyện chưa có chương nào đã xuất bản | `StudioError('no_published_chapters')` |
 | `last_published_chapter` | Ẩn hoặc xóa chương công khai cuối cùng của truyện đang công khai | `StudioError('last_published_chapter')` |
 | `chapter_number_locked` | Đổi số của chương đã từng xuất bản | `StudioError('chapter_number_locked')` |
-| `too_many_genres` | Chọn quá 5 thể loại | Lỗi form |
+| `too_many_genres` | Chọn quá 5 thể loại | `StudioError('too_many_genres')` ("Chọn tối đa 5 thể loại."); form cũng chặn trước |
 | `not_found` | RPC không thấy truyện, hoặc truyện không phải của mình | `StudioError('not_found')` |
 | `unauthenticated` | Gọi RPC cần đăng nhập khi chưa đăng nhập | `AuthError('unauthenticated')` |
 | `23505` (unique) | Trùng số chương / trùng thể loại | `chapter_exists` / `GenreExistsError` |
@@ -147,6 +147,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 - `id` truyện lấy từ `story_cards` theo slug. Các RPC phía người đọc nhận thẳng slug.
 - Query key vẫn chứa `userId` như hiện tại.
 - Map lỗi theo mục 4.
+- Tiện ích dùng chung: `unwrap`/`businessCode`/`isUniqueViolation` (`src/lib/dbError.ts`), `loadPage` (`src/lib/dbPage.ts`, phân trang có đếm tổng, kẹp trang như `paginate()`; PostgREST trả lỗi 416 `PGRST103` khi offset vượt tổng nên không unwrap thẳng), `isUuid` (`src/lib/uuid.ts`, id gõ tay trên URL không gửi lên máy chủ), `requireUserId` (`@/features/auth/api`, như `requireUser` nhưng không tải hồ sơ), thẻ truyện ở `features/stories/cards.remote.ts`.
 - Cột của view (`story_cards`, `studio_stories`, `genre_cards`) trong `src/types/database.ts` đều có kiểu `| null`, vì Postgres không suy được NOT NULL qua view. Hàm map (`toStory`...) cần gán giá trị mặc định hoặc khẳng định kiểu.
 
 **`toStory(row)` từ `story_cards`:**
@@ -161,7 +162,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | auth | `getProfiles(ids)` | `profiles.select('id, display_name, avatar_url').in('id', ids)` |
 | auth | `updateProfile` | Upload lên `avatars`, rồi `update profiles` |
 | auth | `changePassword` | `auth.updateUser({ password })`. Kiểm tra mật khẩu cũ bằng cách đăng nhập lại, hoặc bật "Secure password change" |
-| stories | `getFeaturedStories`, `getEditorPicks` | `curated_stories` (theo `list`, `position`), rồi `story_cards.in('id', …)` |
+| stories | `getFeaturedStories`, `getEditorPicks` | `curated_stories` (theo `list`, `position`), rồi `story_cards.in('id', …)`. Chưa có truyện chọn tay nào công khai thì lấy tự động: nổi bật là 4 truyện công khai nhiều lượt đọc nhất (rồi cập nhật gần nhất); biên tập chọn là 8 truyện theo `rating_avg`, `rating_count`, `created_at` giảm dần |
 | stories | `getLatestUpdated` / `getNewReleases` | `story_cards` công khai, `order('updated_at' / 'created_at', desc)` |
 | stories | `getStory(slug)` | `story_cards.eq('slug', slug).maybeSingle()` (RLS cho chủ truyện thấy cả bản nháp) |
 | stories | `getStoriesByAuthor` | `story_cards` công khai `.eq('owner_id', <tách từ author slug>).neq('slug', …)` |
@@ -169,11 +170,11 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | stories | `browseStories` | `story_cards` công khai. Thể loại: `.contains('genre_slugs', [slug])`. Độ dài: lọc `chapter_count`. Kèm sắp xếp và `.range()` với `count: 'exact'` |
 | stories | `searchStories`, `getSearchSuggestions` | `rpc('search_stories', { p_query }, { count: 'exact' }).order('score', desc).order('view_count', desc).range()` → `story_cards`. Thể loại khớp lấy từ `genre_cards` |
 | stories | `getRanking`, `getTrendingWeekly` | `rpc('story_ranking')` → `story_cards` |
-| chapters | `getChapterList` | `chapters.select('number, title, published_at').eq('story_id').eq('status', 'published').order('number').range()` |
-| chapters | `getChapter` | Chương theo `(story_id, number, status = published)`. Chương trước là chương có `number <` lớn nhất, chương sau là chương có `number >` nhỏ nhất (mỗi bên `limit 1`) |
-| chapters | `recordChapterView` | `rpc('record_chapter_view', { p_slug, p_number })`. Giữ `Set` chống đếm trùng ở client |
+| chapters | `getChapterList` | `chapters.select('number, title, published_at, stories!inner(slug)').eq('stories.slug', slug).eq('status', 'published').order('number')` qua `loadPage`. Lọc truyện bằng join nên RLS của `stories` áp dụng |
+| chapters | `getChapter` | Chương theo `(stories.slug, number, status = published)`, chạy song song với `storyBySlug`, chương trước (`number <` lớn nhất) và chương sau (`number >` nhỏ nhất), mỗi bên `limit 1` |
+| chapters | `recordChapterView` | `rpc('record_chapter_view', { p_slug, p_number })`. Giữ `Set` chống đếm trùng ở client; gọi lỗi thì bỏ khóa khỏi `Set` để lần mở sau thử lại |
 | genres | `getGenres` | `genre_cards` |
-| genres | `createGenre` | `genres.insert({ name, description }).select()`. Lỗi `23505` thì đọc thể loại có `slug = slugify(name)` rồi ném `GenreExistsError` |
+| genres | `createGenre` | `genres.insert({ name, description }).select()`. Lỗi `23505` thì đọc thể loại có `slug = rpc('slugify', name)` rồi ném `GenreExistsError` |
 | studio | `getMyStories`, `getMyStory` | `studio_stories` (`order('updated_at', desc)` / `.eq('id')`) |
 | studio | `createStory`, `updateStory` | Upload bìa (nếu có), rồi `rpc('create_story' / 'update_story')` |
 | studio | `publishStory`, `unpublishStory`, `deleteStory` | `update stories set visibility` / `delete`, rồi xóa file bìa |
@@ -184,11 +185,11 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | studio | `setReportStatus` | `update chapter_reports set status` |
 | library | `getFollowStatus`, `followStory`, `unfollowStory` | `follows` select / insert `{ story_id }` (bỏ qua lỗi `23505`) / delete |
 | library | `getLibrary`, `getLibraryUpdateCount` | `rpc('get_library')` + `story_cards` + `reading_history`; `rpc('library_update_count')` |
-| library | `getReadingHistory`, `getStoryProgress` | Đã đăng nhập: `reading_history` (`order('read_at', desc).limit(100)`) → `story_cards`. Khách: giữ localStorage như hiện tại |
+| library | `getReadingHistory`, `getStoryProgress` | Đã đăng nhập: `reading_history` (`order('read_at', desc).limit(100)`) → `story_cards`. Khách: localStorage khóa `reading-history-guest` (`features/library/guestHistory.ts`; `src/mocks/activity.ts` chỉ bản giả dùng) |
 | library | `saveReadingProgress` | Đã đăng nhập: `rpc('save_reading_progress')`. Khách: localStorage |
-| library | gộp lịch sử khách | Lần đầu thấy session: `rpc('merge_guest_history', { p_entries })`, xong thì xóa bản local |
+| library | gộp lịch sử khách | Lần gọi đầu có session (`getLibrary`, `getLibraryUpdateCount`, các hàm lịch sử): `rpc('merge_guest_history', { p_entries })` một lần, xong thì xóa bản local |
 | library | `removeFromHistory`, `clearHistory` | `reading_history.delete()` luôn kèm `.eq('user_id', uid)` (Supabase chặn delete không có điều kiện) |
-| comments | `getComments` | `comments.select('*, user:profiles(id, display_name, avatar_url)', { count: 'exact' })`, lọc `story_id` và `chapter_number` (`.is(null)` / `.eq`), `order('created_at', desc).range()` |
+| comments | `getComments` | `comments.select('*, user:profiles!comments_user_id_fkey(id, display_name, avatar_url)', { count: 'exact' })`, lọc `story_id` và `chapter_number` (`.is(null)` / `.eq`), `order('created_at', desc).range()` |
 | comments | `addComment`, `deleteComment` | insert `{ story_id, chapter_number, content }` / delete |
 | comments | `getRatingSummary` | `story_cards` (`rating_avg`, `rating_count`, `rating_counts` → `distribution`) |
 | comments | `getMyRating`, `rateStory` | `ratings` select / `upsert({ story_id, score }, { onConflict: 'user_id,story_id' })` |
@@ -206,7 +207,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 
 ## 10. Việc còn lại
 
-- Thay ruột các `api.ts` theo mục 8 (từng feature một), rồi sửa test tích hợp cho phù hợp.
+- ~~Thay ruột các `api.ts` theo mục 8~~ (xong: mọi feature có `api.remote.ts`). Còn chạy thử bản remote trên project thật (test tích hợp với Supabase).
 - **Cấu hình Auth trên Dashboard:**
   - Site URL.
   - Redirect URL (`/auth/callback`, `/dat-lai-mat-khau`; localhost và domain Vercel).

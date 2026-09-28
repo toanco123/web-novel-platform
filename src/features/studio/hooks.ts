@@ -152,7 +152,8 @@ export function useSetReportStatus(storyId: string) {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: ChapterReport['status'] }) =>
       api.setReportStatus(storyId, id, status),
-    // Làm mới danh sách báo lỗi và số báo lỗi trên tab/danh sách truyện
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: studioKeys.all(userId) }),
+    // Làm mới danh sách báo lỗi và số báo lỗi trên tab/danh sách truyện; lỗi cũng làm mới (vd không
+    // mở lại được vì bạn đọc đã gửi báo lỗi mới: hiện báo lỗi mới đó)
+    onSettled: () => queryClient.invalidateQueries({ queryKey: studioKeys.all(userId) }),
   })
 }

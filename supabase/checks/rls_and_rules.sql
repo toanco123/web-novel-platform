@@ -391,7 +391,24 @@ select pg_temp.expect_error(
   '42501');
 select pg_temp.expect_error($$select public.get_library()$$, '42501');
 
+-- ── Xóa tài khoản: cascade truyện đang có người khác chấm điểm, theo dõi ──
+
 reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.ratings (story_id, score) values (pg_temp.story_id('hoa-no-nam-ay'), 4);
+insert into public.follows (story_id) values (pg_temp.story_id('hoa-no-nam-ay'));
+
+reset role;
+select pg_temp.expect(
+  pg_temp.affected($$delete from auth.users where id = '00000000-0000-4000-8000-00000000000b'$$)
+    = 1,
+  'xóa tài khoản kéo theo truyện, điểm chấm, theo dõi không bị trigger đếm chặn');
+select pg_temp.expect(
+  (select count(*) = 0 from public.stories where slug = 'hoa-no-nam-ay'),
+  'truyện của tài khoản bị xóa cũng bị xóa');
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

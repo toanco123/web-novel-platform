@@ -5,7 +5,8 @@ import { useGenres } from '@/features/genres/hooks'
 
 export function GenreCloud() {
   const { data } = useGenres()
-  if (!data) return null
+  // Chưa có thể loại nào (database mới) thì ẩn cả khối
+  if (!data?.length) return null
 
   return (
     <section aria-labelledby="genre-cloud">

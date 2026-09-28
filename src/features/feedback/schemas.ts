@@ -18,6 +18,8 @@ export const contactSchema = z.object({
     .string()
     .trim()
     .min(1, 'Nhập email để chúng tôi trả lời')
+    // Giới hạn của bảng contact_messages: báo ngay ở form thay vì để database từ chối
+    .max(254, 'Email tối đa 254 ký tự')
     .pipe(z.email('Nhập email hợp lệ, ví dụ ten@gmail.com')),
   topic: z.enum(contactTopics.map((t) => t.value) as [ContactTopic, ...ContactTopic[]]),
   message: z
