@@ -174,6 +174,23 @@ Gom mọi dữ liệu "hoạt động của người đọc" vào một chỗ, �
 - **Truyện có sẵn:** báo lỗi được lưu lại, sau này ban quản trị xem.
 - **Api:** `features/feedback/api.ts` gồm `reportChapter`, `getStoryReports`, `resolveReport`, `sendContactMessage`.
 
+### 4.6 Tự động cuộn (bổ sung 28/09/2026, ✅ đã làm)
+- **Bật:** nút **"Tự cuộn"** cạnh nút "Nghe" trên thanh công cụ trang đọc. Bấm lần nữa thì tạm dừng / chạy tiếp.
+- **Thanh nổi ở đáy** (cùng khung `FloatingBar` với thanh nghe truyện): tạm dừng/cuộn tiếp, "Chương N · tự cuộn", tốc độ **− 1× +** (0.5×–3×), tắt.
+- **Tốc độ:**
+  - 1× là đọc kịp 220 chữ/phút (cùng mốc với "khoảng N phút đọc").
+  - Số px mỗi chữ đo từ bố cục thật của chương (chiều cao các đoạn chia số chữ), đo lại mỗi giây, nên tự theo cỡ chữ, giãn dòng, độ rộng màn hình.
+  - Tốc độ được nhớ ở Zustand key `reader-autoscroll`.
+- **Cách cuộn:** `requestAnimationFrame` với vị trí đích dạng số thực và `scrollTo({ behavior: 'instant' })`.
+  - Người đọc tự cuộn (lăn chuột, phím) thì đi tiếp từ chỗ mới.
+  - Đang chạm tay trên màn hình, hoặc đang mở mục lục / cài đặt / hộp thoại, thì đứng yên.
+- **Thanh công cụ:** bắt đầu tự cuộn thì ẩn đi. Trong lúc tự cuộn, thanh chỉ ẩn/hiện khi chạm vào chữ, không tự ẩn theo cuộn (`useAutoHideToolbar(frozen)`).
+- **Hết chương:**
+  - Từng chương: đoạn cuối lên tới trên thanh nổi thì dừng, thanh hiện "Hết chương N · [Chương sau]". Bấm là sang chương sau và cuộn tiếp từ đầu chương.
+  - Cuộn liên tục: chạm đáy trang mà chương sau chưa nối vào thì đứng chờ. Hết hẳn chuỗi chương (`[data-stream-end]`) thì dừng, báo "Đã tới chương mới nhất".
+- **Chuyển chương cách khác** (mục lục, phím ← →, link) khi đang tự cuộn thì tạm dừng.
+- **Không chạy cùng nghe truyện:** bật cái này thì tắt cái kia.
+
 ---
 
 ## 5. Khi nối Supabase (ghi chú)
@@ -215,5 +232,6 @@ Gom mọi dữ liệu "hoạt động của người đọc" vào một chỗ, �
   - Bình luận chương.
   - Báo lỗi → tác giả thấy trong tab.
   - Nghe truyện với `speechSynthesis` giả.
+  - Tự động cuộn với `requestAnimationFrame`/`scrollTo` giả: trôi xuống, đổi tốc độ, tạm dừng, hết chương rồi "Chương sau", tự chuyển chương thì tạm dừng, không chạy cùng nghe truyện.
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` sạch.
 - **Playwright:** 375px, 768px, 1440px, cả hai theme. Kiểm tra không cuộn ngang, trang đọc ở cả hai chế độ, thanh nghe truyện.
