@@ -45,15 +45,6 @@ export function useChapter(slug: string, number: number) {
   return useQuery(chapterQuery(queryClient, slug, number))
 }
 
-/** Tải trước chương kế để bấm "Chương sau" là có ngay */
-export function usePrefetchChapter(slug: string, number: number | undefined) {
-  const queryClient = useQueryClient()
-  useEffect(() => {
-    if (number === undefined) return
-    void queryClient.prefetchQuery(chapterQuery(queryClient, slug, number))
-  }, [queryClient, slug, number])
-}
-
 /** Lấy một chương qua cache (dùng ngoài render, vd giọng đọc cần nội dung chương kế) */
 export function useFetchChapter() {
   const queryClient = useQueryClient()

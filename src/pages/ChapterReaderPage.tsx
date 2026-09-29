@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { NotFound } from '@/components/common/NotFound'
 import { Button } from '@/components/ui/button'
 import { SITE_NAME } from '@/config/site'
-import { useChapter, usePrefetchChapter, useRecordChapterView } from '@/features/chapters/hooks'
+import { useChapter, useRecordChapterView } from '@/features/chapters/hooks'
 import { ReportChapterDialog } from '@/features/feedback/components/ReportChapterDialog'
 import { NotSavedNotice } from '@/features/offline/components/NotSavedNotice'
+import { usePrefetchChapters } from '@/features/offline/prefetch'
 import { ChapterNotSavedError } from '@/features/offline/readChapter'
 import { useAutoScroll } from '@/features/reader/autoscroll/useAutoScroll'
 import { AutoScrollBar } from '@/features/reader/components/AutoScrollBar'
@@ -113,7 +114,7 @@ function Reader({ slug, number }: { slug: string; number: number }) {
     })
   }, [speech.status, speech.chapter, speech.paragraph, reducedMotion, chapter])
 
-  usePrefetchChapter(slug, chapter?.next?.number)
+  usePrefetchChapters(chapter)
   useChapterKeys(slug, chapter?.prev?.number, chapter?.next?.number)
   useRecordChapterView(slug, chapter ? number : undefined)
   const resumed = useReadingTracker(chapter)
