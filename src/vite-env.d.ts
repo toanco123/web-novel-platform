@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_USE_MOCK?: string
   /** Nhà cung cấp đăng nhập đã bật trên Supabase, cách nhau bằng dấu phẩy, vd 'google,facebook' */
   readonly VITE_AUTH_PROVIDERS?: string
+  readonly VITE_TURNSTILE_SITE_KEY?: string
 }
 
 interface ImportMeta {

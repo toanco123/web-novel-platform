@@ -708,6 +708,98 @@ select pg_temp.expect(
   exists (select 1 from auth.users where id = '00000000-0000-4000-8000-00000000000a'),
   'delete_account không đụng tới tài khoản khác');
 
+-- ── Chống lạm dụng: hạn mức tác giả, ảnh, báo lỗi, ảnh đại diện ──────────
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
+  ('00000000-0000-4000-8000-000000000011', 'd11@kiem-tra.local', '{"display_name": "D"}',
+    '{"provider": "email"}'),
+  ('00000000-0000-4000-8000-000000000012', 'e12@kiem-tra.local',
+    '{"display_name": "E", "avatar_url": "https://evil.example/track.gif"}',
+    '{"provider": "email"}'),
+  ('00000000-0000-4000-8000-000000000013', 'f13@kiem-tra.local',
+    '{"full_name": "F", "picture": "https://lh3.googleusercontent.com/a/f"}',
+    '{"provider": "google"}');
+select pg_temp.expect(
+  (select avatar_url is null from public.profiles
+    where id = '00000000-0000-4000-8000-000000000012'),
+  'đăng ký email không gắn được ảnh ngoài qua options.data');
+select pg_temp.expect(
+  (select avatar_url = 'https://lh3.googleusercontent.com/a/f' from public.profiles
+    where id = '00000000-0000-4000-8000-000000000013'),
+  'đăng nhập Google vẫn lấy ảnh của Google');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000011", "role": "authenticated"}', true);
+set local role authenticated;
+
+-- Tối đa 10 truyện mới / ngày
+select public.create_story('Han muc ' || i, 'x', 'ongoing', '{}') from generate_series(1, 10) i;
+select pg_temp.expect_error(
+  $$select public.create_story('Han muc 11', 'x', 'ongoing', '{}')$$, 'story_limit');
+
+-- Tối đa 10.000.000 byte nội dung chương ghi vào / ngày, tính cả khi sửa
+insert into public.chapters (story_id, number, content)
+select pg_temp.story_id('han-muc-1'), i, repeat('a', 200000) from generate_series(1, 49) i;
+update public.chapters set content = repeat('b', 200000)
+where story_id = pg_temp.story_id('han-muc-1') and number = 1;
+select pg_temp.expect_error(
+  $$update public.chapters set content = repeat('c', 200000)
+    where story_id = pg_temp.story_id('han-muc-1') and number = 2$$,
+  'chapter_limit');
+select pg_temp.expect_error(
+  $$insert into public.chapters (story_id, number, content)
+    values (pg_temp.story_id('han-muc-1'), 99, 'x')$$,
+  'chapter_limit');
+
+-- Ảnh: tối đa 30 ảnh mới / 24 giờ
+insert into storage.objects (bucket_id, name, owner_id)
+select 'covers', '00000000-0000-4000-8000-000000000011/' || i || '.webp',
+  '00000000-0000-4000-8000-000000000011'
+from generate_series(1, 30) i;
+select pg_temp.expect_error(
+  $$insert into storage.objects (bucket_id, name, owner_id)
+    values ('avatars', '00000000-0000-4000-8000-000000000011/31.webp',
+      '00000000-0000-4000-8000-000000000011')$$,
+  '42501');
+
+-- Quản trị viên (nhập truyện hàng loạt) không bị giới hạn
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000011", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.create_story('Han muc admin', 'x', 'ongoing', '{}',
+  null, '{"title": "C1", "content": "Noi dung."}');
+insert into storage.objects (bucket_id, name, owner_id)
+values ('covers', '00000000-0000-4000-8000-000000000011/admin.webp',
+  '00000000-0000-4000-8000-000000000011');
+
+-- Ảnh đại diện chỉ nhận ảnh trong thư mục của chính mình trên bucket avatars
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000013", "role": "authenticated"}', true);
+update public.profiles set display_name = 'F đổi tên'
+where id = '00000000-0000-4000-8000-000000000013';
+select pg_temp.expect_error(
+  $$update public.profiles set avatar_url = 'https://evil.example/track.gif'
+    where id = '00000000-0000-4000-8000-000000000013'$$,
+  'invalid_avatar_url');
+select pg_temp.expect_error(
+  $$update public.profiles set avatar_url = 'https://zsbyjxaaxtylgmxybzpf.supabase.co/storage/v1/object/public/avatars/00000000-0000-4000-8000-000000000011/x.webp'
+    where id = '00000000-0000-4000-8000-000000000013'$$,
+  'invalid_avatar_url');
+update public.profiles
+set avatar_url = 'https://zsbyjxaaxtylgmxybzpf.supabase.co/storage/v1/object/public/avatars/00000000-0000-4000-8000-000000000013/a.webp'
+where id = '00000000-0000-4000-8000-000000000013';
+update public.profiles set avatar_url = null where id = '00000000-0000-4000-8000-000000000013';
+
+-- Người gửi báo lỗi không tự lùi created_at được (né giới hạn 10 / giờ)
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000b", "role": "authenticated"}', true);
+select pg_temp.expect_error(
+  $$update public.chapter_reports set created_at = '2000-01-01'$$, '42501');
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

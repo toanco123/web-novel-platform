@@ -11,6 +11,7 @@ export type AuthErrorCode =
   | 'email_not_confirmed'
   | 'rate_limited'
   | 'banned'
+  | 'captcha_failed'
   | 'unknown'
 
 export class AuthError extends Error {
@@ -40,6 +41,9 @@ export function limitError(code: string | null): AuthError | null {
   if (code === 'duplicate_comment') return duplicateComment()
   return null
 }
+
+/** Mã captcha Turnstile (useCaptcha) cho các lệnh Supabase Auth kiểm tra mật khẩu/gửi email */
+export type WithCaptcha = { captchaToken?: string }
 
 /** Bật xác nhận email thì đăng ký xong chưa có phiên: user = null, needsEmailConfirmation = true */
 export type SignUpResult = { user: User | null; needsEmailConfirmation: boolean }

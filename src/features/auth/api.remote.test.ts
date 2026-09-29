@@ -1,5 +1,6 @@
 // Bản Supabase của phiên đăng nhập trên client giả: chỉ kiểm phần chạy trên máy (hồ sơ lần trước
 // dùng khi mở app lúc offline).
+import { AuthApiError } from '@supabase/supabase-js'
 import { goOffline } from '@/test/offline'
 import type * as Remote from './api.remote'
 
@@ -9,13 +10,20 @@ const fake = vi.hoisted(() => {
     session,
     profile: { data: null, error: null } as { data: unknown; error: unknown },
     getSession: (): Promise<unknown> => Promise.resolve({ data: { session } }),
+    signInWithPassword: vi.fn(),
+    resetPasswordForEmail: vi.fn(),
   }
 })
 
 vi.mock('@/lib/supabase', () => ({
   supabase: null,
   db: () => ({
-    auth: { storageKey: 'sb-test-auth-token', getSession: () => fake.getSession() },
+    auth: {
+      storageKey: 'sb-test-auth-token',
+      getSession: () => fake.getSession(),
+      signInWithPassword: fake.signInWithPassword,
+      resetPasswordForEmail: fake.resetPasswordForEmail,
+    },
     from: () => {
       const query: Record<string, () => unknown> = {
         select: () => query,
@@ -72,4 +80,31 @@ test('mất mạng mà supabase-js treo (làm mới phiên hết hạn): dùng p
   const api = await freshApi()
   await expect(api.getSession()).resolves.toMatchObject({ id: 'u1', displayName: 'Linh' })
   await expect(api.getUserId()).resolves.toBe('u1')
+})
+
+test('gửi mã captcha cho Supabase Auth; mã sai thì báo lỗi dễ hiểu', async () => {
+  fake.profile = { data: { id: 'u1', display_name: 'Linh', avatar_url: null }, error: null }
+  fake.signInWithPassword.mockResolvedValueOnce({ data: { session: fake.session }, error: null })
+  const api = await freshApi()
+  await api.signInWithPassword({ email: 'Linh@gmail.com', password: 'x', captchaToken: 'tok' })
+  expect(fake.signInWithPassword).toHaveBeenCalledWith({
+    email: 'linh@gmail.com',
+    password: 'x',
+    options: { captchaToken: 'tok' },
+  })
+
+  fake.resetPasswordForEmail.mockResolvedValueOnce({ error: null })
+  await api.sendPasswordReset({ email: 'linh@gmail.com', captchaToken: 'tok2' })
+  expect(fake.resetPasswordForEmail).toHaveBeenCalledWith(
+    'linh@gmail.com',
+    expect.objectContaining({ captchaToken: 'tok2' }),
+  )
+
+  fake.signInWithPassword.mockResolvedValueOnce({
+    data: { session: null },
+    error: new AuthApiError('captcha protection: request disallowed', 400, 'captcha_failed'),
+  })
+  await expect(
+    api.signInWithPassword({ email: 'linh@gmail.com', password: 'x', captchaToken: 'cũ' }),
+  ).rejects.toMatchObject({ code: 'captcha_failed' })
 })

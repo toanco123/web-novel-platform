@@ -3,16 +3,18 @@ import { useForm } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { authErrorMessage, useSendPasswordReset } from '../hooks'
 import { forgotPasswordSchema, type ForgotPasswordValues } from '../schemas'
+import { useCaptcha } from '../useCaptcha'
 import { FormAlert } from './FormAlert'
 import { authInputClass, FormField } from './FormField'
 import { SubmitButton } from './SubmitButton'
 
 export function ForgotPasswordForm() {
   const send = useSendPasswordReset()
+  const captcha = useCaptcha()
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
     mode: 'onTouched',
@@ -30,7 +32,11 @@ export function ForgotPasswordForm() {
 
   return (
     <form
-      onSubmit={handleSubmit(({ email }) => send.mutate(email))}
+      onSubmit={handleSubmit(async ({ email }) => {
+        const captchaToken = await captcha.token()
+        if (captchaToken === null) return
+        send.mutate({ email, captchaToken }, { onSettled: captcha.reset })
+      })}
       noValidate
       className="space-y-5"
     >
@@ -47,7 +53,8 @@ export function ForgotPasswordForm() {
           />
         )}
       </FormField>
-      <SubmitButton pending={send.isPending} pendingLabel="Đang gửi…">
+      {captcha.element}
+      <SubmitButton pending={send.isPending || isSubmitting} pendingLabel="Đang gửi…">
         Gửi link đặt lại
       </SubmitButton>
     </form>

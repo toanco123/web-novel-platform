@@ -220,3 +220,47 @@ test('xóa chương thì xóa luôn bình luận và báo lỗi của chương, 
   expect((await getComments(story.slug, { chapter: 1 })).total).toBe(1)
   expect(await studio.getStoryReports(story.id)).toEqual([])
 })
+
+describe('hạn mức mỗi ngày của tác giả (như trigger charge_author của DB)', () => {
+  const today = () => {
+    const d = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  const setUsage = (userId: string, usage: { stories: number; chapters: number; bytes: number }) =>
+    localStorage.setItem(
+      'mock-author-usage',
+      JSON.stringify({ [userId]: { day: today(), ...usage } }),
+    )
+
+  test('quá 10 truyện mới trong ngày thì báo story_limit', async () => {
+    const id = await secondUser()
+    setUsage(id, { stories: 9, chapters: 0, bytes: 0 })
+    await studio.createStory(input)
+    await expect(studio.createStory(input)).rejects.toMatchObject({ code: 'story_limit' })
+  })
+
+  test('tính cả dung lượng khi sửa chương, vượt thì báo chapter_limit', async () => {
+    const id = await secondUser()
+    const story = await studio.createStory(input)
+    const saved = await studio.saveChapter(story.id, chapter)
+    const bytes = new TextEncoder().encode(chapter.content.trim()).length
+    setUsage(id, { stories: 1, chapters: 1, bytes: studio.CONTENT_BYTES_PER_DAY - bytes })
+    // Lưu lại đúng nội dung cũ (chỉ đổi tiêu đề) thì không tính
+    await studio.saveChapter(story.id, { ...chapter, title: 'Tên mới', number: saved.number })
+    await expect(
+      studio.saveChapter(story.id, { ...chapter, content: `${chapter.content}!`, number: 1 }),
+    ).rejects.toMatchObject({ code: 'chapter_limit' })
+    // Vừa đủ hạn mức thì vẫn lưu được; thêm 1 chương nữa thì vượt
+    await studio.importChapters(story.id, [chapter], false)
+    await expect(studio.importChapters(story.id, [chapter], false)).rejects.toMatchObject({
+      code: 'chapter_limit',
+    })
+  })
+
+  test('quản trị viên (nhập truyện hàng loạt) không bị giới hạn', async () => {
+    signInAs('demo')
+    setUsage('demo', { stories: 10, chapters: 500, bytes: studio.CONTENT_BYTES_PER_DAY })
+    await expect(studio.createStory(input, { chapter, publish: false })).resolves.toBeTruthy()
+  })
+})

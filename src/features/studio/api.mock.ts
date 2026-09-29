@@ -1,7 +1,7 @@
 // Khu Sáng tác giả lưu trong localStorage: dùng cho test tự động và khi chạy không có Supabase
 // (xem api.ts). Bản thật: api.remote.ts. Mọi hàm kiểm tra đăng nhập và quyền sở hữu.
 import { requireUser } from '@/features/auth/api'
-import { mockDelay as delay } from '@/lib/mockStorage'
+import { mockDelay as delay, readMock, writeMock } from '@/lib/mockStorage'
 import { slugify } from '@/lib/slugify'
 import {
   dayKey,
@@ -26,7 +26,10 @@ import {
 } from '@/mocks/userContent'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
 import type { ChapterReport } from '@/types/report'
+import type { User } from '@/types/user'
 import {
+  CHAPTERS_PER_DAY,
+  CONTENT_BYTES_PER_DAY,
   type ChapterInput,
   type FirstChapterInput,
   type MyStory,
@@ -34,6 +37,7 @@ import {
   STATS_DAYS,
   type StoryInput,
   type StoryStats,
+  STORIES_PER_DAY,
   StudioError,
 } from './shared'
 
@@ -63,6 +67,31 @@ async function ownStory(id: string) {
   const story = stories.find((s) => s.id === id && s.owner.id === user.id)
   if (!story) throw new StudioError('not_found')
   return { user, story, stories }
+}
+
+// Hạn mức mỗi ngày của tác giả, cùng mức với trigger charge_author của DB (migration
+// security_hardening): tính cả truyện/chương xóa sau đó và dung lượng nội dung khi sửa chương
+type AuthorUsage = { day: string; stories: number; chapters: number; bytes: number }
+const USAGE_KEY = 'mock-author-usage'
+
+const contentBytes = (content: string) => new TextEncoder().encode(content.trim()).length
+
+function chargeAuthor(user: User, add: { stories?: number; chapters?: number; bytes?: number }) {
+  if (user.isAdmin) return
+  const all = readMock<Record<string, AuthorUsage>>(USAGE_KEY, {})
+  const day = dayKey(new Date())
+  const used = all[user.id]?.day === day ? all[user.id] : { day, stories: 0, chapters: 0, bytes: 0 }
+  const next = {
+    day,
+    stories: used.stories + (add.stories ?? 0),
+    chapters: used.chapters + (add.chapters ?? 0),
+    bytes: used.bytes + (add.bytes ?? 0),
+  }
+  if (next.stories > STORIES_PER_DAY) throw new StudioError('story_limit')
+  if (next.chapters > CHAPTERS_PER_DAY || next.bytes > CONTENT_BYTES_PER_DAY) {
+    throw new StudioError('chapter_limit')
+  }
+  writeMock(USAGE_KEY, { ...all, [user.id]: next })
 }
 
 function saveStory(stories: StoredStory[], updated: StoredStory) {
@@ -107,6 +136,11 @@ export async function createStory(
 ): Promise<MyStory> {
   await delay(400)
   const user = await requireUser()
+  chargeAuthor(user, {
+    stories: 1,
+    chapters: firstChapter ? 1 : 0,
+    bytes: firstChapter ? contentBytes(firstChapter.chapter.content) : 0,
+  })
   const publish = firstChapter?.publish ?? false
   const story: StoredStory = {
     ...normalize(input),
@@ -216,7 +250,7 @@ export async function saveChapter(
   { publish = false } = {},
 ): Promise<Chapter> {
   await delay(400)
-  const { story, stories } = await ownStory(storyId)
+  const { user, story, stories } = await ownStory(storyId)
   const chapters = loadChapters(storyId)
   const existing =
     input.number === undefined ? undefined : chapters.find((c) => c.number === input.number)
@@ -227,6 +261,10 @@ export async function saveChapter(
   }
   if (existing && number !== existing.number && existing.publishedAt) {
     throw new StudioError('chapter_number_locked')
+  }
+  if (!existing) chargeAuthor(user, { chapters: 1, bytes: contentBytes(input.content) })
+  else if (input.content.trim() !== existing.content) {
+    chargeAuthor(user, { bytes: contentBytes(input.content) })
   }
 
   let saved: Chapter
@@ -305,7 +343,11 @@ export async function deleteChapter(storyId: string, number: number) {
 /** Thêm nhiều chương một lúc (nhập file), đánh số tiếp nối sau chương cuối */
 export async function importChapters(storyId: string, items: ChapterInput[], publish: boolean) {
   await delay(500)
-  const { story, stories } = await ownStory(storyId)
+  const { user, story, stories } = await ownStory(storyId)
+  chargeAuthor(user, {
+    chapters: items.length,
+    bytes: items.reduce((sum, item) => sum + contentBytes(item.content), 0),
+  })
   const chapters = loadChapters(storyId)
   const start = (chapters.at(-1)?.number ?? 0) + 1
   const added = items.map((item, i) => newChapter(storyId, start + i, item, publish))

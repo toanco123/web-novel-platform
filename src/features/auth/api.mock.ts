@@ -10,7 +10,13 @@ import {
   toPublicUser as toPublic,
 } from '@/mocks/users'
 import type { User } from '@/types/user'
-import { AuthError, type SignUpResult, type SocialProvider, unauthenticated } from './shared'
+import {
+  AuthError,
+  type SignUpResult,
+  type SocialProvider,
+  unauthenticated,
+  type WithCaptcha,
+} from './shared'
 
 const SESSION_KEY = 'mock-auth-session'
 
@@ -60,7 +66,7 @@ export async function completeAuthRedirect(): Promise<User | null> {
   return getSession()
 }
 
-export async function signInWithPassword(input: { email: string; password: string }) {
+export async function signInWithPassword(input: { email: string; password: string } & WithCaptcha) {
   await delay(500)
   const user = loadUsers().find(
     (u) => u.email === normalizeEmail(input.email) && u.password === input.password,
@@ -69,11 +75,9 @@ export async function signInWithPassword(input: { email: string; password: strin
   return startSession(user)
 }
 
-export async function signUp(input: {
-  displayName: string
-  email: string
-  password: string
-}): Promise<SignUpResult> {
+export async function signUp(
+  input: { displayName: string; email: string; password: string } & WithCaptcha,
+): Promise<SignUpResult> {
   await delay(700)
   const users = loadUsers()
   const email = normalizeEmail(input.email)
@@ -115,7 +119,7 @@ export async function signInWithProvider(provider: SocialProvider): Promise<User
 }
 
 /** Luôn thành công để không tiết lộ email có tồn tại hay không */
-export async function sendPasswordReset(_email: string) {
+export async function sendPasswordReset(_input: { email: string } & WithCaptcha) {
   await delay(500)
 }
 
@@ -147,7 +151,9 @@ export async function updateProfile(input: { displayName: string; avatarUrl: str
   return toPublic(updated)
 }
 
-export async function changePassword(input: { currentPassword: string; newPassword: string }) {
+export async function changePassword(
+  input: { currentPassword: string; newPassword: string } & WithCaptcha,
+) {
   await delay(500)
   const current = await requireUser()
   const users = loadUsers()
@@ -162,7 +168,7 @@ export async function changePassword(input: { currentPassword: string; newPasswo
  * Xóa hẳn tài khoản đang đăng nhập cùng truyện, bình luận, tủ truyện... của họ, rồi đăng xuất.
  * password: bắt buộc với tài khoản email (tài khoản Google/Facebook truyền null)
  */
-export async function deleteAccount(password: string | null) {
+export async function deleteAccount({ password }: { password: string | null } & WithCaptcha) {
   await delay(500)
   const current = await requireUser()
   const user = loadUsers().find((u) => u.id === current.id)!
