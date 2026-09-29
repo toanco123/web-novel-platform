@@ -1,6 +1,6 @@
 import { stories } from '@/mocks/stories'
 import * as studio from '@/features/studio/api'
-import { getChapter, getChapterList } from './api'
+import { countChaptersFrom, getChapter, getChapterList, getChapterRange } from './api'
 
 const story = stories.find((s) => s.slug === 'truong-an-khong-tuyet')! // 412 chương
 
@@ -71,4 +71,17 @@ describe('getChapter', () => {
       story: { chapterCount: 2 },
     })
   })
+})
+
+test('getChapterRange: các chương từ số `from`, giống hệt getChapter; countChaptersFrom đếm phần còn lại', async () => {
+  const range = await getChapterRange(story.slug, 10, 3)
+  expect(range.map((c) => c.number)).toEqual([10, 11, 12])
+  expect(range[1]).toEqual(await getChapter(story.slug, 11))
+  expect(range[0].story).toMatchObject({ slug: story.slug, coverUrl: story.coverUrl })
+  expect((await getChapterRange(story.slug, 411, 5)).map((c) => c.number)).toEqual([411, 412])
+  expect(await getChapterRange(story.slug, 413, 5)).toEqual([])
+  expect(await getChapterRange(story.slug, 1, 0)).toEqual([])
+  expect(await getChapterRange('khong-co-truyen-nay', 1, 5)).toEqual([])
+  expect(await countChaptersFrom(story.slug, 400)).toBe(13)
+  expect(await countChaptersFrom('khong-co-truyen-nay', 1)).toBe(0)
 })

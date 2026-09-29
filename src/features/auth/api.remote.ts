@@ -10,6 +10,8 @@ import {
   removeUserImages,
   uploadImage,
 } from '@/lib/imageUpload'
+import { readMock, writeMock } from '@/lib/mockStorage'
+import { isNetworkError } from '@/lib/network'
 import { paths } from '@/lib/routes'
 import { db } from '@/lib/supabase'
 import type { User } from '@/types/user'
@@ -68,13 +70,26 @@ function authError(error: unknown): unknown {
   }
 }
 
+/** Hồ sơ lần tải trước (localStorage): mở app lúc offline vẫn nhận ra tài khoản */
+const PROFILE_KEY = 'auth-profile'
+
 async function loadProfile(userId: string): Promise<Profile> {
   if (cachedProfile?.id === userId) return cachedProfile
-  const row = unwrap(
-    await db().from('profiles').select('id, display_name, avatar_url').eq('id', userId).single(),
-  )
-  cachedProfile = { id: row.id, displayName: row.display_name, avatarUrl: row.avatar_url }
-  return cachedProfile
+  let profile: Profile
+  try {
+    const row = unwrap(
+      await db().from('profiles').select('id, display_name, avatar_url').eq('id', userId).single(),
+    )
+    profile = { id: row.id, displayName: row.display_name, avatarUrl: row.avatar_url }
+  } catch (error) {
+    const saved = readMock<Profile | null>(PROFILE_KEY, null)
+    // Không gán cachedProfile: có mạng lại thì tải bản mới
+    if (isNetworkError(error) && saved?.id === userId) return saved
+    throw error
+  }
+  cachedProfile = profile
+  writeMock(PROFILE_KEY, profile)
+  return profile
 }
 
 function toUser(session: Session, profile: Profile): User {
@@ -94,14 +109,38 @@ async function userOf(session: Session) {
   return toUser(session, await loadProfile(session.user.id))
 }
 
+/** Mất mạng thì chờ supabase-js tối đa chừng này: token hết hạn thì nó thử làm mới tới ~25 giây */
+const OFFLINE_SESSION_WAIT_MS = 2000
+
+/** Phiên supabase-js lưu trên máy, đọc thẳng (không làm mới token) */
+function storedSession(): Session | null {
+  const key = (db().auth as unknown as { storageKey?: string }).storageKey
+  const session = key ? readMock<Session | null>(key, null) : null
+  return session?.user?.id ? session : null
+}
+
+/**
+ * Phiên hiện tại (supabase-js tự làm mới token khi cần). Mất mạng mà supabase-js treo vì đang làm
+ * mới token hết hạn, hoặc trả về không có phiên, thì dùng phiên đã lưu trên máy: mở app lúc offline
+ * vẫn nhận đúng tài khoản (thao tác cần máy chủ đằng nào cũng chờ có mạng).
+ */
+async function currentSession(): Promise<Session | null> {
+  const load = db()
+    .auth.getSession()
+    .then(({ data }) => data.session)
+  if (navigator.onLine) return load
+  const timeout = new Promise<null>((resolve) => setTimeout(resolve, OFFLINE_SESSION_WAIT_MS, null))
+  return (await Promise.race([load.catch(() => null), timeout])) ?? storedSession()
+}
+
 export async function getSession(): Promise<User | null> {
   // Đọc phiên đã lưu trên máy (tự làm mới token khi cần), không gọi máy chủ nếu còn hạn
-  const { data } = await db().auth.getSession()
-  if (!data.session) {
+  const session = await currentSession()
+  if (!session) {
     cachedProfile = null
     return null
   }
-  return userOf(data.session)
+  return userOf(session)
 }
 
 /** Dùng trong các api khác cho thao tác cần đăng nhập (tủ truyện, bình luận...) */
@@ -113,8 +152,7 @@ export async function requireUser(): Promise<User> {
 
 /** Id người đang đăng nhập; null nếu là khách. Không tải hồ sơ nên nhanh hơn getSession */
 export async function getUserId(): Promise<string | null> {
-  const { data } = await db().auth.getSession()
-  return data.session?.user.id ?? null
+  return (await currentSession())?.user.id ?? null
 }
 
 /**
@@ -123,6 +161,8 @@ export async function getUserId(): Promise<string | null> {
  */
 export function onAuthStateChange(onChange: () => void): () => void {
   const { data } = db().auth.onAuthStateChange((event) => {
+    // Đăng xuất (kể cả xóa tài khoản, phiên hết hạn): không giữ hồ sơ trên máy
+    if (event === 'SIGNED_OUT') writeMock(PROFILE_KEY, null)
     if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return
     cachedProfile = null
     setTimeout(onChange, 0)

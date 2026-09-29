@@ -9,4 +9,5 @@ export * from './shared'
 
 const api: typeof mock = supabase ? remote : mock
 
-export const { getChapterList, getChapter, recordChapterView } = api
+export const { getChapterList, getChapter, getChapterRange, countChaptersFrom, recordChapterView } =
+  api

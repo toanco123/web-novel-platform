@@ -9,6 +9,7 @@ import { loadPage } from '@/lib/dbPage'
 import { db } from '@/lib/supabase'
 import type { ChapterContent, ChapterNeighbor, ChapterOrder, ChapterSummary } from '@/types/chapter'
 import type { Page } from '@/types/page'
+import type { Story } from '@/types/story'
 import { CHAPTERS_PER_PAGE } from './shared'
 
 /** Chương đã xuất bản luôn có published_at (trigger đặt), lùi về created_at như bản giả */
@@ -72,6 +73,18 @@ async function neighbor(
   return row ? { number: row.number, title: row.title } : null
 }
 
+/** Thông tin truyện đi kèm mỗi chương cho người đọc */
+const readerStory = (story: Story): ChapterContent['story'] => ({
+  slug: story.slug,
+  title: story.title,
+  author: story.author,
+  status: story.status,
+  // Số chương đã xuất bản (story_stats)
+  chapterCount: story.chapterCount,
+  coverUrl: story.coverUrl,
+  visibility: story.visibility,
+})
+
 /** Một chương để đọc, kèm chương trước/sau; null khi không có truyện hoặc chương */
 export async function getChapter(slug: string, number: number): Promise<ChapterContent | null> {
   const [story, chapter, prev, next] = await Promise.all([
@@ -82,14 +95,7 @@ export async function getChapter(slug: string, number: number): Promise<ChapterC
   ])
   if (!story || !chapter) return null
   return {
-    story: {
-      slug: story.slug,
-      title: story.title,
-      author: story.author,
-      status: story.status,
-      // Số chương đã xuất bản (story_stats)
-      chapterCount: story.chapterCount,
-    },
+    story: readerStory(story),
     number,
     title: chapter.title,
     content: chapter.content,
@@ -97,6 +103,82 @@ export async function getChapter(slug: string, number: number): Promise<ChapterC
     prev,
     next,
   }
+}
+
+/** Chương đã xuất bản có số ≥ `from`, tăng dần, tối đa `limit`: kèm nội dung hoặc chỉ số và tên */
+async function chaptersFrom(slug: string, from: number, limit: number) {
+  return unwrap(
+    await db()
+      .from('chapters')
+      .select('number, title, content, published_at, created_at, stories!inner(slug)')
+      .eq('stories.slug', slug)
+      .eq('status', 'published')
+      .gte('number', from)
+      .order('number', { ascending: true })
+      .limit(limit),
+  )
+}
+
+async function outlineFrom(slug: string, from: number, limit: number) {
+  return unwrap(
+    await db()
+      .from('chapters')
+      .select('number, title, stories!inner(slug)')
+      .eq('stories.slug', slug)
+      .eq('status', 'published')
+      .gte('number', from)
+      .order('number', { ascending: true })
+      .limit(limit),
+  )
+}
+
+/**
+ * Tối đa `count` chương đã xuất bản có số ≥ `from` (tải trước, tải về đọc offline). Nội dung chỉ
+ * lấy `count` chương; mục lục lấy thêm 1 chương để biết chương sau của chương cuối.
+ */
+export async function getChapterRange(
+  slug: string,
+  from: number,
+  count: number,
+): Promise<ChapterContent[]> {
+  if (count <= 0) return []
+  const [story, rows, outline, prev] = await Promise.all([
+    storyBySlug(slug),
+    chaptersFrom(slug, from, count),
+    outlineFrom(slug, from, count + 1),
+    neighbor(slug, from, 'prev'),
+  ])
+  if (!story) return []
+  const byNumber = new Map(rows.map((r) => [r.number, r]))
+  const toNeighbor = (c: { number: number; title: string } | undefined) =>
+    c ? { number: c.number, title: c.title } : null
+  return outline.slice(0, count).flatMap((c, i) => {
+    const row = byNumber.get(c.number)
+    if (!row) return []
+    return [
+      {
+        story: readerStory(story),
+        number: row.number,
+        title: row.title,
+        content: row.content,
+        publishedAt: publishedAt(row),
+        prev: i === 0 ? prev : toNeighbor(outline[i - 1]),
+        next: toNeighbor(outline[i + 1]),
+      },
+    ]
+  })
+}
+
+/** Số chương đã xuất bản có số ≥ `from` */
+export async function countChaptersFrom(slug: string, from: number): Promise<number> {
+  const { count, error } = await db()
+    .from('chapters')
+    .select('number, stories!inner(slug)', { count: 'exact', head: true })
+    .eq('stories.slug', slug)
+    .eq('status', 'published')
+    .gte('number', from)
+  if (error) throw error
+  return count ?? 0
 }
 
 // Mỗi người chỉ tính 1 lượt/chương cho mỗi lần tải trang (máy chủ chưa chống đếm trùng)

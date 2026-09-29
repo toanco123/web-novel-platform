@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { CommentsSection } from '@/features/comments/components/CommentsSection'
 import { useComments } from '@/features/comments/hooks'
+import { useOnline } from '@/hooks/useOnline'
 
 type Props = {
   slug: string
@@ -15,6 +16,14 @@ export function ChapterComments({ slug, chapter, collapsible = false }: Props) {
   const [open, setOpen] = useState(!collapsible)
   const { data } = useComments(slug, chapter)
   const total = data?.pages[0]?.total
+  const online = useOnline()
+  if (!online) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Cần có mạng để xem và gửi bình luận chương {chapter}.
+      </p>
+    )
+  }
 
   if (!open) {
     return (

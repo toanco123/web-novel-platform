@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { useSession } from '@/features/auth/hooks'
 import type { ReadingProgress } from '@/types/library'
 import * as api from './api'
@@ -93,6 +94,8 @@ export function useSaveReadingProgress() {
   const { userId } = useLibraryUser()
   const queryClient = useQueryClient()
   return useMutation({
+    // Mặc định mutation bị dừng khi offline: phải chạy để tới được hàng chờ (bản Supabase)
+    networkMode: 'always',
     mutationFn: api.saveReadingProgress,
     onSuccess: (entry: ReadingProgress) => {
       queryClient.setQueryData(libraryKeys.progress(userId, entry.slug), entry)
@@ -118,4 +121,24 @@ export function useRemoveFromHistory() {
 export function useClearHistory() {
   const invalidate = useInvalidateLibrary()
   return useMutation({ mutationFn: api.clearHistory, onSuccess: invalidate })
+}
+
+/** Khi mở app, đổi tài khoản và khi có mạng lại: gửi các chỗ đọc ghi lúc offline */
+export function usePendingProgressSync() {
+  const { user } = useLibraryUser()
+  const queryClient = useQueryClient()
+  const userId = user?.id
+  useEffect(() => {
+    if (!userId) return
+    const sync = () =>
+      void api.syncPendingProgress().then(
+        (sent) => {
+          if (sent > 0) void queryClient.invalidateQueries({ queryKey: libraryKeys.all(userId) })
+        },
+        () => {},
+      )
+    sync()
+    window.addEventListener('online', sync)
+    return () => window.removeEventListener('online', sync)
+  }, [queryClient, userId])
 }

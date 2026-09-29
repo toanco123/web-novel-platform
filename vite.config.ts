@@ -3,6 +3,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
+import { pwa } from './pwa.config.ts'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -15,7 +16,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), ...pwa()],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),

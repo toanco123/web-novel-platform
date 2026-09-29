@@ -1,4 +1,4 @@
-import type { Author, StoryStatus } from './story'
+import type { Author, StoryStatus, StoryVisibility } from './story'
 
 export type ChapterSummary = {
   number: number
@@ -27,7 +27,17 @@ export type ChapterNeighbor = { number: number; title: string }
 
 /** Một chương cho trang đọc: nội dung + thông tin truyện + chương trước/sau */
 export type ChapterContent = {
-  story: { slug: string; title: string; author: Author; status: StoryStatus; chapterCount: number }
+  story: {
+    slug: string
+    title: string
+    author: Author
+    status: StoryStatus
+    chapterCount: number
+    /** Ảnh bìa (tab "Đã lưu" hiện bìa của truyện đã lưu trên máy) */
+    coverUrl: string | null
+    /** Chủ truyện đọc được cả truyện chưa công khai; loại này không lưu vào kho đọc offline */
+    visibility: StoryVisibility
+  }
   number: number
   title: string
   /** HTML rút gọn của trình soạn hoặc văn bản thuần kiểu cũ: đọc qua `parseContent` (`features/chapters/richText`) */

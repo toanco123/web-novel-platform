@@ -21,4 +21,5 @@ export const {
   saveReadingProgress,
   removeFromHistory,
   clearHistory,
+  syncPendingProgress,
 } = api

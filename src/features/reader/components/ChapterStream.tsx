@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { ReportChapterDialog } from '@/features/feedback/components/ReportChapterDialog'
+import { NotSavedNotice } from '@/features/offline/components/NotSavedNotice'
+import { ChapterNotSavedError } from '@/features/offline/readChapter'
 import { useChapter } from '@/features/chapters/hooks'
 import { paths } from '@/lib/routes'
 import { ChapterArticle } from './ChapterArticle'
@@ -140,7 +142,7 @@ function StreamChapter({
   onTap: () => void
   onOpenIndex: () => void
 }) {
-  const { data: chapter, isPending, isError, refetch } = useChapter(slug, number)
+  const { data: chapter, isPending, isError, error, refetch } = useChapter(slug, number)
 
   if (isPending) {
     return (
@@ -149,6 +151,13 @@ function StreamChapter({
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="h-4 animate-pulse rounded bg-muted" />
         ))}
+      </div>
+    )
+  }
+  if (isError && error instanceof ChapterNotSavedError) {
+    return (
+      <div className="mt-24">
+        <NotSavedNotice number={number} onRetry={() => void refetch()} />
       </div>
     )
   }

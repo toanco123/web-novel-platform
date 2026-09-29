@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router'
 import { Footer } from '@/components/common/Footer'
 import { Header } from '@/components/common/Header'
+import { OfflineBanner } from '@/components/common/OfflineBanner'
 import { AppScrollRestoration } from '@/components/common/AppScrollRestoration'
 
 export function MainLayout() {
@@ -13,6 +14,7 @@ export function MainLayout() {
         Bỏ qua điều hướng
       </a>
       <Header />
+      <OfflineBanner />
       <main id="main" className="flex-1">
         <Outlet />
       </main>

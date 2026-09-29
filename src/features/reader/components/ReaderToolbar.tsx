@@ -119,6 +119,8 @@ export function ReaderToolbar({ chapter, visible, open, setOpen, listen, autoScr
           </SheetHeader>
           <ReaderChapterIndex
             slug={story.slug}
+            title={story.title}
+            downloadable={story.visibility === 'published'}
             current={chapter.number}
             max={story.chapterCount}
             onNavigate={() => setOpen(null)}
