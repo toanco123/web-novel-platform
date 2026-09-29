@@ -55,6 +55,12 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
   - **Tự động cuộn:** `features/reader/autoscroll` (Zustand key `reader-autoscroll`; 1× = 220 chữ/phút, đo theo bố cục thật). Không chạy cùng nghe truyện. Trong lúc tự cuộn, thanh công cụ chỉ ẩn/hiện khi chạm chữ (`useAutoHideToolbar(frozen)`). Hết chương thì dừng, nút "Chương sau" trên thanh nổi sang chương và cuộn tiếp; tự chuyển chương cách khác thì tạm dừng. Cuộn liên tục thì chờ ở đáy trang tới khi chương sau nối vào (`[data-stream-end]` đánh dấu hết chuỗi). Hai thanh nổi dùng chung `FloatingBar`.
   - **Lịch sử và lượt đọc:** ghi bằng `useReadingTracker` + `useRecordChapterView` (không tính lượt của chính tác giả).
   - **Cuối chương:** có "Báo lỗi chương" (`features/feedback`) và bình luận của chương (`CommentsSection` với prop `chapter`).
+- **Đọc offline & PWA** (`features/offline`, plan `documents/plan-pwa-doc-offline.md`):
+  - `vite-plugin-pwa` cấu hình ở `pwa.config.ts` (precache bỏ chunk khu Quản trị/Sáng tác và font ngoài Latin/tiếng Việt; tắt ở dev và test). Icon sinh từ `public/favicon.svg` bằng `npm run generate-pwa-assets`. Có bản mới thì hỏi (`src/app/PwaUpdater.tsx`).
+  - Chương đọc qua `readChapter` → kho IndexedDB `features/offline/store.ts` (có bản lưu thì trả ngay và làm mới ở nền; mất mạng mà chưa lưu → `ChapterNotSavedError`). Tải trước 5 chương (`usePrefetchChapters`), tải về chủ động thì ghim (`downloads.ts`), tối đa 300 chương không ghim. Tab `/library?tab=saved`.
+  - Query/mutation cần chạy khi offline đặt `networkMode: 'always'` (chương, kho, phiên đăng nhập, ghi lịch sử).
+  - Lịch sử đọc lỗi mạng (bản Supabase) vào hàng chờ `features/library/pendingProgress.ts`, `OfflineSync` gửi khi có mạng lại.
+  - Thông báo nổi dùng `toast` của `sonner`.
 - **Cuộn trang**: layout dùng `AppScrollRestoration` thay vì `ScrollRestoration` trực tiếp (lý do ghi trong file).
 - **Chống spam & xóa tài khoản**: trigger DB giới hạn tần suất bình luận, liên hệ, báo lỗi, tạo thể loại và chỉ tính 1 lượt đọc / người / chương / ngày; vượt giới hạn ném `rate_limited` (bình luận trùng: `duplicate_comment`), api remote đổi sang `AuthError` bằng `limitError()`; bản giả làm cùng mức (`src/mocks/rateLimit.ts`). Mức giới hạn ở mục 4 `thiet-ke-database.md`. Tự xóa tài khoản ở cuối trang `/account` (`deleteAccount`: remote xóa ảnh Storage rồi `rpc('delete_account')`, DB cascade; bản giả `src/mocks/accounts.ts`).
 - **Form**: react-hook-form + zod (`mode: 'onTouched'`), schema và thông báo lỗi tiếng Việt ở `features/auth/schemas.ts`. Dùng `FormField` (render-prop truyền `id`/`aria-invalid`/`aria-describedby` cho ô nhập) để giữ đúng liên kết nhãn–lỗi.
@@ -90,6 +96,7 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
   - Mock có độ trễ nên `findBy*` cần `{ timeout: 3000 }`; `testTimeout` chung là 10 giây.
   - Điều hướng tới trang lazy-load và dữ liệu ghi sau cập nhật lạc quan cần `expect.poll(...)` thay vì kiểm tra ngay sau `user.click`.
   - `src/test/setup.ts` đã stub các API jsdom thiếu cho Radix và ProseMirror. Gõ từng phím vào trình soạn chương bị mất ký tự trong jsdom: dùng `writeInEditor` (bấm rồi dán) ở `src/test/helpers.ts`. jsdom không có `speechSynthesis`/`IntersectionObserver`: test nghe truyện dùng `vi.stubGlobal`, còn cuộn liên tục thì bấm nút "Tải chương N". Test tự động cuộn giả `requestAnimationFrame`/`scrollTo` và `getBoundingClientRect` (xem `features/reader/autoscroll.test.tsx`).
+  - Đọc offline: `fake-indexeddb` nạp trong `src/test/setup.ts` (mỗi test một kho trống, hết test tự có mạng lại). Giả mất mạng bằng `goOffline()`, chương giả bằng `fakeChapter()` ở `src/test/offline.ts`.
 - Kiểm tra UI ở 375px, 768px, 1440px và cả hai theme; ảnh chụp Playwright để trong `.playwright-mcp/` (đã gitignore).
 - Tailwind v4 không có `tailwind.config`; theme/token (màu, font Geist, dark mode qua class `.dark`) nằm trong `src/index.css`. Dùng các class token của shadcn (`bg-background`, `text-muted-foreground`...) thay vì màu cứng.
 - `cn()` ở `src/lib/utils.ts` re-export từ package `cn` (của shadcn, thay cho clsx + tailwind-merge).

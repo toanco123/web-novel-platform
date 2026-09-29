@@ -9,7 +9,7 @@ Người đọc hay đọc trên điện thoại, lúc mạng yếu hoặc mất
 - **Lịch sử đọc khi offline:** lưu tạm trên máy, có mạng thì đồng bộ lên server.
 - Cách làm: service worker (`vite-plugin-pwa`) chỉ lo file tĩnh; dữ liệu chương lưu **IndexedDB** do code app quản lý (không cache response Supabase trong service worker, không persist cả cache TanStack Query).
 
-**Trạng thái:** Đã duyệt thiết kế, chưa làm.
+**Trạng thái:** ✅ Xong (29/09/2026).
 
 ---
 

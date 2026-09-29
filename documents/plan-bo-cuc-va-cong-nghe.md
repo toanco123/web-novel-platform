@@ -177,7 +177,7 @@ Thiết kế chi tiết (bảng, luật nghiệp vụ, RLS, RPC, storage, bảng
 4b. **Sáng tác & thể loại** ✅ (25/09/2026, chi tiết ở `plan-sang-tac-va-the-loai.md`): tạo thể loại, đăng truyện, soạn/nhập chương, xuất bản.
 5. **Nối Supabase**: schema + RLS + trigger + RPC + storage ✅ (28/09/2026, chi tiết ở `thiet-ke-database.md`, không seed dữ liệu) → cấu hình Auth → thay `api.ts` từng feature.
 5b. **Trang quản trị** ✅ (28/09/2026, chi tiết ở `plan-trang-quan-tri.md`): `/admin` chỉ xem, Ant Design + biểu đồ `@ant-design/plots`.
-5c. **PWA và đọc offline** (đã duyệt thiết kế 29/09/2026, chưa làm; chi tiết ở `plan-pwa-doc-offline.md`): cài ứng dụng, tự lưu chương đã mở + tải trước 5 chương, nút tải về, tab "Đã lưu", đồng bộ lịch sử đọc khi có mạng lại.
+5c. **PWA và đọc offline** ✅ (29/09/2026, chi tiết ở `plan-pwa-doc-offline.md`): cài ứng dụng, tự lưu chương đã mở + tải trước 5 chương, nút tải về, tab "Đã lưu", đồng bộ lịch sử đọc khi có mạng lại.
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---
