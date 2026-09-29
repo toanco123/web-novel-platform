@@ -17,10 +17,18 @@ import {
 } from '@/mocks/activity'
 import { allGenres, toStory } from '@/mocks/catalog'
 import { mockChapters } from '@/mocks/chapters'
-import { stories as seedStories } from '@/mocks/stories'
-import { loadChapters, loadUserStories, saveUserStories } from '@/mocks/userContent'
+import { genres as seedGenres, stories as seedStories } from '@/mocks/stories'
+import {
+  loadChapters,
+  loadUserGenres,
+  loadUserStories,
+  saveUserGenres,
+  saveUserStories,
+} from '@/mocks/userContent'
 import { loadUsers, saveUsers } from '@/mocks/users'
+import { normalizeGenreName } from '@/features/genres/api'
 import type { Page } from '@/types/page'
+import type { Genre } from '@/types/story'
 import {
   ADMIN_PAGE_SIZE,
   AdminError,
@@ -373,4 +381,76 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
           : { ...s, takedown: null },
     ),
   )
+}
+
+// ── Thể loại ────────────────────────────────────────────────────────────
+// Bản giả chỉ sửa được thể loại do người dùng tạo (thể loại có sẵn nằm trong code)
+
+function userGenre(slug: string) {
+  if (seedGenres.some((g) => g.slug === slug)) throw new AdminError('builtin_genre')
+  const genre = loadUserGenres().find((g) => g.slug === slug)
+  if (!genre) throw new AdminError('not_found')
+  return genre
+}
+
+/** Đổi thể loại của mọi truyện người dùng: from → to (null: bỏ), không để trùng */
+function replaceStoryGenre(from: string, to: string | null) {
+  saveUserStories(
+    loadUserStories().map((s) =>
+      s.genreSlugs.includes(from)
+        ? {
+            ...s,
+            genreSlugs: [
+              ...new Set(s.genreSlugs.flatMap((g) => (g === from ? (to ? [to] : []) : [g]))),
+            ],
+          }
+        : s,
+    ),
+  )
+}
+
+export async function updateGenre(
+  slug: string,
+  input: { name: string; description: string },
+): Promise<Genre> {
+  await delay()
+  await requireAdmin()
+  const genre = userGenre(slug)
+  const { name, slug: nextSlug } = normalizeGenreName(input.name)
+  if (nextSlug !== slug && allGenres().some((g) => g.slug === nextSlug)) {
+    throw new AdminError('genre_exists')
+  }
+  const updated = {
+    ...genre,
+    name,
+    slug: nextSlug,
+    description: input.description.trim() || undefined,
+  }
+  saveUserGenres(loadUserGenres().map((g) => (g.slug === slug ? updated : g)))
+  if (nextSlug !== slug) replaceStoryGenre(slug, nextSlug)
+  // Giống RPC admin_update_genre: chỉ trả tên, slug, mô tả
+  return { slug: updated.slug, name: updated.name, description: updated.description }
+}
+
+export async function deleteGenre(slug: string) {
+  await delay()
+  await requireAdmin()
+  userGenre(slug)
+  saveUserGenres(loadUserGenres().filter((g) => g.slug !== slug))
+  replaceStoryGenre(slug, null)
+}
+
+/** Gộp `from` vào `into`; trả về số truyện được chuyển sang */
+export async function mergeGenres(from: string, into: string): Promise<number> {
+  await delay()
+  await requireAdmin()
+  if (from === into) throw new AdminError('same_genre')
+  userGenre(from)
+  if (!allGenres().some((g) => g.slug === into)) throw new AdminError('not_found')
+  const moved = loadUserStories().filter(
+    (s) => s.genreSlugs.includes(from) && !s.genreSlugs.includes(into),
+  ).length
+  saveUserGenres(loadUserGenres().filter((g) => g.slug !== from))
+  replaceStoryGenre(from, into)
+  return moved
 }

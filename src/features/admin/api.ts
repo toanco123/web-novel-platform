@@ -19,4 +19,7 @@ export const {
   setAdminReportStatus,
   setUserBanned,
   setStoryTakedown,
+  updateGenre,
+  deleteGenre,
+  mergeGenres,
 } = api

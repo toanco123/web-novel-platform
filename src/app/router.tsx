@@ -61,6 +61,7 @@ export const routes: RouteObject[] = [
       { path: 'stories', lazy: page(() => import('@/pages/admin/AdminStoriesPage')) },
       { path: 'inbox', lazy: page(() => import('@/pages/admin/AdminInboxPage')) },
       { path: 'reports', lazy: page(() => import('@/pages/admin/AdminReportsPage')) },
+      { path: 'genres', lazy: page(() => import('@/pages/admin/AdminGenresPage')) },
     ],
   },
   {

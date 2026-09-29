@@ -6,7 +6,9 @@ import { businessCode, unwrap } from '@/lib/dbError'
 import { loadPage } from '@/lib/dbPage'
 import { db } from '@/lib/supabase'
 import { isUuid } from '@/lib/uuid'
+import { normalizeGenreName } from '@/features/genres/api'
 import type { Page } from '@/types/page'
+import type { Genre } from '@/types/story'
 import {
   ADMIN_PAGE_SIZE,
   AdminError,
@@ -207,4 +209,34 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
     }),
     adminError,
   )
+}
+
+// ── Thể loại ────────────────────────────────────────────────────────────
+
+export async function updateGenre(
+  slug: string,
+  input: { name: string; description: string },
+): Promise<Genre> {
+  await requireUserId()
+  const { name } = normalizeGenreName(input.name)
+  const row = unwrap(
+    await db().rpc('admin_update_genre', {
+      p_slug: slug,
+      p_name: name,
+      p_description: input.description.trim(),
+    }),
+    adminError,
+  ) as { slug: string; name: string; description: string | null }
+  return { slug: row.slug, name: row.name, description: row.description ?? undefined }
+}
+
+export async function deleteGenre(slug: string) {
+  await requireUserId()
+  unwrap(await db().rpc('admin_delete_genre', { p_slug: slug }), adminError)
+}
+
+/** Gộp `from` vào `into`; trả về số truyện được chuyển sang */
+export async function mergeGenres(from: string, into: string): Promise<number> {
+  await requireUserId()
+  return unwrap(await db().rpc('admin_merge_genres', { p_from: from, p_into: into }), adminError)
 }

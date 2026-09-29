@@ -128,3 +128,30 @@ test('khóa người dùng và gỡ truyện trên giao diện; tác giả thấ
   expect(screen.getByText(/Đạo văn/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Xuất bản truyện' })).toBeDisabled()
 })
+
+test('thể loại: sửa tên và gộp trên giao diện', async () => {
+  const { createGenre } = await import('@/features/genres/api')
+  await registerUser('Linh', 'linh@gmail.com')
+  await createGenre({ name: 'Tình cảm' })
+  await createGenre({ name: 'Lãng mạn' })
+  signInAs('demo')
+  const { user } = renderApp('/admin/genres')
+
+  const row = (name: string) => screen.getByRole('link', { name }).closest('tr')!
+  await screen.findByRole('link', { name: 'Tình cảm' }, slow)
+  await user.click(within(row('Tình cảm')).getByRole('button', { name: 'Sửa' }))
+  const edit = await screen.findByRole('dialog', { name: /Sửa thể loại/ }, slow)
+  const name = within(edit).getByLabelText('Tên thể loại')
+  await user.clear(name)
+  await user.type(name, 'Tình cảm học đường')
+  await user.click(within(edit).getByRole('button', { name: 'Lưu' }))
+  expect(await screen.findByRole('link', { name: 'Tình cảm học đường' }, slow)).toBeInTheDocument()
+  expect(screen.getByText('tinh-cam-hoc-duong')).toBeInTheDocument()
+
+  await user.click(within(row('Lãng mạn')).getByRole('button', { name: 'Gộp vào…' }))
+  const mergeDialog = await screen.findByRole('dialog', { name: /Gộp "Lãng mạn"/ }, slow)
+  await user.click(within(mergeDialog).getByRole('combobox'))
+  await user.click(await screen.findByTitle('Tình cảm học đường', {}, slow))
+  await user.click(within(mergeDialog).getByRole('button', { name: 'Gộp' }))
+  await expect.poll(() => screen.queryByRole('link', { name: 'Lãng mạn' }), slow).toBeNull()
+})

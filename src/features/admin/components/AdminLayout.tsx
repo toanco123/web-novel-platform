@@ -1,6 +1,6 @@
 import { App, ConfigProvider, Grid, Layout, Menu } from 'antd'
 import viVN from 'antd/locale/vi_VN'
-import { ArrowLeft, BookOpen, Flag, Inbox, LayoutDashboard, Users } from 'lucide-react'
+import { ArrowLeft, BookOpen, Flag, Inbox, LayoutDashboard, Tags, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
@@ -17,6 +17,7 @@ const menu = [
   { key: paths.adminStories(), icon: BookOpen, label: 'Truyện' },
   { key: paths.adminInbox, icon: Inbox, label: 'Hộp thư' },
   { key: paths.adminReports, icon: Flag, label: 'Báo lỗi' },
+  { key: paths.adminGenres, icon: Tags, label: 'Thể loại' },
 ]
 
 /** Khung trang quản trị: menu bên trái (màn rộng) hoặc trên đầu (màn hẹp), theo theme của web */

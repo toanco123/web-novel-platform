@@ -140,11 +140,52 @@ test('gỡ truyện: truyện ẩn khỏi người đọc, tác giả thấy lý
   expect(await getStory(story.slug)).toBeNull()
 
   signInAs(linh)
-  expect((await studio.getMyStory(story.id)).takedown).toMatchObject({ reason: 'Đạo văn' })
+  expect((await studio.getMyStory(story.id))?.takedown).toMatchObject({ reason: 'Đạo văn' })
   await expect(studio.publishStory(story.id)).rejects.toMatchObject({ code: 'story_taken_down' })
 
   signInAs('demo')
   await admin.setStoryTakedown(story.id, null)
   signInAs(linh)
   expect((await studio.publishStory(story.id)).visibility).toBe('published')
+})
+
+test('thể loại: sửa tên (slug đổi theo), gộp, xóa; truyện đi theo', async () => {
+  const { createGenre } = await import('@/features/genres/api')
+  const studio = await import('@/features/studio/api')
+  await registerUser('Linh', 'linh@gmail.com')
+  await createGenre({ name: 'Tình cảm' })
+  await createGenre({ name: 'Học đường' })
+  const story = await studio.createStory({
+    title: 'Mùa Hạ Năm Ấy',
+    description: 'Một câu chuyện tình học trò nhẹ nhàng, kết thúc có hậu.',
+    genreSlugs: ['tinh-cam', 'hoc-duong'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+
+  signInAs('demo')
+  await expect(
+    admin.updateGenre('ngon-tinh', { name: 'Ngôn', description: '' }),
+  ).rejects.toMatchObject({ code: 'builtin_genre' })
+  await expect(
+    admin.updateGenre('tinh-cam', { name: 'học đường', description: '' }),
+  ).rejects.toMatchObject({ code: 'genre_exists' })
+
+  expect(await admin.updateGenre('tinh-cam', { name: 'lãng mạn', description: 'Mô tả' })).toEqual({
+    slug: 'lang-man',
+    name: 'Lãng mạn',
+    description: 'Mô tả',
+  })
+  const genresOf = async () => {
+    signInAs(story.owner.id)
+    const genres = (await studio.getMyStory(story.id))?.genreSlugs
+    signInAs('demo')
+    return genres
+  }
+  expect(await genresOf()).toEqual(['lang-man', 'hoc-duong'])
+
+  expect(await admin.mergeGenres('lang-man', 'hoc-duong')).toBe(0)
+  expect(await genresOf()).toEqual(['hoc-duong'])
+  await admin.deleteGenre('hoc-duong')
+  expect(await genresOf()).toEqual([])
 })

@@ -800,6 +800,11 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_delete_genre: { Args: { p_slug: string }; Returns: undefined }
+      admin_merge_genres: {
+        Args: { p_from: string; p_into: string }
+        Returns: number
+      }
       admin_overview: { Args: { p_days?: number }; Returns: Json }
       admin_reports: {
         Args: { p_status?: Database["public"]["Enums"]["report_status"] }
@@ -867,6 +872,10 @@ export type Database = {
           view_count: number
           visibility: Database["public"]["Enums"]["publication_status"]
         }[]
+      }
+      admin_update_genre: {
+        Args: { p_description: string; p_name: string; p_slug: string }
+        Returns: Json
       }
       admin_users: {
         Args: { p_query?: string }

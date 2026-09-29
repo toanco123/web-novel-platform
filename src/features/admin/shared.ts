@@ -151,13 +151,24 @@ export type AdminReport = {
 export type AdminMessageQuery = { status: AdminMessageStatus; page: number }
 export type AdminReportQuery = { status: ReportStatus | 'all'; page: number }
 
-export type AdminErrorCode = 'forbidden' | 'not_found' | 'cannot_ban_self' | 'cannot_ban_admin'
+export type AdminErrorCode =
+  | 'forbidden'
+  | 'not_found'
+  | 'cannot_ban_self'
+  | 'cannot_ban_admin'
+  | 'genre_exists'
+  | 'same_genre'
+  | 'builtin_genre'
 
 const adminMessages: Record<AdminErrorCode, string> = {
   forbidden: 'Chỉ quản trị viên mới xem được trang này.',
   not_found: 'Không tìm thấy mục này. Có thể nó vừa bị xóa.',
   cannot_ban_self: 'Bạn không thể tự khóa tài khoản của mình.',
   cannot_ban_admin: 'Không khóa được tài khoản quản trị viên khác.',
+  genre_exists: 'Đã có thể loại khác trùng tên này. Dùng "Gộp" nếu muốn nhập hai thể loại làm một.',
+  same_genre: 'Chọn một thể loại khác để gộp vào.',
+  builtin_genre:
+    'Bản thử nghiệm không sửa được thể loại có sẵn, chỉ sửa được thể loại do người dùng tạo.',
 }
 
 export const isAdminErrorCode = (code: string): code is AdminErrorCode =>

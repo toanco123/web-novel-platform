@@ -610,6 +610,44 @@ select pg_temp.expect(
     $$update public.stories set visibility = 'published' where slug = 'truyen-chong-spam'$$) = 1,
   'khôi phục xong thì tác giả công khai lại được');
 
+-- ── Admin: quản lý thể loại ─────────────────────────────────────────────
+
+select pg_temp.expect_error($$select public.admin_delete_genre('the-loai-3')$$, 'forbidden');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select g ->> 'slug' = 'the-loai-nam'
+    from public.admin_update_genre('the-loai-5', '  Thể Loại   Năm ', 'Mô tả mới') as g),
+  'đổi tên thể loại: slug đổi theo, tên gọn khoảng trắng');
+select pg_temp.expect_error(
+  $$select public.admin_update_genre('the-loai-6', 'cổ đại', null)$$, 'genre_exists');
+select pg_temp.expect(
+  public.admin_merge_genres('co-dai', 'the-loai-nam') >= 1,
+  'gộp thể loại trả về số truyện được chuyển');
+select pg_temp.expect_error($$select public.admin_merge_genres('co-dai', 'the-loai-nam')$$, 'not_found');
+
+reset role;
+select pg_temp.expect(
+  (select array_agg(genre_slug) = array['the-loai-nam'] from public.story_genres
+    where story_id = pg_temp.story_id('truyen-chong-spam'))
+    and not exists (select 1 from public.genres where slug = 'co-dai'),
+  'gộp: truyện chuyển sang thể loại đích, thể loại nguồn bị xóa');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_delete_genre('the-loai-nam');
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from public.story_genres
+    where story_id = pg_temp.story_id('truyen-chong-spam')),
+  'xóa thể loại: truyện mất thể loại đó');
+
 -- ── Tự xóa tài khoản ────────────────────────────────────────────────────
 
 reset role;

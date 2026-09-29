@@ -84,6 +84,32 @@ export const useSetStoryTakedown = () =>
     api.setStoryTakedown(storyId, reason),
   )
 
+/** Sửa/xóa/gộp thể loại: làm mới cả danh sách thể loại và truyện ở phần công khai */
+function useGenreMutation<T>(mutationFn: (input: T) => Promise<unknown>) {
+  const queryClient = useQueryClient()
+  const userId = useUserId()
+  return useMutation({
+    mutationFn,
+    onSettled: () =>
+      Promise.all(
+        [adminKeys.all(userId), ['genres'], ['stories']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+  })
+}
+
+export const useUpdateGenre = () =>
+  useGenreMutation(
+    ({ slug, name, description }: { slug: string; name: string; description: string }) =>
+      api.updateGenre(slug, { name, description }),
+  )
+
+export const useDeleteGenre = () => useGenreMutation((slug: string) => api.deleteGenre(slug))
+
+export const useMergeGenres = () =>
+  useGenreMutation(({ from, into }: { from: string; into: string }) => api.mergeGenres(from, into))
+
 export const useSetAdminReportStatus = () =>
   useAdminMutation(({ id, status }: { id: string; status: api.AdminReport['status'] }) =>
     api.setAdminReportStatus(id, status),
