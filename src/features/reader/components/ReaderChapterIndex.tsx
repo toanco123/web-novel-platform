@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type Ref, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { SectionError } from '@/components/common/SectionHeading'
 import {
@@ -11,8 +11,11 @@ import {
 import { CHAPTERS_PER_PAGE } from '@/features/chapters/api'
 import { JumpToChapter } from '@/features/chapters/components/JumpToChapter'
 import { useChapterList } from '@/features/chapters/hooks'
+import { useSavedChapters } from '@/features/offline/hooks'
+import { useOnline } from '@/hooks/useOnline'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
+import type { ChapterNeighbor } from '@/types/chapter'
 
 type Props = {
   slug: string
@@ -26,6 +29,7 @@ type Props = {
 export function ReaderChapterIndex({ slug, current, max, onNavigate }: Props) {
   const [page, setPage] = useState(() => Math.max(1, Math.ceil(current / CHAPTERS_PER_PAGE)))
   const { data, isPending, isError, isPlaceholderData } = useChapterList(slug, page, 'asc')
+  const online = useOnline()
   const currentRef = useRef<HTMLAnchorElement>(null)
 
   useEffect(() => {
@@ -62,7 +66,9 @@ export function ReaderChapterIndex({ slug, current, max, onNavigate }: Props) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {isError ? (
+        {!online && !data ? (
+          <SavedIndex slug={slug} current={current} onNavigate={onNavigate} />
+        ) : isError ? (
           <div className="p-2">
             <SectionError />
           </div>
@@ -77,33 +83,87 @@ export function ReaderChapterIndex({ slug, current, max, onNavigate }: Props) {
                     <div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
                   </li>
                 ))
-              : data.items.map((c) => {
-                  const active = c.number === current
-                  return (
-                    <li key={c.number}>
-                      <Link
-                        ref={active ? currentRef : undefined}
-                        to={paths.chapter(slug, c.number)}
-                        onClick={onNavigate}
-                        aria-current={active ? 'page' : undefined}
-                        className={cn(
-                          'flex gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
-                          active
-                            ? 'bg-primary/10 font-medium text-foreground ring-1 ring-primary/30'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                        )}
-                      >
-                        <span className="w-10 shrink-0 text-right tabular-nums opacity-70">
-                          {c.number}
-                        </span>
-                        <span className="min-w-0 truncate">{c.title}</span>
-                      </Link>
-                    </li>
-                  )
-                })}
+              : data.items.map((c) => (
+                  <li key={c.number}>
+                    <ChapterLink
+                      slug={slug}
+                      chapter={c}
+                      active={c.number === current}
+                      onNavigate={onNavigate}
+                      linkRef={c.number === current ? currentRef : undefined}
+                    />
+                  </li>
+                ))}
           </ol>
         )}
       </div>
+    </div>
+  )
+}
+
+function ChapterLink({
+  slug,
+  chapter,
+  active,
+  onNavigate,
+  linkRef,
+}: {
+  slug: string
+  chapter: ChapterNeighbor
+  active: boolean
+  onNavigate: () => void
+  linkRef?: Ref<HTMLAnchorElement>
+}) {
+  return (
+    <Link
+      ref={linkRef}
+      to={paths.chapter(slug, chapter.number)}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'flex gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+        active
+          ? 'bg-primary/10 font-medium text-foreground ring-1 ring-primary/30'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
+    >
+      <span className="w-10 shrink-0 text-right tabular-nums opacity-70">{chapter.number}</span>
+      <span className="min-w-0 truncate">{chapter.title}</span>
+    </Link>
+  )
+}
+
+/** Mất mạng: chỉ liệt kê chương đã lưu trên máy của truyện */
+function SavedIndex({
+  slug,
+  current,
+  onNavigate,
+}: {
+  slug: string
+  current: number
+  onNavigate: () => void
+}) {
+  const { data } = useSavedChapters(slug)
+  if (!data) return null
+  return (
+    <div>
+      <p className="px-3 pt-1 pb-2 text-sm text-muted-foreground">
+        {data.length
+          ? 'Đang offline, các chương đã lưu:'
+          : 'Đang offline và truyện này chưa có chương nào được lưu.'}
+      </p>
+      <ol>
+        {data.map((c) => (
+          <li key={c.number}>
+            <ChapterLink
+              slug={slug}
+              chapter={c}
+              active={c.number === current}
+              onNavigate={onNavigate}
+            />
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
 import { PageLoader } from '@/components/common/PageLoader'
+import { RouteError } from '@/components/common/RouteError'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { MainLayout } from '@/layouts/MainLayout'
 import { ReaderLayout } from '@/layouts/ReaderLayout'
@@ -12,6 +13,7 @@ export const routes: RouteObject[] = [
   {
     Component: MainLayout,
     HydrateFallback: PageLoader,
+    ErrorBoundary: RouteError,
     children: [
       { index: true, lazy: page(() => import('@/pages/HomePage')) },
       { path: 'story/:slug', lazy: page(() => import('@/pages/StoryDetailPage')) },
@@ -55,6 +57,7 @@ export const routes: RouteObject[] = [
     path: 'admin',
     lazy: page(() => import('@/pages/admin/AdminShell')),
     HydrateFallback: PageLoader,
+    ErrorBoundary: RouteError,
     children: [
       { index: true, lazy: page(() => import('@/pages/admin/AdminDashboardPage')) },
       { path: 'users', lazy: page(() => import('@/pages/admin/AdminUsersPage')) },
@@ -68,6 +71,7 @@ export const routes: RouteObject[] = [
   {
     Component: ReaderLayout,
     HydrateFallback: PageLoader,
+    ErrorBoundary: RouteError,
     children: [
       // Đoạn cuối có dạng "chapter-12"; trang tự tách số chương
       { path: 'story/:slug/:chapter', lazy: page(() => import('@/pages/ChapterReaderPage')) },
@@ -76,6 +80,7 @@ export const routes: RouteObject[] = [
   {
     Component: AuthLayout,
     HydrateFallback: PageLoader,
+    ErrorBoundary: RouteError,
     children: [
       { path: 'login', lazy: page(() => import('@/pages/LoginPage')) },
       { path: 'register', lazy: page(() => import('@/pages/RegisterPage')) },

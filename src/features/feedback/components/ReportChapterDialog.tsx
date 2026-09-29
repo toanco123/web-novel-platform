@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { FormAlert } from '@/features/auth/components/FormAlert'
 import { authErrorMessage, useSession } from '@/features/auth/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
+import { useOnline } from '@/hooks/useOnline'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import { useReportChapter } from '../hooks'
@@ -30,6 +31,7 @@ export function ReportChapterDialog({ slug, chapter, className }: Props) {
   const navigate = useNavigate()
   const current = useCurrentPath()
   const [open, setOpen] = useState(false)
+  const online = useOnline()
 
   return (
     <>
@@ -37,6 +39,8 @@ export function ReportChapterDialog({ slug, chapter, className }: Props) {
         variant="ghost"
         size="sm"
         className={cn('rounded-full text-muted-foreground', className)}
+        disabled={!online}
+        title={online ? undefined : 'Cần có mạng để báo lỗi chương'}
         onClick={() => (user ? setOpen(true) : navigate(paths.login(current)))}
       >
         <Flag />

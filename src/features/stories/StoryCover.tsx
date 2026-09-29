@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Story } from '@/types/story'
 import { coverPalette } from './coverPalette'
@@ -10,12 +11,16 @@ type Props = {
 }
 
 export function StoryCover({ story, compact = false, className }: Props) {
-  if (story.coverUrl) {
+  // Ảnh không tải được (offline chưa có trong bộ nhớ đệm, ảnh bị xóa): dùng bìa chữ tự sinh
+  const [failed, setFailed] = useState<string | null>(null)
+  if (story.coverUrl && failed !== story.coverUrl) {
+    const url = story.coverUrl
     return (
       <img
-        src={story.coverUrl}
+        src={url}
         alt={`Bìa truyện ${story.title}`}
         loading="lazy"
+        onError={() => setFailed(url)}
         className={cn('aspect-[2/3] w-full object-cover', className)}
       />
     )
