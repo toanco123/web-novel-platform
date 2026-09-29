@@ -51,6 +51,11 @@ function authError(error: unknown): unknown {
         'email_not_confirmed',
         'Email chưa được xác nhận. Mở thư xác nhận trong hộp thư rồi thử lại.',
       )
+    case 'user_banned':
+      return new AuthError(
+        'banned',
+        'Tài khoản đã bị khóa do vi phạm quy định. Liên hệ ban quản trị nếu bạn cho rằng đây là nhầm lẫn.',
+      )
     case 'over_request_rate_limit':
     case 'over_email_send_rate_limit':
       return new AuthError('rate_limited', 'Bạn thao tác hơi nhanh. Đợi một lát rồi thử lại.')

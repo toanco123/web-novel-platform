@@ -4,6 +4,7 @@
 import { readMock, writeMock } from '@/lib/mockStorage'
 import type { Comment, Score } from '@/types/comment'
 import type { ReadingProgress } from '@/types/library'
+import type { ContactTopic } from '@/features/feedback/schemas'
 import type { ChapterReport } from '@/types/report'
 
 const FOLLOWS_KEY = 'mock-library'
@@ -12,6 +13,7 @@ const VIEWS_KEY = 'mock-views'
 const RATINGS_KEY = 'mock-ratings'
 const COMMENTS_KEY = 'mock-comments'
 const REPORTS_KEY = 'mock-reports'
+const CONTACT_KEY = 'mock-contact-messages'
 
 /** Chủ lịch sử đọc khi chưa đăng nhập */
 export const GUEST = 'guest'
@@ -117,3 +119,29 @@ export const saveUserComments = (comments: Comment[]) => writeMock(COMMENTS_KEY,
 
 export const loadReports = () => readMock<ChapterReport[]>(REPORTS_KEY, [])
 export const saveReports = (reports: ChapterReport[]) => writeMock(REPORTS_KEY, reports)
+
+// ── Tin nhắn liên hệ ────────────────────────────────────────────────────
+
+export type StoredContactMessage = {
+  id: string
+  name: string
+  email: string
+  topic: ContactTopic
+  message: string
+  sentAt: string
+  /** Lúc quản trị viên đánh dấu đã xử lý; null: chưa xử lý */
+  handledAt: string | null
+}
+
+// Dữ liệu cũ không có id và handledAt
+export const loadContactMessages = () =>
+  readMock<(Omit<StoredContactMessage, 'id' | 'handledAt'> & Partial<StoredContactMessage>)[]>(
+    CONTACT_KEY,
+    [],
+  ).map((m, i): StoredContactMessage => ({
+    ...m,
+    id: m.id ?? `cu-${i}`,
+    handledAt: m.handledAt ?? null,
+  }))
+export const saveContactMessages = (messages: StoredContactMessage[]) =>
+  writeMock(CONTACT_KEY, messages)

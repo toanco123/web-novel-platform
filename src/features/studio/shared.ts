@@ -9,6 +9,7 @@ export type StudioErrorCode =
   | 'chapter_number_locked'
   | 'too_many_genres'
   | 'report_already_open'
+  | 'story_taken_down'
 
 const messages: Record<StudioErrorCode, string> = {
   not_found: 'Không tìm thấy truyện này trong khu Sáng tác của bạn.',
@@ -19,6 +20,8 @@ const messages: Record<StudioErrorCode, string> = {
   chapter_number_locked:
     'Chương đã xuất bản giữ nguyên số để link và lịch sử đọc của người đọc không bị hỏng.',
   too_many_genres: 'Chọn tối đa 5 thể loại.',
+  story_taken_down:
+    'Truyện đã bị ban quản trị gỡ nên chưa xuất bản lại được. Liên hệ ban quản trị nếu bạn cho rằng đây là nhầm lẫn.',
   report_already_open:
     'Bạn đọc này đã gửi lại đúng báo lỗi này và báo lỗi mới vẫn chưa xử lý, nên không mở lại báo lỗi cũ được.',
 }
@@ -41,6 +44,8 @@ export type StoryInput = {
   genreSlugs: string[]
   status: StoryStatus
   coverUrl: string | null
+  /** Bút danh / tác giả gốc; trống: hiển thị tên tài khoản */
+  authorName?: string | null
 }
 
 export type ChapterInput = { title: string; content: string }
@@ -75,6 +80,10 @@ export type MyStory = {
   followers: number
   /** Báo lỗi chương chưa xử lý */
   openReports: number
+  /** Bị ban quản trị gỡ: truyện về nháp, không tự xuất bản lại được; null: bình thường */
+  takedown: { at: string; reason: string } | null
+  /** Bút danh / tác giả gốc; null: dùng tên tài khoản */
+  authorName: string | null
 }
 
 export const STATS_DAYS = 7
@@ -100,5 +109,6 @@ export function normalizeStoryInput(input: StoryInput) {
     genreSlugs: [...new Set(input.genreSlugs)],
     status: input.status,
     coverUrl: input.coverUrl,
+    authorName: input.authorName?.trim().replace(/\s+/g, ' ') || null,
   }
 }

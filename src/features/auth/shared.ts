@@ -10,6 +10,7 @@ export type AuthErrorCode =
   | 'invalid_email'
   | 'email_not_confirmed'
   | 'rate_limited'
+  | 'banned'
   | 'unknown'
 
 export class AuthError extends Error {

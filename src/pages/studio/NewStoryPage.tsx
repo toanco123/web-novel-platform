@@ -38,6 +38,7 @@ export default function NewStoryPage() {
           genreSlugs: presetGenres,
           status: 'ongoing',
           coverUrl: null,
+          authorName: '',
         }}
         authorName={user?.displayName ?? ''}
         firstChapter

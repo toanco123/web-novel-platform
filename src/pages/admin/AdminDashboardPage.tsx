@@ -74,7 +74,7 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
     content === 'stories' ? d.stories : d.chapters
   const contentName = content === 'stories' ? 'Truyện mới' : 'Chương mới xuất bản'
 
-  const tiles = [
+  const tiles: { title: string; value: number; hint?: string; to?: string }[] = [
     {
       title: 'Người dùng',
       value: totals.users,
@@ -92,21 +92,44 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
       hint: `${number.format(totals.viewsInPeriod)} trong kỳ`,
     },
     { title: 'Bình luận', value: totals.comments },
-    { title: 'Báo lỗi đang mở', value: totals.openReports },
+    {
+      title: 'Báo lỗi đang mở',
+      value: totals.openReports,
+      hint: 'Xem báo lỗi',
+      to: paths.adminReports,
+    },
+    {
+      title: 'Tin nhắn chưa xử lý',
+      value: totals.unhandledMessages,
+      hint: 'Mở hộp thư',
+      to: paths.adminInbox,
+    },
+    {
+      title: 'Tài khoản bị khóa',
+      value: totals.bannedUsers,
+      hint: 'Xem người dùng',
+      to: paths.adminUsers,
+    },
   ]
 
   return (
     <>
       <Row gutter={[16, 16]}>
         {tiles.map((t) => (
-          <Col key={t.title} xs={12} md={8} xl={4}>
+          <Col key={t.title} xs={12} md={8} lg={6}>
             <Card size="small" className="h-full">
               <Statistic
                 title={t.title}
                 value={t.value}
                 formatter={(v) => number.format(Number(v))}
               />
-              {t.hint && <p className="mt-1 text-xs text-muted-foreground">{t.hint}</p>}
+              {t.to ? (
+                <Link to={t.to} className="mt-1 inline-block text-xs">
+                  {t.hint} →
+                </Link>
+              ) : (
+                t.hint && <p className="mt-1 text-xs text-muted-foreground">{t.hint}</p>
+              )}
             </Card>
           </Col>
         ))}

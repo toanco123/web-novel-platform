@@ -47,14 +47,19 @@ function ManageStory({ story }: { story: MyStory }) {
 
       <header className="grid grid-cols-[5rem_minmax(0,1fr)] gap-5 sm:grid-cols-[6rem_minmax(0,1fr)]">
         <div className="self-start overflow-hidden rounded-lg ring-1 ring-border">
-          <StoryCover story={{ ...story, author: { slug: '', name: story.owner.displayName } }} />
+          <StoryCover
+            story={{
+              ...story,
+              author: { slug: '', name: story.authorName ?? story.owner.displayName },
+            }}
+          />
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-heading text-3xl leading-tight font-semibold sm:text-4xl">
               {story.title}
             </h1>
-            <StatusBadge published={published} />
+            <StatusBadge published={published} takenDown={!!story.takedown} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {story.chapterCount} chương ({story.publishedCount} đã xuất bản, {story.draftCount}{' '}
@@ -141,10 +146,20 @@ function ManageStory({ story }: { story: MyStory }) {
 function PublishControls({ story }: { story: MyStory }) {
   const visibility = useSetStoryVisibility(story.id)
   const published = story.visibility === 'published'
-  const canPublish = story.publishedCount > 0
+  const canPublish = story.publishedCount > 0 && !story.takedown
+  // Gợi ý "cần xuất bản chương" (truyện bị gỡ thì đã có thông báo riêng ở trên)
+  const needsChapter = !story.takedown && story.publishedCount === 0
 
   return (
     <div className="space-y-3">
+      {story.takedown && (
+        <FormAlert>
+          <strong>Truyện đã bị ban quản trị gỡ:</strong> {story.takedown.reason}
+          <br />
+          Người đọc không còn thấy truyện và bạn chưa xuất bản lại được. Nếu cho rằng đây là nhầm
+          lẫn, hãy gửi tin nhắn ở trang <Link to={paths.contact}>Liên hệ</Link>.
+        </FormAlert>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {published ? (
           <Button
@@ -159,7 +174,7 @@ function PublishControls({ story }: { story: MyStory }) {
           <Button
             className="h-10 rounded-full px-5"
             disabled={!canPublish || visibility.isPending}
-            aria-describedby={canPublish ? undefined : 'publish-hint'}
+            aria-describedby={needsChapter ? 'publish-hint' : undefined}
             onClick={() => visibility.mutate(true)}
           >
             Xuất bản truyện
@@ -172,7 +187,7 @@ function PublishControls({ story }: { story: MyStory }) {
           </Link>
         </Button>
       </div>
-      {!published && !canPublish && (
+      {!published && needsChapter && (
         <p id="publish-hint" className="text-sm text-muted-foreground">
           Xuất bản ít nhất 1 chương để có thể xuất bản truyện.
         </p>
@@ -201,6 +216,7 @@ function EditStoryInfo({ story }: { story: MyStory }) {
         genreSlugs: story.genreSlugs,
         status: story.status,
         coverUrl: story.coverUrl,
+        authorName: story.authorName ?? '',
       }}
       submitLabel="Lưu thay đổi"
       pendingLabel="Đang lưu…"

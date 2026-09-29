@@ -54,6 +54,7 @@ const empty: StoryValues = {
   genreSlugs: [],
   status: 'ongoing',
   coverUrl: null,
+  authorName: '',
 }
 
 export function StoryForm({
@@ -127,6 +128,28 @@ export function StoryForm({
         >
           {(c) => (
             <Input {...c} {...register('title')} autoComplete="off" className={authInputClass} />
+          )}
+        </FormField>
+
+        <FormField
+          id="story-author"
+          label="Tác giả / bút danh (không bắt buộc)"
+          error={errors.authorName?.message}
+          below={
+            <p className="text-xs text-muted-foreground">
+              Để trống thì hiển thị tên tài khoản{authorName ? ` "${authorName}"` : ''}. Đăng truyện
+              của tác giả khác thì ghi tên tác giả gốc.
+            </p>
+          }
+        >
+          {(c) => (
+            <Input
+              {...c}
+              {...register('authorName')}
+              autoComplete="off"
+              maxLength={60}
+              className={authInputClass}
+            />
           )}
         </FormField>
 
@@ -288,7 +311,11 @@ export function StoryForm({
       <aside className="hidden lg:block">
         <div className="sticky top-32">
           <p className="mb-3 text-sm font-medium">Xem trước</p>
-          <StoryPreview values={values} slug={previewSlug} authorName={authorName} />
+          <StoryPreview
+            values={values}
+            slug={previewSlug}
+            authorName={values.authorName.trim() || authorName}
+          />
           <p className="mt-3 text-xs text-muted-foreground">
             Người đọc sẽ thấy truyện của bạn như thế này ở trang chủ và trang thể loại.
           </p>

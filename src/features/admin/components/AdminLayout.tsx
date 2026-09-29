@@ -1,7 +1,16 @@
 import { App, ConfigProvider, Grid, Layout, Menu } from 'antd'
 import viVN from 'antd/locale/vi_VN'
-import { ArrowLeft, BookOpen, LayoutDashboard, Users } from 'lucide-react'
-import type { ReactNode } from 'react'
+import {
+  ArrowLeft,
+  BookOpen,
+  FileUp,
+  Flag,
+  Inbox,
+  LayoutDashboard,
+  Tags,
+  Users,
+} from 'lucide-react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { SITE_NAME } from '@/config/site'
@@ -15,6 +24,10 @@ const menu = [
   { key: paths.admin, icon: LayoutDashboard, label: 'Tổng quan' },
   { key: paths.adminUsers, icon: Users, label: 'Người dùng' },
   { key: paths.adminStories(), icon: BookOpen, label: 'Truyện' },
+  { key: paths.adminInbox, icon: Inbox, label: 'Hộp thư' },
+  { key: paths.adminReports, icon: Flag, label: 'Báo lỗi' },
+  { key: paths.adminGenres, icon: Tags, label: 'Thể loại' },
+  { key: paths.adminImport, icon: FileUp, label: 'Nhập truyện' },
 ]
 
 /** Khung trang quản trị: menu bên trái (màn rộng) hoặc trên đầu (màn hẹp), theo theme của web */
@@ -22,23 +35,35 @@ export function AdminLayout({ user, children }: { user: User; children: ReactNod
   const theme = useTheme((s) => s.theme)
   const { pathname } = useLocation()
   const wide = Grid.useBreakpoint().lg ?? false
+  const tabs = useRef<HTMLUListElement>(null)
+
+  // Dải tab cuộn ngang ở màn hẹp: đưa tab đang mở vào tầm nhìn khi đổi trang
+  useEffect(() => {
+    const reveal = () =>
+      tabs.current
+        ?.querySelector('[aria-current="page"]')
+        ?.scrollIntoView({ block: 'nearest', inline: 'center' })
+    reveal()
+    // Font web tải xong thì chữ rộng ra: canh lại lần nữa
+    void document.fonts?.ready.then(reveal)
+  }, [pathname, wide])
 
   const items = menu.map(({ key, icon: Icon, label }) => ({
     key,
     icon: <Icon className="size-4" aria-hidden />,
     label: <Link to={key}>{label}</Link>,
   }))
-  // Màn hẹp: 3 tab chia đều (Menu ngang của antd sẽ giấu mục cuối vào "···")
+  // Màn hẹp: dải tab cuộn ngang (Menu ngang của antd sẽ giấu các mục cuối vào "···")
   const nav = wide ? (
     <Menu mode="inline" selectedKeys={[pathname]} items={items} className="border-none!" />
   ) : (
-    <ul className="grid grid-cols-3">
+    <ul ref={tabs} className="relative flex [scrollbar-width:none] overflow-x-auto">
       {menu.map(({ key, icon: Icon, label }) => (
         <li key={key}>
           <Link
             to={key}
             aria-current={pathname === key ? 'page' : undefined}
-            className="flex items-center justify-center gap-1.5 border-b-2 border-transparent py-3 text-sm text-muted-foreground aria-[current=page]:border-primary aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+            className="flex items-center justify-center gap-1.5 border-b-2 border-transparent px-4 py-3 text-sm whitespace-nowrap text-muted-foreground aria-[current=page]:border-primary aria-[current=page]:font-medium aria-[current=page]:text-foreground"
           >
             <Icon className="size-4" aria-hidden />
             {label}

@@ -1,4 +1,6 @@
 // Phần dùng chung của hai backend trang quản trị (api.mock.ts, api.remote.ts)
+import type { ContactTopic } from '@/features/feedback/schemas'
+import type { ReportReason, ReportStatus } from '@/types/report'
 import type { StoryStatus, StoryVisibility } from '@/types/story'
 
 export const ADMIN_PAGE_SIZE = 20
@@ -19,6 +21,8 @@ export type AdminOverview = {
     viewsInPeriod: number
     comments: number
     openReports: number
+    unhandledMessages: number
+    bannedUsers: number
   }
   /** Mỗi ngày trong kỳ (cũ trước), day dạng 2026-09-25 */
   days: { day: string; signups: number; views: number; stories: number; chapters: number }[]
@@ -52,6 +56,8 @@ export type AdminUser = {
   storyCount: number
   commentCount: number
   followCount: number
+  /** Bị khóa: không đăng nhập được */
+  isBanned: boolean
 }
 
 export type AdminStory = {
@@ -75,7 +81,11 @@ export type AdminStory = {
   openReports: number
   createdAt: string
   updatedAt: string
+  /** Bị admin gỡ (về nháp, tác giả không tự công khai lại được); null: bình thường */
+  takedown: StoryTakedown | null
 }
+
+export type StoryTakedown = { at: string; reason: string }
 
 export type AdminStorySort = 'updated' | 'views' | 'created'
 
@@ -107,10 +117,72 @@ export const formatShortDay = (day: string) => shortDay.format(parseDay(day))
 /** "2026-09-25" → "Thứ Sáu, 25/9/2026" */
 export const formatLongDay = (day: string) => longDay.format(parseDay(day))
 
+// ── Hộp thư & báo lỗi ───────────────────────────────────────────────────
+
+/** Lọc hộp thư: chưa xử lý | đã xử lý | tất cả */
+export type AdminMessageStatus = 'open' | 'handled' | 'all'
+
+export type AdminContactMessage = {
+  id: string
+  name: string
+  email: string
+  topic: ContactTopic
+  message: string
+  createdAt: string
+  /** null: chưa xử lý */
+  handledAt: string | null
+}
+
+export type AdminReport = {
+  id: string
+  storySlug: string
+  storyTitle: string
+  /** Truyện đang công khai (có link sang trang đọc) */
+  storyPublished: boolean
+  chapterNumber: number
+  chapterTitle: string
+  reason: ReportReason
+  note: string
+  status: ReportStatus
+  reporter: { id: string; displayName: string }
+  createdAt: string
+}
+
+export type AdminMessageQuery = { status: AdminMessageStatus; page: number }
+export type AdminReportQuery = { status: ReportStatus | 'all'; page: number }
+
+export type AdminErrorCode =
+  | 'forbidden'
+  | 'not_found'
+  | 'cannot_ban_self'
+  | 'cannot_ban_admin'
+  | 'genre_exists'
+  | 'same_genre'
+  | 'builtin_genre'
+
+const adminMessages: Record<AdminErrorCode, string> = {
+  forbidden: 'Chỉ quản trị viên mới xem được trang này.',
+  not_found: 'Không tìm thấy mục này. Có thể nó vừa bị xóa.',
+  cannot_ban_self: 'Bạn không thể tự khóa tài khoản của mình.',
+  cannot_ban_admin: 'Không khóa được tài khoản quản trị viên khác.',
+  genre_exists: 'Đã có thể loại khác trùng tên này. Dùng "Gộp" nếu muốn nhập hai thể loại làm một.',
+  same_genre: 'Chọn một thể loại khác để gộp vào.',
+  builtin_genre:
+    'Bản thử nghiệm không sửa được thể loại có sẵn, chỉ sửa được thể loại do người dùng tạo.',
+}
+
+export const isAdminErrorCode = (code: string): code is AdminErrorCode =>
+  Object.hasOwn(adminMessages, code)
+
 export class AdminError extends Error {
-  code = 'forbidden' as const
-  constructor() {
-    super('Chỉ quản trị viên mới xem được trang này.')
+  code: AdminErrorCode
+  constructor(code: AdminErrorCode = 'forbidden') {
+    super(adminMessages[code])
     this.name = 'AdminError'
+    this.code = code
   }
 }
+
+/** Lời báo cho thao tác admin thất bại */
+export const adminErrorMessage = (error: unknown) =>
+  error instanceof AdminError ? error.message : 'Chưa lưu được. Kiểm tra mạng rồi thử lại.'

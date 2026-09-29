@@ -219,6 +219,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          handled_at: string | null
           id: number
           ip_hash: string | null
           message: string
@@ -229,6 +230,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          handled_at?: string | null
           id?: never
           ip_hash?: string | null
           message: string
@@ -239,6 +241,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          handled_at?: string | null
           id?: never
           ip_hash?: string | null
           message?: string
@@ -513,6 +516,7 @@ export type Database = {
       }
       stories: {
         Row: {
+          author_name: string | null
           cover_path: string | null
           created_at: string
           description: string
@@ -522,11 +526,14 @@ export type Database = {
           search_title: string | null
           slug: string
           status: Database["public"]["Enums"]["story_status"]
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string
           updated_at: string
           visibility: Database["public"]["Enums"]["publication_status"]
         }
         Insert: {
+          author_name?: string | null
           cover_path?: string | null
           created_at?: string
           description?: string
@@ -536,11 +543,14 @@ export type Database = {
           search_title?: string | null
           slug: string
           status?: Database["public"]["Enums"]["story_status"]
+          takedown_reason?: string | null
+          taken_down_at?: string | null
           title: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["publication_status"]
         }
         Update: {
+          author_name?: string | null
           cover_path?: string | null
           created_at?: string
           description?: string
@@ -550,6 +560,8 @@ export type Database = {
           search_title?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["story_status"]
+          takedown_reason?: string | null
+          taken_down_at?: string | null
           title?: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["publication_status"]
@@ -709,6 +721,7 @@ export type Database = {
       }
       story_cards: {
         Row: {
+          author_key: string | null
           author_name: string | null
           chapter_count: number | null
           cover_path: string | null
@@ -744,6 +757,7 @@ export type Database = {
       }
       studio_stories: {
         Row: {
+          author_name: string | null
           chapter_count: number | null
           cover_path: string | null
           created_at: string | null
@@ -759,6 +773,8 @@ export type Database = {
           published_count: number | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string | null
           updated_at: string | null
           views: number | null
@@ -776,7 +792,63 @@ export type Database = {
       }
     }
     Functions: {
+      admin_contact_messages: {
+        Args: { p_status?: string }
+        Returns: {
+          created_at: string
+          email: string
+          handled_at: string
+          id: number
+          message: string
+          name: string
+          topic: Database["public"]["Enums"]["contact_topic"]
+          user_id: string
+        }[]
+      }
+      admin_delete_genre: { Args: { p_slug: string }; Returns: undefined }
+      admin_merge_genres: {
+        Args: { p_from: string; p_into: string }
+        Returns: number
+      }
       admin_overview: { Args: { p_days?: number }; Returns: Json }
+      admin_reports: {
+        Args: { p_status?: Database["public"]["Enums"]["report_status"] }
+        Returns: {
+          chapter_number: number
+          chapter_title: string
+          created_at: string
+          id: string
+          note: string
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+          reporter_name: string
+          resolved_at: string
+          status: Database["public"]["Enums"]["report_status"]
+          story_id: string
+          story_slug: string
+          story_title: string
+          story_visibility: Database["public"]["Enums"]["publication_status"]
+        }[]
+      }
+      admin_set_contact_handled: {
+        Args: { p_handled: boolean; p_id: number }
+        Returns: undefined
+      }
+      admin_set_report_status: {
+        Args: {
+          p_id: string
+          p_status: Database["public"]["Enums"]["report_status"]
+        }
+        Returns: undefined
+      }
+      admin_set_story_takedown: {
+        Args: { p_reason: string; p_story_id: string }
+        Returns: undefined
+      }
+      admin_set_user_banned: {
+        Args: { p_banned: boolean; p_user_id: string }
+        Returns: undefined
+      }
       admin_stories: {
         Args: {
           p_owner_id?: string
@@ -798,11 +870,17 @@ export type Database = {
           rating_count: number
           slug: string
           status: Database["public"]["Enums"]["story_status"]
+          takedown_reason: string
+          taken_down_at: string
           title: string
           updated_at: string
           view_count: number
           visibility: Database["public"]["Enums"]["publication_status"]
         }[]
+      }
+      admin_update_genre: {
+        Args: { p_description: string; p_name: string; p_slug: string }
+        Returns: Json
       }
       admin_users: {
         Args: { p_query?: string }
@@ -815,6 +893,7 @@ export type Database = {
           follow_count: number
           id: string
           is_admin: boolean
+          is_banned: boolean
           last_sign_in_at: string
           provider: string
           story_count: number
@@ -822,6 +901,7 @@ export type Database = {
       }
       create_story: {
         Args: {
+          p_author_name?: string
           p_cover_path?: string
           p_description: string
           p_first_chapter?: Json
@@ -831,6 +911,7 @@ export type Database = {
           p_title: string
         }
         Returns: {
+          author_name: string | null
           chapter_count: number | null
           cover_path: string | null
           created_at: string | null
@@ -846,6 +927,8 @@ export type Database = {
           published_count: number | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string | null
           updated_at: string | null
           views: number | null
@@ -948,6 +1031,7 @@ export type Database = {
       studio_story_stats: { Args: { p_story_id: string }; Returns: Json }
       update_story: {
         Args: {
+          p_author_name?: string
           p_cover_path?: string
           p_description: string
           p_genres: string[]
@@ -956,6 +1040,7 @@ export type Database = {
           p_title: string
         }
         Returns: {
+          author_name: string | null
           chapter_count: number | null
           cover_path: string | null
           created_at: string | null
@@ -971,6 +1056,8 @@ export type Database = {
           published_count: number | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string | null
           updated_at: string | null
           views: number | null

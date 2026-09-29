@@ -504,6 +504,179 @@ select pg_temp.expect_error(
   'rate_limited');
 select pg_temp.expect_error($$select public.delete_account()$$, '42501');
 
+-- ── Admin: hộp thư và báo lỗi toàn web ─────────────────────────────────
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated"}', true);
+set local role authenticated;
+select public.report_chapter('truyen-chong-spam', 1, 'typo', 'Sai chính tả');
+select pg_temp.expect_error($$select * from public.admin_reports()$$, 'forbidden');
+select pg_temp.expect_error($$select * from public.admin_contact_messages()$$, 'forbidden');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_reports('open')
+    where story_slug = 'truyen-chong-spam' and chapter_title = 'Một'
+      and reporter_name = 'khach-c'),
+  'admin thấy báo lỗi của truyện người khác, kèm tên truyện, chương, người báo');
+select public.admin_set_report_status(
+  (select id from public.admin_reports('open') where story_slug = 'truyen-chong-spam'), 'resolved');
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_reports('resolved') where resolved_at is not null),
+  'admin đánh dấu báo lỗi đã sửa');
+select pg_temp.expect(
+  (select count(*) >= 3 from public.admin_contact_messages('open')),
+  'admin đọc được tin nhắn liên hệ chưa xử lý');
+select public.admin_set_contact_handled(
+  (select id from public.admin_contact_messages('open') where message = 'Tin nhắn thứ nhất.'),
+  true);
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_contact_messages('handled')
+    where message = 'Tin nhắn thứ nhất.' and handled_at is not null)
+    and (select (o -> 'totals' ->> 'unhandledMessages')::int >= 2
+      from public.admin_overview(7) as o),
+  'đánh dấu tin nhắn đã xử lý; tổng quan đếm tin chưa xử lý');
+
+-- ── Admin: gỡ truyện, khóa tài khoản ───────────────────────────────────
+
+select public.admin_set_story_takedown(pg_temp.story_id('truyen-chong-spam'), 'Đạo văn');
+select pg_temp.expect(
+  (select visibility = 'draft' and takedown_reason = 'Đạo văn' and taken_down_at is not null
+    from public.admin_stories() where slug = 'truyen-chong-spam'),
+  'gỡ truyện: về nháp, ghi lý do');
+select pg_temp.expect_error(
+  $$select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000c', true)$$,
+  'cannot_ban_self');
+
+reset role;
+insert into auth.users (id, email, raw_app_meta_data) values
+  ('00000000-0000-4000-8000-00000000000d', 'admin-d@kiem-tra.local', '{"role": "admin"}');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000d', true)$$,
+  'cannot_ban_admin');
+select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000a', true);
+select pg_temp.expect(
+  (select is_banned from public.admin_users('tac gia a'))
+    and (select (o -> 'totals' ->> 'bannedUsers')::int = 1 from public.admin_overview(7) as o),
+  'khóa tài khoản: admin_users và tổng quan thấy trạng thái khóa');
+
+-- Tác giả A không tự công khai lại truyện đang bị gỡ, nhưng thấy lý do trong khu Sáng tác
+reset role;
+select pg_temp.expect(
+  (select banned_until = 'infinity' from auth.users
+    where id = '00000000-0000-4000-8000-00000000000a'),
+  'khóa tài khoản đặt banned_until');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select takedown_reason = 'Đạo văn' from public.studio_stories where slug = 'truyen-chong-spam'),
+  'tác giả thấy lý do gỡ');
+select pg_temp.expect_error(
+  $$update public.stories set visibility = 'published' where slug = 'truyen-chong-spam'$$,
+  'story_taken_down');
+select pg_temp.expect_error(
+  $$update public.stories set taken_down_at = null where slug = 'truyen-chong-spam'$$,
+  '42501');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+-- Truyện đang là nháp nên admin (không phải chủ) lấy id qua admin_stories
+select public.admin_set_story_takedown(
+  (select id from public.admin_stories() where slug = 'truyen-chong-spam'), null);
+select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000a', false);
+select pg_temp.expect(
+  not (select is_banned from public.admin_users('tac gia a')),
+  'mở khóa tài khoản');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected(
+    $$update public.stories set visibility = 'published' where slug = 'truyen-chong-spam'$$) = 1,
+  'khôi phục xong thì tác giả công khai lại được');
+
+-- ── Admin: quản lý thể loại ─────────────────────────────────────────────
+
+select pg_temp.expect_error($$select public.admin_delete_genre('the-loai-3')$$, 'forbidden');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select g ->> 'slug' = 'the-loai-nam'
+    from public.admin_update_genre('the-loai-5', '  Thể Loại   Năm ', 'Mô tả mới') as g),
+  'đổi tên thể loại: slug đổi theo, tên gọn khoảng trắng');
+select pg_temp.expect_error(
+  $$select public.admin_update_genre('the-loai-6', 'cổ đại', null)$$, 'genre_exists');
+select pg_temp.expect(
+  public.admin_merge_genres('co-dai', 'the-loai-nam') >= 1,
+  'gộp thể loại trả về số truyện được chuyển');
+select pg_temp.expect_error($$select public.admin_merge_genres('co-dai', 'the-loai-nam')$$, 'not_found');
+
+reset role;
+select pg_temp.expect(
+  (select array_agg(genre_slug) = array['the-loai-nam'] from public.story_genres
+    where story_id = pg_temp.story_id('truyen-chong-spam'))
+    and not exists (select 1 from public.genres where slug = 'co-dai'),
+  'gộp: truyện chuyển sang thể loại đích, thể loại nguồn bị xóa');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_delete_genre('the-loai-nam');
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from public.story_genres
+    where story_id = pg_temp.story_id('truyen-chong-spam')),
+  'xóa thể loại: truyện mất thể loại đó');
+
+-- ── Bút danh / tác giả gốc ──────────────────────────────────────────────
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Chí Phèo', 'Truyện ngắn nổi tiếng về người nông dân bị tha hóa.', 'completed',
+  array['the-loai-3'], null, '{"title": "Một", "content": "Hắn vừa đi vừa chửi."}', true,
+  '  Nam   Cao ');
+select pg_temp.expect(
+  (select author_name = 'Nam Cao' and author_key = 'nam-cao'
+    from public.story_cards where slug = 'chi-pheo'),
+  'bút danh hiển thị thay tên tài khoản, gọn khoảng trắng');
+select pg_temp.expect(
+  (select author_name = 'Nam Cao' from public.studio_stories where slug = 'chi-pheo'),
+  'khu Sáng tác thấy bút danh');
+select pg_temp.expect(
+  exists (select 1 from public.search_stories('nam cao') s
+    where s.story_id = pg_temp.story_id('chi-pheo') and s.score = 1),
+  'tìm được theo bút danh');
+select * from public.update_story(
+  pg_temp.story_id('chi-pheo'), 'Chí Phèo', 'Truyện ngắn nổi tiếng về người nông dân bị tha hóa.',
+  'completed', array['the-loai-3'], null, '');
+select pg_temp.expect(
+  (select author_name = 'Tác giả A' and author_key is null
+    from public.story_cards where slug = 'chi-pheo'),
+  'xóa bút danh thì hiển thị lại tên tài khoản');
+reset role;
+
 -- ── Tự xóa tài khoản ────────────────────────────────────────────────────
 
 reset role;

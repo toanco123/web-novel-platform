@@ -9,7 +9,7 @@ import type { Database } from '@/types/database'
 import type { Page } from '@/types/page'
 import type { Genre, Story } from '@/types/story'
 import {
-  ownerIdFromAuthorSlug,
+  parseAuthorSlug,
   publicStoryCards,
   type StoryCardRow,
   storiesByIds,
@@ -109,9 +109,11 @@ export async function getStory(slug: string): Promise<Story | null> {
 
 /** Truyện công khai khác của cùng tác giả, mới cập nhật trước */
 export async function getStoriesByAuthor(authorSlug: string, excludeSlug?: string) {
-  const ownerId = ownerIdFromAuthorSlug(authorSlug)
-  if (!ownerId) return []
-  let query = publicStoryCards().eq('owner_id', ownerId)
+  const author = parseAuthorSlug(authorSlug)
+  if (!author) return []
+  // Cùng chủ truyện và cùng bút danh (không bút danh thì chỉ lấy truyện cũng không bút danh)
+  let query = publicStoryCards().eq('owner_id', author.ownerId)
+  query = author.authorKey ? query.eq('author_key', author.authorKey) : query.is('author_key', null)
   if (excludeSlug) query = query.neq('slug', excludeSlug)
   const rows = unwrap(await query.order('updated_at', { ascending: false }).order('id'))
   return rows.map(toStory)

@@ -9,13 +9,20 @@ import type { Genre, Story } from '@/types/story'
 
 export type StoryCardRow = Database['public']['Views']['story_cards']['Row']
 
-/** Tác giả chính là chủ truyện; đường dẫn tác giả giữ dạng tac-gia-<id> như bản giả */
-export const authorSlug = (ownerId: string) => `tac-gia-${ownerId}`
+/**
+ * Khóa "tác giả" của truyện: chủ truyện, cộng bút danh nếu có (author_key của story_cards), giống
+ * bản giả: tac-gia-<uuid> hoặc tac-gia-<uuid>-<bút-danh-dạng-slug>
+ */
+export const authorSlug = (ownerId: string, authorKey?: string | null) =>
+  authorKey ? `tac-gia-${ownerId}-${authorKey}` : `tac-gia-${ownerId}`
 
-/** 'tac-gia-<uuid>' → uuid; null nếu không đúng dạng (tránh gửi uuid hỏng lên máy chủ) */
-export function ownerIdFromAuthorSlug(slug: string) {
-  const id = slug.replace(/^tac-gia-/, '')
-  return isUuid(id) ? id : null
+/** Tách khóa tác giả; null nếu không đúng dạng (tránh gửi uuid hỏng lên máy chủ) */
+export function parseAuthorSlug(slug: string) {
+  const rest = slug.replace(/^tac-gia-/, '')
+  const ownerId = rest.slice(0, 36)
+  if (!isUuid(ownerId)) return null
+  const key = rest.slice(37)
+  return { ownerId, authorKey: key || null }
 }
 
 type GenreJson = { slug: string; name: string; description: string | null }
@@ -27,7 +34,7 @@ export function toStory(row: StoryCardRow): Story {
     id: row.id!,
     slug: row.slug!,
     title: row.title!,
-    author: { slug: authorSlug(row.owner_id!), name: row.author_name ?? '' },
+    author: { slug: authorSlug(row.owner_id!, row.author_key), name: row.author_name ?? '' },
     genres: genres.map((g): Genre =>
       g.description
         ? { slug: g.slug, name: g.name, description: g.description }

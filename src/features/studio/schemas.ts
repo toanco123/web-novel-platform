@@ -21,6 +21,8 @@ export const storySchema = z.object({
     .max(5, 'Chọn tối đa 5 thể loại'),
   status: z.enum(['ongoing', 'completed']),
   coverUrl: z.string().nullable(),
+  /** Bút danh / tác giả gốc; trống thì hiển thị tên tài khoản */
+  authorName: z.string().trim().max(60, 'Bút danh tối đa 60 ký tự'),
 })
 
 export type StoryValues = z.infer<typeof storySchema>

@@ -51,6 +51,8 @@ function withCounts(story: StoredStory): MyStory {
     followers: followerCount(story.slug),
     openReports: loadReports().filter((r) => r.storySlug === story.slug && r.status === 'open')
       .length,
+    takedown: story.takedown ?? null,
+    authorName: story.authorName ?? null,
   }
 }
 
@@ -139,6 +141,7 @@ export async function updateStory(id: string, input: StoryInput): Promise<MyStor
 export async function publishStory(id: string): Promise<MyStory> {
   await delay(300)
   const { story, stories } = await ownStory(id)
+  if (story.takedown) throw new StudioError('story_taken_down')
   if (withCounts(story).publishedCount === 0) throw new StudioError('no_published_chapters')
   return saveStory(stories, {
     ...story,

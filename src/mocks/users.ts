@@ -9,6 +9,8 @@ export type MockUser = Omit<User, 'isAdmin'> & {
   /** Không có ở dữ liệu cũ */
   createdAt?: string
   lastSignInAt?: string
+  /** Bị admin khóa: không đăng nhập được */
+  bannedAt?: string | null
 }
 
 const USERS_KEY = 'mock-auth-users'
@@ -39,5 +41,6 @@ export const toPublicUser = ({
   role,
   createdAt: _createdAt,
   lastSignInAt: _lastSignInAt,
+  bannedAt: _bannedAt,
   ...user
 }: MockUser): User => ({ ...user, isAdmin: role === 'admin' })

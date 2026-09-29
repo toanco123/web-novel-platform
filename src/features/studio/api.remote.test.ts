@@ -256,6 +256,8 @@ test('tạo truyện: một lần RPC, tên gọn khoảng trắng, chương đ�
     views: 0,
     followers: 0,
     openReports: 0,
+    takedown: null,
+    authorName: null,
   })
 
   fake.responses = [ok(studioRow())]

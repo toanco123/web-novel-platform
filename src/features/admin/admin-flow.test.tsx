@@ -69,3 +69,128 @@ test('quản trị viên xem tổng quan, người dùng và truyện của mộ
   expect(await screen.findByText('Tác giả: Linh', {}, slow)).toBeInTheDocument()
   expect(screen.getByText('Công khai', { selector: '.ant-tag' })).toBeInTheDocument()
 })
+
+test('hộp thư và báo lỗi: đánh dấu đã xử lý thì rời khỏi danh sách đang mở', async () => {
+  const { sendContactMessage, reportChapter } = await import('@/features/feedback/api')
+  await sendContactMessage({
+    name: 'Lan',
+    email: 'lan@gmail.com',
+    topic: 'copyright',
+    message: 'Truyện này đăng lại khi chưa xin phép tác giả.',
+  })
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  await reportChapter({ slug: story.slug, chapter: 1, reason: 'violation', note: 'Nội dung lạ' })
+  signInAs('demo')
+  const { user } = renderApp('/admin/inbox')
+
+  expect(await screen.findByText('lan@gmail.com', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Bản quyền nội dung')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Đã xử lý' }))
+  expect(await screen.findByText('Không còn tin nhắn nào cần xử lý', {}, slow)).toBeInTheDocument()
+
+  const nav = screen.getAllByRole('navigation', { name: 'Quản trị' })[0]
+  await user.click(within(nav).getByRole('link', { name: 'Báo lỗi' }))
+  expect(await screen.findByText('Nội dung lạ', {}, slow)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Chương 1: Chương thử 1' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Đã sửa' }))
+  expect(await screen.findByText('Không có báo lỗi nào đang mở', {}, slow)).toBeInTheDocument()
+})
+
+test('khóa người dùng và gỡ truyện trên giao diện; tác giả thấy lý do gỡ', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  signInAs('demo')
+  const { router, user } = renderApp('/admin/users?q=linh')
+
+  // Không có nút khóa cho chính mình; khóa Linh sau khi xác nhận
+  expect(await screen.findByText('linh@gmail.com', {}, slow)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Khóa' }))
+  const popconfirm = (await screen.findByText('Khóa Linh?', {}, slow)).closest('.ant-popover')!
+  await user.click(within(popconfirm as HTMLElement).getByRole('button', { name: 'Khóa' }))
+  expect(await screen.findByText('Đã khóa', { selector: '.ant-tag' }, slow)).toBeInTheDocument()
+
+  await router.navigate(`/admin/stories?owner=${linh}`)
+  await user.click(await screen.findByRole('button', { name: 'Gỡ' }, slow))
+  const dialog = await screen.findByRole('dialog', {}, slow)
+  const confirm = within(dialog).getByRole('button', { name: 'Gỡ truyện' })
+  expect(confirm).toBeDisabled()
+  await user.type(within(dialog).getByLabelText('Lý do gỡ'), 'Đạo văn')
+  await user.click(confirm)
+  expect(await screen.findByText('Bị gỡ', { selector: '.ant-tag' }, slow)).toBeInTheDocument()
+
+  // Mở khóa để Linh vào khu Sáng tác xem lý do
+  const { setUserBanned } = await import('./api')
+  await setUserBanned(linh, false)
+  signInAs(linh)
+  await router.navigate(`/studio/story/${story.id}`)
+  expect(await screen.findByText(/Truyện đã bị ban quản trị gỡ/, {}, slow)).toBeInTheDocument()
+  expect(screen.getByText(/Đạo văn/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Xuất bản truyện' })).toBeDisabled()
+})
+
+test('thể loại: sửa tên và gộp trên giao diện', async () => {
+  const { createGenre } = await import('@/features/genres/api')
+  await registerUser('Linh', 'linh@gmail.com')
+  await createGenre({ name: 'Tình cảm' })
+  await createGenre({ name: 'Lãng mạn' })
+  signInAs('demo')
+  const { user } = renderApp('/admin/genres')
+
+  const row = (name: string) => screen.getByRole('link', { name }).closest('tr')!
+  await screen.findByRole('link', { name: 'Tình cảm' }, slow)
+  await user.click(within(row('Tình cảm')).getByRole('button', { name: 'Sửa' }))
+  const edit = await screen.findByRole('dialog', { name: /Sửa thể loại/ }, slow)
+  const name = within(edit).getByLabelText('Tên thể loại')
+  await user.clear(name)
+  await user.type(name, 'Tình cảm học đường')
+  await user.click(within(edit).getByRole('button', { name: 'Lưu' }))
+  expect(await screen.findByRole('link', { name: 'Tình cảm học đường' }, slow)).toBeInTheDocument()
+  expect(screen.getByText('tinh-cam-hoc-duong')).toBeInTheDocument()
+
+  await user.click(within(row('Lãng mạn')).getByRole('button', { name: 'Gộp vào…' }))
+  const mergeDialog = await screen.findByRole('dialog', { name: /Gộp "Lãng mạn"/ }, slow)
+  await user.click(within(mergeDialog).getByRole('combobox'))
+  await user.click(await screen.findByTitle('Tình cảm học đường', {}, slow))
+  await user.click(within(mergeDialog).getByRole('button', { name: 'Gộp' }))
+  await expect.poll(() => screen.queryByRole('link', { name: 'Lãng mạn' }), slow).toBeNull()
+})
+
+test('nhập truyện hàng loạt: chọn 2 file, áp thể loại cho tất cả, nhập và xuất bản', async () => {
+  signInAs('demo')
+  const { user } = renderApp('/admin/import')
+  const body = (n: number) => `Nội dung chương ${n}. `.repeat(12)
+  const file = (name: string) =>
+    new File(
+      [
+        `Giới thiệu truyện ${name}, đủ dài để qua kiểm tra.\n\nChương 1: Mở đầu\n${body(1)}\n\nChương 2: Kết\n${body(2)}`,
+      ],
+      `${name}.txt`,
+      { type: 'text/plain' },
+    )
+
+  const input = (await screen.findByText(/Kéo các file .txt/, {}, slow))
+    .closest('.ant-upload')!
+    .querySelector('input[type="file"]') as HTMLInputElement
+  await user.upload(input, [file('Chí Phèo'), file('Lão Hạc')])
+  expect(await screen.findByText('Chí Phèo.txt', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Lão Hạc.txt')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Nhập 2 truyện' })).toBeDisabled()
+  expect(screen.getByText('Còn 2 truyện cần sửa trước khi nhập.')).toBeInTheDocument()
+
+  await user.type(screen.getAllByLabelText('Tác giả gốc')[0], 'Nam Cao')
+  await user.click(screen.getByRole('combobox', { name: 'Thể loại cho tất cả' }))
+  await user.click(await screen.findByTitle('Hiện đại', {}, slow))
+  await user.click(screen.getByRole('button', { name: 'Áp dụng' }))
+
+  await user.click(screen.getByRole('button', { name: 'Nhập 2 truyện' }))
+  expect(await screen.findByText('Đã nhập 2/2 truyện.', {}, { timeout: 8000 })).toBeInTheDocument()
+  expect(screen.getAllByRole('link', { name: 'Xem trang truyện' })).toHaveLength(2)
+
+  const { getStory } = await import('@/features/stories/api')
+  expect(await getStory('lao-hac')).toMatchObject({
+    author: { name: 'Nam Cao' },
+    chapterCount: 2,
+    description: 'Giới thiệu truyện Lão Hạc, đủ dài để qua kiểm tra.',
+  })
+}, 20_000)

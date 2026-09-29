@@ -1,10 +1,11 @@
-import { Alert, Card, Grid, Input, Table, Tag } from 'antd'
+import { Alert, App, Button, Card, Grid, Input, Popconfirm, Table, Tag } from 'antd'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
-import { ADMIN_PAGE_SIZE, type AdminUser } from '@/features/admin/api'
+import { ADMIN_PAGE_SIZE, type AdminUser, adminErrorMessage } from '@/features/admin/api'
 import { useFilterParams } from '@/features/admin/components/useFilterParams'
-import { useAdminUsers } from '@/features/admin/hooks'
+import { useAdminUsers, useSetUserBanned } from '@/features/admin/hooks'
 import { UserAvatar } from '@/features/auth/components/UserAvatar'
+import { useSession } from '@/features/auth/hooks'
 import { formatDate, formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
 
@@ -22,6 +23,21 @@ export default function AdminUsersPage() {
   const pinFirst = Grid.useBreakpoint().md ?? false
   const q = params.get('q') ?? ''
   const { data, isPending, isFetching, isError } = useAdminUsers({ q, page })
+  const { data: me } = useSession()
+  const setBanned = useSetUserBanned()
+  const { message } = App.useApp()
+
+  const toggleBan = (u: AdminUser) =>
+    setBanned.mutate(
+      { userId: u.id, banned: !u.isBanned },
+      {
+        onSuccess: () =>
+          void message.success(
+            u.isBanned ? `Đã mở khóa ${u.displayName}.` : `Đã khóa ${u.displayName}.`,
+          ),
+        onError: (error) => void message.error(adminErrorMessage(error)),
+      },
+    )
 
   return (
     <div className="space-y-6">
@@ -51,7 +67,7 @@ export default function AdminUsersPage() {
             rowKey="id"
             loading={isPending || isFetching}
             dataSource={data?.items}
-            scroll={{ x: 960 }}
+            scroll={{ x: 1120 }}
             locale={{ emptyText: q ? 'Không có ai khớp từ khóa' : 'Chưa có người dùng nào' }}
             pagination={{
               current: data?.page ?? page,
@@ -133,6 +149,48 @@ export default function AdminUsersPage() {
                 dataIndex: 'followCount',
                 align: 'right',
                 render: (n: number) => number.format(n),
+              },
+              {
+                title: 'Trạng thái',
+                key: 'ban',
+                className: 'whitespace-nowrap',
+                render: (_, u) => {
+                  // Không tự khóa mình, không khóa quản trị viên khác (DB cũng chặn)
+                  const locked = u.id === me?.id || (u.isAdmin && !u.isBanned)
+                  return (
+                    <div className="flex items-center gap-2">
+                      {u.isBanned ? (
+                        <Tag color="red">Đã khóa</Tag>
+                      ) : (
+                        <Tag color="green">Hoạt động</Tag>
+                      )}
+                      {!locked && (
+                        <Popconfirm
+                          title={
+                            u.isBanned ? `Mở khóa ${u.displayName}?` : `Khóa ${u.displayName}?`
+                          }
+                          description={
+                            u.isBanned
+                              ? 'Người này đăng nhập lại được.'
+                              : 'Người này bị đăng xuất (tối đa sau 1 giờ) và không đăng nhập lại được. Truyện và bình luận vẫn giữ nguyên.'
+                          }
+                          okText={u.isBanned ? 'Mở khóa' : 'Khóa'}
+                          okButtonProps={{ danger: !u.isBanned }}
+                          cancelText="Hủy"
+                          onConfirm={() => toggleBan(u)}
+                        >
+                          <Button
+                            size="small"
+                            danger={!u.isBanned}
+                            loading={setBanned.isPending && setBanned.variables?.userId === u.id}
+                          >
+                            {u.isBanned ? 'Mở khóa' : 'Khóa'}
+                          </Button>
+                        </Popconfirm>
+                      )}
+                    </div>
+                  )
+                },
               },
             ]}
           />

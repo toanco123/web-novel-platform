@@ -1,6 +1,6 @@
-# Plan: Trang quản trị `/admin` (chỉ xem)
+# Plan: Trang quản trị `/admin`
 
-Trạng thái: ✅ xong (28/09/2026).
+Trạng thái: ✅ xong (28/09/2026). Phần thao tác (hộp thư, báo lỗi, khóa user, gỡ truyện, thể loại, nhập truyện hàng loạt) ở `plan-cong-cu-admin.md`.
 
 ## Mục tiêu
 
