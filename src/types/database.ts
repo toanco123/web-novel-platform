@@ -525,6 +525,8 @@ export type Database = {
           search_title: string | null
           slug: string
           status: Database["public"]["Enums"]["story_status"]
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string
           updated_at: string
           visibility: Database["public"]["Enums"]["publication_status"]
@@ -539,6 +541,8 @@ export type Database = {
           search_title?: string | null
           slug: string
           status?: Database["public"]["Enums"]["story_status"]
+          takedown_reason?: string | null
+          taken_down_at?: string | null
           title: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["publication_status"]
@@ -553,6 +557,8 @@ export type Database = {
           search_title?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["story_status"]
+          takedown_reason?: string | null
+          taken_down_at?: string | null
           title?: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["publication_status"]
@@ -762,6 +768,8 @@ export type Database = {
           published_count: number | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string | null
           updated_at: string | null
           views: number | null
@@ -823,6 +831,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_set_story_takedown: {
+        Args: { p_reason: string; p_story_id: string }
+        Returns: undefined
+      }
+      admin_set_user_banned: {
+        Args: { p_banned: boolean; p_user_id: string }
+        Returns: undefined
+      }
       admin_stories: {
         Args: {
           p_owner_id?: string
@@ -844,6 +860,8 @@ export type Database = {
           rating_count: number
           slug: string
           status: Database["public"]["Enums"]["story_status"]
+          takedown_reason: string
+          taken_down_at: string
           title: string
           updated_at: string
           view_count: number
@@ -861,6 +879,7 @@ export type Database = {
           follow_count: number
           id: string
           is_admin: boolean
+          is_banned: boolean
           last_sign_in_at: string
           provider: string
           story_count: number
@@ -892,6 +911,8 @@ export type Database = {
           published_count: number | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string | null
           updated_at: string | null
           views: number | null
@@ -1017,6 +1038,8 @@ export type Database = {
           published_count: number | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
+          takedown_reason: string | null
+          taken_down_at: string | null
           title: string | null
           updated_at: string | null
           views: number | null

@@ -22,6 +22,7 @@ export type AdminOverview = {
     comments: number
     openReports: number
     unhandledMessages: number
+    bannedUsers: number
   }
   /** Mỗi ngày trong kỳ (cũ trước), day dạng 2026-09-25 */
   days: { day: string; signups: number; views: number; stories: number; chapters: number }[]
@@ -55,6 +56,8 @@ export type AdminUser = {
   storyCount: number
   commentCount: number
   followCount: number
+  /** Bị khóa: không đăng nhập được */
+  isBanned: boolean
 }
 
 export type AdminStory = {
@@ -78,7 +81,11 @@ export type AdminStory = {
   openReports: number
   createdAt: string
   updatedAt: string
+  /** Bị admin gỡ (về nháp, tác giả không tự công khai lại được); null: bình thường */
+  takedown: StoryTakedown | null
 }
+
+export type StoryTakedown = { at: string; reason: string }
 
 export type AdminStorySort = 'updated' | 'views' | 'created'
 
@@ -144,10 +151,27 @@ export type AdminReport = {
 export type AdminMessageQuery = { status: AdminMessageStatus; page: number }
 export type AdminReportQuery = { status: ReportStatus | 'all'; page: number }
 
+export type AdminErrorCode = 'forbidden' | 'not_found' | 'cannot_ban_self' | 'cannot_ban_admin'
+
+const adminMessages: Record<AdminErrorCode, string> = {
+  forbidden: 'Chỉ quản trị viên mới xem được trang này.',
+  not_found: 'Không tìm thấy mục này. Có thể nó vừa bị xóa.',
+  cannot_ban_self: 'Bạn không thể tự khóa tài khoản của mình.',
+  cannot_ban_admin: 'Không khóa được tài khoản quản trị viên khác.',
+}
+
+export const isAdminErrorCode = (code: string): code is AdminErrorCode =>
+  Object.hasOwn(adminMessages, code)
+
 export class AdminError extends Error {
-  code = 'forbidden' as const
-  constructor() {
-    super('Chỉ quản trị viên mới xem được trang này.')
+  code: AdminErrorCode
+  constructor(code: AdminErrorCode = 'forbidden') {
+    super(adminMessages[code])
     this.name = 'AdminError'
+    this.code = code
   }
 }
+
+/** Lời báo cho thao tác admin thất bại */
+export const adminErrorMessage = (error: unknown) =>
+  error instanceof AdminError ? error.message : 'Chưa lưu được. Kiểm tra mạng rồi thử lại.'

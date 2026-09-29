@@ -16,7 +16,14 @@ const SESSION_KEY = 'mock-auth-session'
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
+const bannedError = () =>
+  new AuthError(
+    'banned',
+    'Tài khoản đã bị khóa do vi phạm quy định. Liên hệ ban quản trị nếu bạn cho rằng đây là nhầm lẫn.',
+  )
+
 function startSession(user: MockUser) {
+  if (user.bannedAt) throw bannedError()
   write(SESSION_KEY, user.id)
   // Trang quản trị hiện lần đăng nhập cuối
   const lastSignInAt = new Date().toISOString()
@@ -27,7 +34,8 @@ function startSession(user: MockUser) {
 export async function getSession(): Promise<User | null> {
   const id = read<string | null>(SESSION_KEY, null)
   const user = id ? loadUsers().find((u) => u.id === id) : undefined
-  return user ? toPublic(user) : null
+  // Bản giả: bị khóa thì mất phiên ngay (Supabase: khi token hết hạn, tối đa 1 giờ)
+  return user && !user.bannedAt ? toPublic(user) : null
 }
 
 /** Dùng trong các api.ts khác cho thao tác cần đăng nhập (tủ truyện, bình luận...) */

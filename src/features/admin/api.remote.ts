@@ -10,6 +10,7 @@ import type { Page } from '@/types/page'
 import {
   ADMIN_PAGE_SIZE,
   AdminError,
+  isAdminErrorCode,
   type AdminContactMessage,
   type AdminMessageQuery,
   type AdminOverview,
@@ -21,8 +22,11 @@ import {
   type AdminUserQuery,
 } from './shared'
 
-const adminError = (error: PostgrestError) =>
-  businessCode(error) === 'forbidden' ? new AdminError() : null
+/** Mã lỗi của các RPC admin (forbidden, not_found, cannot_ban_*) → AdminError; lỗi khác null */
+function adminError(error: PostgrestError) {
+  const code = businessCode(error)
+  return code && isAdminErrorCode(code) ? new AdminError(code) : null
+}
 
 /** Dùng trong .catch() của loadPage: lỗi quyền → AdminError, lỗi khác ném nguyên */
 const rethrow = (error: PostgrestError) => {
@@ -56,6 +60,7 @@ export async function getAdminUsers({ q, page }: AdminUserQuery): Promise<Page<A
       storyCount: r.story_count,
       commentCount: r.comment_count,
       followCount: r.follow_count,
+      isBanned: r.is_banned,
     })),
   }
 }
@@ -99,6 +104,10 @@ export async function getAdminStories({
       openReports: r.open_reports,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
+      takedown:
+        r.taken_down_at && r.takedown_reason
+          ? { at: r.taken_down_at, reason: r.takedown_reason }
+          : null,
     })),
   }
 }
@@ -173,4 +182,29 @@ export async function setAdminReportStatus(id: string, status: AdminReport['stat
   await requireUserId()
   if (!isUuid(id)) throw new Error('Id báo lỗi không hợp lệ')
   unwrap(await db().rpc('admin_set_report_status', { p_id: id, p_status: status }), adminError)
+}
+
+// ── Khóa tài khoản, gỡ truyện ───────────────────────────────────────────
+
+export async function setUserBanned(userId: string, banned: boolean) {
+  await requireUserId()
+  if (!isUuid(userId)) throw new AdminError('not_found')
+  unwrap(
+    await db().rpc('admin_set_user_banned', { p_user_id: userId, p_banned: banned }),
+    adminError,
+  )
+}
+
+/** reason null/rỗng: khôi phục (truyện vẫn là nháp, tác giả tự xuất bản lại) */
+export async function setStoryTakedown(storyId: string, reason: string | null) {
+  await requireUserId()
+  if (!isUuid(storyId)) throw new AdminError('not_found')
+  unwrap(
+    await db().rpc('admin_set_story_takedown', {
+      p_story_id: storyId,
+      // Kiểu sinh ra đòi string; RPC coi chuỗi rỗng là khôi phục
+      p_reason: reason?.trim() ?? '',
+    }),
+    adminError,
+  )
 }

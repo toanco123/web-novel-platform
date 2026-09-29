@@ -96,3 +96,35 @@ test('hộp thư và báo lỗi: đánh dấu đã xử lý thì rời khỏi da
   await user.click(screen.getByRole('button', { name: 'Đã sửa' }))
   expect(await screen.findByText('Không có báo lỗi nào đang mở', {}, slow)).toBeInTheDocument()
 })
+
+test('khóa người dùng và gỡ truyện trên giao diện; tác giả thấy lý do gỡ', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  signInAs('demo')
+  const { router, user } = renderApp('/admin/users?q=linh')
+
+  // Không có nút khóa cho chính mình; khóa Linh sau khi xác nhận
+  expect(await screen.findByText('linh@gmail.com', {}, slow)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Khóa' }))
+  const popconfirm = (await screen.findByText('Khóa Linh?', {}, slow)).closest('.ant-popover')!
+  await user.click(within(popconfirm as HTMLElement).getByRole('button', { name: 'Khóa' }))
+  expect(await screen.findByText('Đã khóa', { selector: '.ant-tag' }, slow)).toBeInTheDocument()
+
+  await router.navigate(`/admin/stories?owner=${linh}`)
+  await user.click(await screen.findByRole('button', { name: 'Gỡ' }, slow))
+  const dialog = await screen.findByRole('dialog', {}, slow)
+  const confirm = within(dialog).getByRole('button', { name: 'Gỡ truyện' })
+  expect(confirm).toBeDisabled()
+  await user.type(within(dialog).getByLabelText('Lý do gỡ'), 'Đạo văn')
+  await user.click(confirm)
+  expect(await screen.findByText('Bị gỡ', { selector: '.ant-tag' }, slow)).toBeInTheDocument()
+
+  // Mở khóa để Linh vào khu Sáng tác xem lý do
+  const { setUserBanned } = await import('./api')
+  await setUserBanned(linh, false)
+  signInAs(linh)
+  await router.navigate(`/studio/story/${story.id}`)
+  expect(await screen.findByText(/Truyện đã bị ban quản trị gỡ/, {}, slow)).toBeInTheDocument()
+  expect(screen.getByText(/Đạo văn/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Xuất bản truyện' })).toBeDisabled()
+})

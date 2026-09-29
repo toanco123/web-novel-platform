@@ -17,4 +17,6 @@ export const {
   setMessageHandled,
   getAdminReports,
   setAdminReportStatus,
+  setUserBanned,
+  setStoryTakedown,
 } = api

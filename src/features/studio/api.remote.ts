@@ -60,6 +60,10 @@ function toMyStory(row: StudioStoryRow): MyStory {
     views: row.views ?? 0,
     followers: row.followers ?? 0,
     openReports: row.open_reports ?? 0,
+    takedown:
+      row.taken_down_at && row.takedown_reason
+        ? { at: row.taken_down_at, reason: row.takedown_reason }
+        : null,
   }
 }
 

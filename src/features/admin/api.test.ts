@@ -104,3 +104,47 @@ test('báo lỗi toàn web: admin thấy báo lỗi truyện người khác và 
   expect((await admin.getAdminReports({ status: 'open', page: 1 })).total).toBe(0)
   expect((await admin.getAdminReports({ status: 'resolved', page: 1 })).total).toBe(1)
 })
+
+test('khóa tài khoản: người bị khóa mất phiên, không đăng nhập lại được; mở khóa thì được', async () => {
+  const { getSession, signInWithPassword } = await import('@/features/auth/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+
+  signInAs('demo')
+  await expect(admin.setUserBanned('demo', true)).rejects.toMatchObject({
+    code: 'cannot_ban_self',
+  })
+  await admin.setUserBanned(linh, true)
+  expect((await admin.getAdminUsers({ q: 'linh', page: 1 })).items[0].isBanned).toBe(true)
+  expect((await admin.getAdminOverview(7)).totals.bannedUsers).toBe(1)
+
+  signInAs(linh)
+  expect(await getSession()).toBeNull()
+  const login = { email: 'linh@gmail.com', password: 'matkhau123' }
+  await expect(signInWithPassword(login)).rejects.toMatchObject({ code: 'banned' })
+
+  signInAs('demo')
+  await admin.setUserBanned(linh, false)
+  await expect(signInWithPassword(login)).resolves.toMatchObject({ id: linh })
+})
+
+test('gỡ truyện: truyện ẩn khỏi người đọc, tác giả thấy lý do và không tự công khai lại được', async () => {
+  const { getStory } = await import('@/features/stories/api')
+  const studio = await import('@/features/studio/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+
+  signInAs('demo')
+  await admin.setStoryTakedown(story.id, 'Đạo văn')
+  const listed = await admin.getAdminStories({ ownerId: linh, page: 1 })
+  expect(listed.items[0]).toMatchObject({ visibility: 'draft', takedown: { reason: 'Đạo văn' } })
+  expect(await getStory(story.slug)).toBeNull()
+
+  signInAs(linh)
+  expect((await studio.getMyStory(story.id)).takedown).toMatchObject({ reason: 'Đạo văn' })
+  await expect(studio.publishStory(story.id)).rejects.toMatchObject({ code: 'story_taken_down' })
+
+  signInAs('demo')
+  await admin.setStoryTakedown(story.id, null)
+  signInAs(linh)
+  expect((await studio.publishStory(story.id)).visibility).toBe('published')
+})

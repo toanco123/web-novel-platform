@@ -100,11 +100,15 @@ export default function StudioPage() {
                     )}
                     <StatusBadge
                       published={s.visibility === 'published'}
+                      takenDown={!!s.takedown}
                       className="mt-2 sm:hidden"
                     />
                   </div>
                   <div className="hidden flex-col items-end gap-1.5 sm:flex">
-                    <StatusBadge published={s.visibility === 'published'} />
+                    <StatusBadge
+                      published={s.visibility === 'published'}
+                      takenDown={!!s.takedown}
+                    />
                     <span className="text-xs text-muted-foreground">
                       Sửa {formatRelativeTime(s.updatedAt)}
                     </span>

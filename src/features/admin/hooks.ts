@@ -74,6 +74,16 @@ export const useSetMessageHandled = () =>
     api.setMessageHandled(id, handled),
   )
 
+export const useSetUserBanned = () =>
+  useAdminMutation(({ userId, banned }: { userId: string; banned: boolean }) =>
+    api.setUserBanned(userId, banned),
+  )
+
+export const useSetStoryTakedown = () =>
+  useAdminMutation(({ storyId, reason }: { storyId: string; reason: string | null }) =>
+    api.setStoryTakedown(storyId, reason),
+  )
+
 export const useSetAdminReportStatus = () =>
   useAdminMutation(({ id, status }: { id: string; status: api.AdminReport['status'] }) =>
     api.setAdminReportStatus(id, status),

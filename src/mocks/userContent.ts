@@ -20,6 +20,8 @@ export type StoredStory = {
   updatedAt: string
   /** Lần đầu xuất bản (dùng cho "Truyện mới ra") */
   publishedAt: string | null
+  /** Bị admin gỡ (không có ở dữ liệu cũ) */
+  takedown?: { at: string; reason: string } | null
 }
 
 const GENRES_KEY = 'mock-user-genres'

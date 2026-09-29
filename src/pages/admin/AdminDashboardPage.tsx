@@ -104,6 +104,12 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
       hint: 'Mở hộp thư',
       to: paths.adminInbox,
     },
+    {
+      title: 'Tài khoản bị khóa',
+      value: totals.bannedUsers,
+      hint: 'Xem người dùng',
+      to: paths.adminUsers,
+    },
   ]
 
   return (

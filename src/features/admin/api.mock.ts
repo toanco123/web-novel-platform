@@ -18,8 +18,8 @@ import {
 import { allGenres, toStory } from '@/mocks/catalog'
 import { mockChapters } from '@/mocks/chapters'
 import { stories as seedStories } from '@/mocks/stories'
-import { loadChapters, loadUserStories } from '@/mocks/userContent'
-import { loadUsers } from '@/mocks/users'
+import { loadChapters, loadUserStories, saveUserStories } from '@/mocks/userContent'
+import { loadUsers, saveUsers } from '@/mocks/users'
 import type { Page } from '@/types/page'
 import {
   ADMIN_PAGE_SIZE,
@@ -40,6 +40,7 @@ const SYSTEM_AUTHOR = 'Hệ thống'
 async function requireAdmin() {
   const user = await requireUser()
   if (!user.isAdmin) throw new AdminError()
+  return user
 }
 
 const matches = (q: string, ...fields: string[]) => !q || fields.some((f) => slugify(f).includes(q))
@@ -72,6 +73,7 @@ function allStories(): AdminStory[] {
     ),
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
+    takedown: null,
   }))
 
   const genres = allGenres()
@@ -99,6 +101,7 @@ function allStories(): AdminStory[] {
       ),
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
+      takedown: stored.takedown ?? null,
     }
   })
 
@@ -166,6 +169,7 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
       comments: loadUserComments().length,
       openReports: loadReports().filter((r) => r.status === 'open').length,
       unhandledMessages: loadContactMessages().filter((m) => !m.handledAt).length,
+      bannedUsers: users.filter((u) => u.bannedAt).length,
     },
     days: keys.map((day) => ({
       day,
@@ -217,6 +221,7 @@ export async function getAdminUsers({ q = '', page }: AdminUserQuery): Promise<P
       storyCount: stories.filter((s) => s.owner.id === u.id).length,
       commentCount: comments.filter((c) => c.user.id === u.id).length,
       followCount: follows[u.id]?.length ?? 0,
+      isBanned: !!u.bannedAt,
     }))
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
   return paginate(users, page, ADMIN_PAGE_SIZE)
@@ -330,4 +335,42 @@ export async function setAdminReportStatus(id: string, status: AdminReport['stat
   await delay()
   await requireAdmin()
   saveReports(loadReports().map((r) => (r.id === id ? { ...r, status } : r)))
+}
+
+// ── Khóa tài khoản, gỡ truyện ───────────────────────────────────────────
+
+export async function setUserBanned(userId: string, banned: boolean) {
+  await delay()
+  const admin = await requireAdmin()
+  if (userId === admin.id) throw new AdminError('cannot_ban_self')
+  const users = loadUsers()
+  const target = users.find((u) => u.id === userId)
+  if (!target) throw new AdminError('not_found')
+  if (banned && target.role === 'admin') throw new AdminError('cannot_ban_admin')
+  const bannedAt = banned ? (target.bannedAt ?? new Date().toISOString()) : null
+  saveUsers(users.map((u) => (u.id === userId ? { ...u, bannedAt } : u)))
+}
+
+/** reason null/rỗng: khôi phục (truyện vẫn là nháp, tác giả tự xuất bản lại) */
+export async function setStoryTakedown(storyId: string, reason: string | null) {
+  await delay()
+  await requireAdmin()
+  const stories = loadUserStories()
+  const story = stories.find((s) => s.id === storyId)
+  // Truyện có sẵn của bản giả không gỡ được (không lưu trong localStorage)
+  if (!story) throw new AdminError('not_found')
+  const text = reason?.trim()
+  saveUserStories(
+    stories.map((s) =>
+      s.id !== storyId
+        ? s
+        : text
+          ? {
+              ...s,
+              visibility: 'draft' as const,
+              takedown: { at: s.takedown?.at ?? new Date().toISOString(), reason: text },
+            }
+          : { ...s, takedown: null },
+    ),
+  )
 }

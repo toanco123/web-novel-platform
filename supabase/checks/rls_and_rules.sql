@@ -542,6 +542,74 @@ select pg_temp.expect(
       from public.admin_overview(7) as o),
   'đánh dấu tin nhắn đã xử lý; tổng quan đếm tin chưa xử lý');
 
+-- ── Admin: gỡ truyện, khóa tài khoản ───────────────────────────────────
+
+select public.admin_set_story_takedown(pg_temp.story_id('truyen-chong-spam'), 'Đạo văn');
+select pg_temp.expect(
+  (select visibility = 'draft' and takedown_reason = 'Đạo văn' and taken_down_at is not null
+    from public.admin_stories() where slug = 'truyen-chong-spam'),
+  'gỡ truyện: về nháp, ghi lý do');
+select pg_temp.expect_error(
+  $$select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000c', true)$$,
+  'cannot_ban_self');
+
+reset role;
+insert into auth.users (id, email, raw_app_meta_data) values
+  ('00000000-0000-4000-8000-00000000000d', 'admin-d@kiem-tra.local', '{"role": "admin"}');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000d', true)$$,
+  'cannot_ban_admin');
+select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000a', true);
+select pg_temp.expect(
+  (select is_banned from public.admin_users('tac gia a'))
+    and (select (o -> 'totals' ->> 'bannedUsers')::int = 1 from public.admin_overview(7) as o),
+  'khóa tài khoản: admin_users và tổng quan thấy trạng thái khóa');
+
+-- Tác giả A không tự công khai lại truyện đang bị gỡ, nhưng thấy lý do trong khu Sáng tác
+reset role;
+select pg_temp.expect(
+  (select banned_until = 'infinity' from auth.users
+    where id = '00000000-0000-4000-8000-00000000000a'),
+  'khóa tài khoản đặt banned_until');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select takedown_reason = 'Đạo văn' from public.studio_stories where slug = 'truyen-chong-spam'),
+  'tác giả thấy lý do gỡ');
+select pg_temp.expect_error(
+  $$update public.stories set visibility = 'published' where slug = 'truyen-chong-spam'$$,
+  'story_taken_down');
+select pg_temp.expect_error(
+  $$update public.stories set taken_down_at = null where slug = 'truyen-chong-spam'$$,
+  '42501');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+-- Truyện đang là nháp nên admin (không phải chủ) lấy id qua admin_stories
+select public.admin_set_story_takedown(
+  (select id from public.admin_stories() where slug = 'truyen-chong-spam'), null);
+select public.admin_set_user_banned('00000000-0000-4000-8000-00000000000a', false);
+select pg_temp.expect(
+  not (select is_banned from public.admin_users('tac gia a')),
+  'mở khóa tài khoản');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected(
+    $$update public.stories set visibility = 'published' where slug = 'truyen-chong-spam'$$) = 1,
+  'khôi phục xong thì tác giả công khai lại được');
+
 -- ── Tự xóa tài khoản ────────────────────────────────────────────────────
 
 reset role;

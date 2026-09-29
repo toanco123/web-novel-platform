@@ -1,9 +1,29 @@
-import { Alert, Card, Grid, Input, Segmented, Select, Table, Tag } from 'antd'
+import {
+  Alert,
+  App,
+  Button,
+  Card,
+  Grid,
+  Input,
+  Modal,
+  Popconfirm,
+  Segmented,
+  Select,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
-import { ADMIN_PAGE_SIZE, type AdminStory, type AdminStorySort } from '@/features/admin/api'
+import {
+  ADMIN_PAGE_SIZE,
+  type AdminStory,
+  type AdminStorySort,
+  adminErrorMessage,
+} from '@/features/admin/api'
 import { useFilterParams } from '@/features/admin/components/useFilterParams'
-import { useAdminStories } from '@/features/admin/hooks'
+import { useAdminStories, useSetStoryTakedown } from '@/features/admin/hooks'
 import { formatDate } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import type { StoryVisibility } from '@/types/story'
@@ -32,6 +52,25 @@ export default function AdminStoriesPage() {
     page,
   })
   const ownerName = ownerId && data?.items[0]?.ownerName
+  const takedown = useSetStoryTakedown()
+  const { message } = App.useApp()
+  // Truyện đang mở hộp thoại gỡ và lý do đang nhập
+  const [removing, setRemoving] = useState<AdminStory | null>(null)
+  const [reason, setReason] = useState('')
+
+  const submitTakedown = (story: AdminStory, text: string | null) =>
+    takedown.mutate(
+      { storyId: story.id, reason: text },
+      {
+        onSuccess: () => {
+          setRemoving(null)
+          void message.success(
+            text ? `Đã gỡ "${story.title}".` : `Đã khôi phục "${story.title}" (vẫn là nháp).`,
+          )
+        },
+        onError: (error) => void message.error(adminErrorMessage(error)),
+      },
+    )
 
   return (
     <div className="space-y-6">
@@ -89,7 +128,7 @@ export default function AdminStoriesPage() {
             rowKey="id"
             loading={isPending || isFetching}
             dataSource={data?.items}
-            scroll={{ x: 1180 }}
+            scroll={{ x: 1280 }}
             locale={{ emptyText: 'Không có truyện nào khớp bộ lọc' }}
             pagination={{
               current: data?.page ?? page,
@@ -125,8 +164,16 @@ export default function AdminStoriesPage() {
                 title: 'Hiển thị',
                 className: 'whitespace-nowrap',
                 dataIndex: 'visibility',
-                render: (v: StoryVisibility) =>
-                  v === 'published' ? <Tag color="green">Công khai</Tag> : <Tag>Nháp</Tag>,
+                render: (v: StoryVisibility, s) =>
+                  s.takedown ? (
+                    <Tooltip title={`Lý do: ${s.takedown.reason}`}>
+                      <Tag color="red">Bị gỡ</Tag>
+                    </Tooltip>
+                  ) : v === 'published' ? (
+                    <Tag color="green">Công khai</Tag>
+                  ) : (
+                    <Tag>Nháp</Tag>
+                  ),
               },
               {
                 title: 'Tiến độ',
@@ -189,10 +236,72 @@ export default function AdminStoriesPage() {
                 dataIndex: 'updatedAt',
                 render: (v: string) => formatDate(v),
               },
+              {
+                title: 'Thao tác',
+                key: 'actions',
+                className: 'whitespace-nowrap',
+                // Truyện có sẵn của bản giả (không có chủ) không gỡ được
+                render: (_, s) =>
+                  !s.ownerId ? null : s.takedown ? (
+                    <Popconfirm
+                      title={`Khôi phục "${s.title}"?`}
+                      description="Truyện vẫn là nháp; tác giả tự xuất bản lại."
+                      okText="Khôi phục"
+                      cancelText="Hủy"
+                      onConfirm={() => submitTakedown(s, null)}
+                    >
+                      <Button
+                        size="small"
+                        loading={takedown.isPending && takedown.variables?.storyId === s.id}
+                      >
+                        Khôi phục
+                      </Button>
+                    </Popconfirm>
+                  ) : (
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => {
+                        setReason('')
+                        setRemoving(s)
+                      }}
+                    >
+                      Gỡ
+                    </Button>
+                  ),
+              },
             ]}
           />
         )}
       </Card>
+
+      <Modal
+        open={!!removing}
+        title={removing && `Gỡ truyện "${removing.title}"`}
+        okText="Gỡ truyện"
+        okButtonProps={{ danger: true, disabled: !reason.trim(), loading: takedown.isPending }}
+        cancelText="Hủy"
+        onOk={() => removing && submitTakedown(removing, reason)}
+        onCancel={() => setRemoving(null)}
+        destroyOnHidden
+      >
+        <p className="mb-3 text-sm text-muted-foreground">
+          Truyện về nháp và tác giả không tự công khai lại được cho tới khi bạn khôi phục. Tác giả
+          thấy lý do này trong khu Sáng tác.
+        </p>
+        <label htmlFor="takedown-reason" className="mb-1 block text-sm font-medium">
+          Lý do gỡ
+        </label>
+        <Input.TextArea
+          id="takedown-reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={500}
+          showCount
+          autoSize={{ minRows: 3 }}
+          placeholder="Ví dụ: Đăng lại truyện của tác giả khác khi chưa được phép."
+        />
+      </Modal>
     </div>
   )
 }
