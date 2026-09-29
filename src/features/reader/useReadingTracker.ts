@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { useSaveReadingProgress } from '@/features/library/hooks'
+import { markRead } from '@/features/offline/store'
 import { readResumeState } from '@/features/library/resume'
 import type { ChapterContent } from '@/types/chapter'
 import { chapterElement, progressOf, scrollToProgress } from './progress'
@@ -26,6 +27,7 @@ export function useReadingTracker(chapter: ChapterContent | null | undefined) {
   useEffect(() => {
     if (slug === undefined || number === undefined || title === undefined) return
     save({ slug, chapter: number, chapterTitle: title })
+    void markRead(slug, number).catch(() => {})
   }, [save, slug, number, title])
 
   // Tới từ "Đọc tiếp": cuộn tới chỗ đã lưu, mỗi lần điều hướng một lần
@@ -58,7 +60,11 @@ export function useReadingTracker(chapter: ChapterContent | null | undefined) {
       if (!dirty) return
       dirty = false
       const el = chapterElement(number)
-      if (el) save({ slug, chapter: number, chapterTitle: title, progress: progressOf(el) })
+      if (!el) return
+      const progress = progressOf(el)
+      save({ slug, chapter: number, chapterTitle: title, progress })
+      // Bản lưu trên máy nhớ chỗ đọc để "Đọc tiếp" ở tab Đã lưu (cả khi offline)
+      void markRead(slug, number, progress).catch(() => {})
     }
     const onScroll = () => {
       dirty = true

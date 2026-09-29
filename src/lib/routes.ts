@@ -31,6 +31,8 @@ export const paths = {
   studioImport: (id: string) => `/studio/story/${id}/import`,
   library: '/library',
   readingHistory: '/library?tab=history',
+  /** Tab "Đã lưu" của tủ truyện: chương đọc được khi không có mạng */
+  savedChapters: '/library?tab=saved',
   about: '/about',
   contact: '/contact',
   terms: '/terms',
