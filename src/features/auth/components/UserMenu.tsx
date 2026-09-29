@@ -1,4 +1,4 @@
-import { BookMarked, LayoutDashboard, LogOut, PenLine, UserRound } from 'lucide-react'
+import { BookMarked, Download, LayoutDashboard, LogOut, PenLine, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import {
   DropdownMenu,
@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useLibraryUpdateCount } from '@/features/library/hooks'
+import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import { paths } from '@/lib/routes'
 import type { User } from '@/types/user'
 import { useSignOut } from '../hooks'
@@ -29,6 +30,7 @@ export function UserMenu({ user }: { user: User }) {
   const signOut = useSignOut()
   const navigate = useNavigate()
   const { data: updates = 0 } = useLibraryUpdateCount()
+  const { available: installable, install } = useInstallPrompt()
 
   return (
     <DropdownMenu>
@@ -73,6 +75,12 @@ export function UserMenu({ user }: { user: User }) {
             Tài khoản
           </Link>
         </DropdownMenuItem>
+        {installable && (
+          <DropdownMenuItem onSelect={() => void install()}>
+            <Download />
+            Cài ứng dụng
+          </DropdownMenuItem>
+        )}
         {user.isAdmin && (
           <DropdownMenuItem asChild>
             <Link to={paths.admin}>

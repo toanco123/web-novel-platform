@@ -3,6 +3,7 @@ import { SITE_NAME, SITE_TAGLINE } from '@/config/site'
 import { useGenres } from '@/features/genres/hooks'
 import { paths } from '@/lib/routes'
 import { Container } from './Container'
+import { InstallAppButton } from './InstallAppButton'
 import { SiteLogo } from './SiteLogo'
 
 export function Footer() {
@@ -40,6 +41,7 @@ export function Footer() {
         <div className="col-span-full max-w-xs lg:col-span-1">
           <SiteLogo />
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{SITE_TAGLINE}</p>
+          <InstallAppButton className="mt-4" />
         </div>
         {columns.map((col) => (
           <div key={col.title}>
