@@ -317,3 +317,32 @@ test('ghi được lên máy chủ thì bỏ mục đang chờ (cũ hơn) của 
   await saveReadingProgress({ slug: 'mua-ha', chapter: 6, chapterTitle: 'Chương 6' })
   expect(pendingProgress(USER)).toEqual([])
 })
+
+test('đổi tài khoản giữa lúc gửi hàng chờ: không gửi hàng chờ của người trước bằng phiên người sau', async () => {
+  queueProgress(USER, { slug: 'a', chapter: 1, chapterTitle: 'Chương 1' })
+  await new Promise((resolve) => setTimeout(resolve, 2))
+  queueProgress(USER, { slug: 'b', chapter: 2, chapterTitle: 'Chương 2' })
+  fake.userId = USER
+  fake.respond = () => {
+    fake.userId = 'u-b' // người khác đăng nhập ngay sau lần gửi đầu
+    return ok(historyRow(1, 0))
+  }
+  await syncPendingProgress()
+  expect(rpcCalls('save_reading_progress')).toHaveLength(1)
+  expect(pendingProgress(USER).map((p) => p.slug)).toEqual(['b'])
+})
+
+test('đổi tài khoản trong lúc chờ lượt ghi: lần ghi vào hàng chờ của người cũ', async () => {
+  fake.userId = USER
+  const pending: ((response: Response) => void)[] = []
+  fake.respond = () => new Promise((resolve) => pending.push(resolve))
+  const first = saveReadingProgress({ slug: 'a', chapter: 1, chapterTitle: 'Chương 1' })
+  const second = saveReadingProgress({ slug: 'b', chapter: 2, chapterTitle: 'Chương 2' })
+  await settle()
+  fake.userId = 'u-b'
+  pending[0](ok(historyRow(1, 0)))
+  await first
+  await expect(second).resolves.toMatchObject({ slug: 'b', chapter: 2 })
+  expect(rpcCalls('save_reading_progress')).toHaveLength(1)
+  expect(pendingProgress(USER).map((p) => p.slug)).toEqual(['b'])
+})

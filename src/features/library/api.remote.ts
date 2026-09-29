@@ -253,6 +253,8 @@ async function writeProgress(input: ProgressInput, previous: Promise<unknown>) {
   const userId = await getUserId()
   await previous
   if (!userId) return saveGuestProgress(input)
+  // Trong lúc chờ lượt đã đổi tài khoản: RPC ghi theo phiên hiện tại, nên giữ lại cho đúng người
+  if ((await getUserId()) !== userId) return queueProgress(userId, input)
   try {
     await mergeGuestHistory()
     const row = unwrap(
@@ -291,6 +293,8 @@ async function sendPending(previous: Promise<unknown>) {
   if (!userId) return 0
   let sent = 0
   for (const entry of pendingProgress(userId)) {
+    // RPC ghi theo phiên hiện tại: đổi tài khoản giữa chừng thì dừng, để dành cho đúng người
+    if ((await getUserId()) !== userId) break
     const { error } = await db().rpc('save_reading_progress', {
       p_slug: entry.slug,
       p_chapter: entry.chapter,

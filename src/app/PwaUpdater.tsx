@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { setPendingUpdate } from '@/lib/appUpdate'
 
 export function PwaUpdater() {
   const {
@@ -12,6 +13,8 @@ export function PwaUpdater() {
 
   useEffect(() => {
     if (!needRefresh) return
+    // Màn hình lỗi (RouteError) "Tải lại trang" cũng kích hoạt bản mới
+    setPendingUpdate(() => void updateServiceWorker(true))
     toast('Có phiên bản mới', {
       description: 'Cập nhật để dùng bản mới nhất của web.',
       duration: Infinity,

@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { getChapterRange } from '@/features/chapters/api'
 import { chapterKeys } from '@/features/chapters/hooks'
 import type { ChapterContent } from '@/types/chapter'
-import { saveChapters, walkSaved } from './store'
+import { offlineAvailable, saveChapters, walkSaved } from './store'
 
 /** Số chương tải trước sau chương đang đọc */
 export const PREFETCH_COUNT = 5
@@ -25,7 +25,7 @@ function whenIdle(task: () => void) {
 
 /** Tải các chương còn thiếu trong PREFETCH_COUNT chương tính từ chương `from`; trả chương vừa tải */
 export async function prefetchFrom(slug: string, from: number): Promise<ChapterContent[]> {
-  if (!navigator.onLine || saveData()) return []
+  if (!navigator.onLine || saveData() || !(await offlineAvailable())) return []
   const { saved, missing } = await walkSaved(slug, from, PREFETCH_COUNT)
   if (missing === null) return []
   const chapters = await getChapterRange(slug, missing, PREFETCH_COUNT - saved.length)

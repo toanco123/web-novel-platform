@@ -47,6 +47,14 @@ export type SavedStory = {
   usedAt: string
 }
 
+/** Trình duyệt không cho dùng IndexedDB (chế độ riêng tư, bị chặn): không lưu được chương nào */
+export class OfflineUnavailableError extends Error {
+  constructor() {
+    super('Trình duyệt này không cho lưu dữ liệu nên không tải về được.')
+    this.name = 'OfflineUnavailableError'
+  }
+}
+
 export class OfflineStorageFullError extends Error {
   constructor() {
     super('Bộ nhớ máy đã đầy.')
@@ -74,6 +82,11 @@ function database() {
           },
         }).catch(() => null)
   return dbPromise
+}
+
+/** Kho dùng được không (trình duyệt cho dùng IndexedDB) */
+export async function offlineAvailable() {
+  return (await database()) !== null
 }
 
 /** Chỉ dùng trong test: đóng kết nối để test sau mở kho mới */
@@ -222,7 +235,8 @@ export async function pinChapters(slug: string, numbers: number[]) {
 
 /**
  * Lần theo chương sau (`next`) của các chương đã lưu từ chương `from`, tối đa `limit` chương. Trả
- * các chương đã có và chương đầu tiên còn thiếu (null: đủ `limit` chương, hoặc tới chương cuối).
+ * các chương đã có và số chương để hỏi tiếp máy chủ (null: đã đủ `limit` chương). Bản lưu ghi "không
+ * có chương sau" có thể đã cũ (truyện ra thêm chương sau khi lưu) nên vẫn hỏi từ số kế tiếp.
  */
 export async function walkSaved(
   slug: string,
@@ -233,12 +247,12 @@ export async function walkSaved(
   if (!db) return { saved: [], missing: from }
   const store = db.transaction('chapters').store
   const saved: number[] = []
-  let next: number | null = from
-  while (next !== null && saved.length < limit) {
+  let next = from
+  while (saved.length < limit) {
     const record = await store.get(idOf(slug, next))
     if (!record) return { saved, missing: next }
     saved.push(next)
-    next = record.meta.next?.number ?? null
+    next = record.meta.next?.number ?? next + 1
   }
   return { saved, missing: null }
 }

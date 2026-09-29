@@ -4,6 +4,7 @@ import { WifiOff } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useOnline } from '@/hooks/useOnline'
+import { reloadApp } from '@/lib/appUpdate'
 import { paths } from '@/lib/routes'
 
 export function RouteError() {
@@ -27,7 +28,7 @@ export function RouteError() {
         </>
       )}
       <div className="flex flex-wrap justify-center gap-3">
-        <Button className="rounded-full" onClick={() => window.location.reload()}>
+        <Button className="rounded-full" onClick={reloadApp}>
           Tải lại trang
         </Button>
         {!online && (

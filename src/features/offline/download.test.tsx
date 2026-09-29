@@ -3,7 +3,15 @@ import { getChapterRange } from '@/features/chapters/api'
 import { goOffline } from '@/test/offline'
 import { renderApp } from '@/test/renderApp'
 import { cancelDownload, downloadChapters, useDownloads } from './downloads'
-import { getSavedChapter, listSavedStories, savedChapterList } from './store'
+import { fakeChapter } from '@/test/offline'
+import { prefetchFrom } from './prefetch'
+import {
+  getSavedChapter,
+  listSavedStories,
+  resetOfflineDatabase,
+  saveChapters,
+  savedChapterList,
+} from './store'
 
 vi.mock('@/features/chapters/api', async (importOriginal) => {
   const api = await importOriginal<typeof import('@/features/chapters/api')>()
@@ -21,7 +29,10 @@ beforeEach(() => {
   useDownloads.setState({ bySlug: {} })
   vi.mocked(getChapterRange).mockReset().mockImplementation(actual.getChapterRange)
 })
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 test('tải 20 chương từ trang truyện; mất mạng vẫn đọc được chương thứ 20', async () => {
   const { user, router } = renderApp(base)
@@ -86,4 +97,25 @@ test('mục lục trang đọc có nút tải về, tải từ chương đang đ
   expect(
     await screen.findByText(/Tải từ chương 12\./, undefined, { timeout: 3000 }),
   ).toBeInTheDocument()
+})
+
+test('chuỗi chương đã lưu dừng ở chương "mới nhất" cũ (truyện đã ra thêm): vẫn tải tiếp từ máy chủ', async () => {
+  await saveChapters([10, 11, 12].map((n) => fakeChapter(slug, n, { last: 12 })))
+  await downloadChapters({ slug, title, from: 10, total: 20 })
+  expect(vi.mocked(getChapterRange).mock.calls).toEqual([[slug, 13, 17]])
+  expect(useDownloads.getState().bySlug[slug]).toMatchObject({ status: 'done', done: 20 })
+  expect(await getSavedChapter(slug, 29)).not.toBeNull()
+})
+
+test('trình duyệt không cho lưu (không có IndexedDB): báo lỗi, không tải, không tải trước', async () => {
+  await resetOfflineDatabase()
+  vi.stubGlobal('indexedDB', undefined)
+  await downloadChapters({ slug, title, from: 1, total: 20 })
+  expect(useDownloads.getState().bySlug[slug]).toMatchObject({
+    status: 'failed',
+    error: 'Trình duyệt này không cho lưu dữ liệu nên không tải về được.',
+  })
+  expect(await prefetchFrom(slug, 13)).toEqual([])
+  expect(getChapterRange).not.toHaveBeenCalled()
+  await resetOfflineDatabase()
 })

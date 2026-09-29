@@ -20,8 +20,9 @@ export default function LibraryPage() {
   const { data: updates = 0 } = useLibraryUpdateCount()
   const current = useCurrentPath()
 
-  if (isPending) return <PageLoader />
   const requested = params.get('tab')
+  // Tab Đã lưu chỉ đọc kho trên máy: không chờ phiên (lúc offline supabase-js có thể treo khá lâu)
+  if (isPending && requested !== 'saved') return <PageLoader />
   // Khách mặc định xem lịch sử (tab theo dõi cần tài khoản)
   const tab: Tab =
     requested === 'saved'

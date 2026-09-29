@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react'
+import { getSession } from '@/features/auth/api'
 import { registerUser } from '@/test/helpers'
 import { fakeChapter, goOffline } from '@/test/offline'
 import { renderApp } from '@/test/renderApp'
@@ -11,7 +12,18 @@ const at = (iso: string) => {
   vi.setSystemTime(new Date(iso))
 }
 
-beforeEach(() => localStorage.clear())
+// Bọc getSession để giả phiên đăng nhập chưa đọc xong (supabase-js đang làm mới token lúc offline)
+vi.mock('@/features/auth/api', async (importOriginal) => {
+  const api = await importOriginal<typeof import('@/features/auth/api')>()
+  return { ...api, getSession: vi.fn(api.getSession) }
+})
+const actualAuth =
+  await vi.importActual<typeof import('@/features/auth/api')>('@/features/auth/api')
+
+beforeEach(() => {
+  localStorage.clear()
+  vi.mocked(getSession).mockImplementation(actualAuth.getSession)
+})
 afterEach(() => vi.useRealTimers())
 
 test('liệt kê truyện có chương trong máy; "Đọc tiếp" mở chương đọc gần nhất', async () => {
@@ -66,4 +78,11 @@ test('mất mạng vẫn mở được tab Đã lưu, vẫn nhận ra tài kho�
   renderApp('/library?tab=saved')
   expect(await screen.findByText('Mùa Hạ', undefined, { timeout: 3000 })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Tài khoản của Linh/ })).toBeInTheDocument()
+})
+
+test('tab Đã lưu không phải chờ phiên đăng nhập', async () => {
+  await saveChapters(chapters('mua-ha', 'Mùa Hạ', [1]))
+  vi.mocked(getSession).mockImplementation(() => new Promise(() => {}))
+  renderApp('/library?tab=saved')
+  expect(await screen.findByText('Mùa Hạ', undefined, { timeout: 3000 })).toBeInTheDocument()
 })

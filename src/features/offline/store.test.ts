@@ -69,7 +69,8 @@ test('walkSaved lần theo chương sau của bản lưu, dừng ở chương c�
   await saveChapters([...range('mua-ha', 5, 7), fakeChapter('mua-ha', 10, { last: 10 })])
   expect(await walkSaved('mua-ha', 5, 5)).toEqual({ saved: [5, 6, 7], missing: 8 })
   expect(await walkSaved('mua-ha', 5, 2)).toEqual({ saved: [5, 6], missing: null })
-  expect(await walkSaved('mua-ha', 10, 5)).toEqual({ saved: [10], missing: null }) // chương cuối
+  // Bản lưu ghi "không có chương sau" có thể đã cũ (truyện đang ra): hỏi máy chủ từ chương kế
+  expect(await walkSaved('mua-ha', 10, 5)).toEqual({ saved: [10], missing: 11 })
   expect(await walkSaved('mua-ha', 1, 5)).toEqual({ saved: [], missing: 1 })
 })
 

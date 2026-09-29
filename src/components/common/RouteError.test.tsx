@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
+import userEvent from '@testing-library/user-event'
 import { routes } from '@/app/router'
+import { setPendingUpdate } from '@/lib/appUpdate'
 import { goOffline } from '@/test/offline'
 import { RouteError } from './RouteError'
 
@@ -37,4 +39,17 @@ test('có mạng mà vẫn lỗi: gợi ý tải lại trang', async () => {
   render(<RouterProvider router={failingRouter()} />)
   expect(await screen.findByText('Không mở được trang này')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Tải lại trang' })).toBeInTheDocument()
+})
+
+test('có bản mới đang chờ: "Tải lại trang" kích hoạt bản mới (bản cũ không còn file của trang)', async () => {
+  const update = vi.fn()
+  setPendingUpdate(update)
+  try {
+    const user = userEvent.setup()
+    render(<RouterProvider router={failingRouter()} />)
+    await user.click(await screen.findByRole('button', { name: 'Tải lại trang' }))
+    expect(update).toHaveBeenCalled()
+  } finally {
+    setPendingUpdate(null)
+  }
 })

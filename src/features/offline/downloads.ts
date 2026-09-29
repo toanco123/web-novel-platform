@@ -6,7 +6,14 @@ import { create } from 'zustand'
 import { getChapterRange } from '@/features/chapters/api'
 import { formatBytes } from '@/lib/format'
 import { isNetworkError } from '@/lib/network'
-import { OfflineStorageFullError, pinChapters, saveChapters, walkSaved } from './store'
+import {
+  offlineAvailable,
+  OfflineStorageFullError,
+  OfflineUnavailableError,
+  pinChapters,
+  saveChapters,
+  walkSaved,
+} from './store'
 
 /** Số chương mỗi đợt tải */
 export const DOWNLOAD_BATCH = 20
@@ -56,6 +63,8 @@ export async function downloadChapters({ slug, title, from, total, onChange }: R
   let bytes = 0
   update(slug, { status: 'running', done, total, bytes })
   try {
+    // Không lưu được thì đừng tải rồi báo "đã tải"
+    if (!(await offlineAvailable())) throw new OfflineUnavailableError()
     const { saved, missing } = await walkSaved(slug, from, total)
     await pinChapters(slug, saved)
     done = saved.length
@@ -81,11 +90,13 @@ export async function downloadChapters({ slug, title, from, total, onChange }: R
     }
   } catch (error) {
     const message =
-      error instanceof OfflineStorageFullError
-        ? `Bộ nhớ máy đầy, đã tải được ${done} chương.`
-        : isNetworkError(error)
-          ? `Mất mạng, đã tải được ${done} chương. Có mạng lại thì bấm tải tiếp.`
-          : `Không tải được, đã tải được ${done} chương. Thử lại sau.`
+      error instanceof OfflineUnavailableError
+        ? error.message
+        : error instanceof OfflineStorageFullError
+          ? `Bộ nhớ máy đầy, đã tải được ${done} chương.`
+          : isNetworkError(error)
+            ? `Mất mạng, đã tải được ${done} chương. Có mạng lại thì bấm tải tiếp.`
+            : `Không tải được, đã tải được ${done} chương. Thử lại sau.`
     update(slug, { status: 'failed', done, total, bytes, error: message })
     toast.error(message)
   } finally {
