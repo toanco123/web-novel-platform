@@ -648,6 +648,35 @@ select pg_temp.expect(
     where story_id = pg_temp.story_id('truyen-chong-spam')),
   'xóa thể loại: truyện mất thể loại đó');
 
+-- ── Bút danh / tác giả gốc ──────────────────────────────────────────────
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Chí Phèo', 'Truyện ngắn nổi tiếng về người nông dân bị tha hóa.', 'completed',
+  array['the-loai-3'], null, '{"title": "Một", "content": "Hắn vừa đi vừa chửi."}', true,
+  '  Nam   Cao ');
+select pg_temp.expect(
+  (select author_name = 'Nam Cao' and author_key = 'nam-cao'
+    from public.story_cards where slug = 'chi-pheo'),
+  'bút danh hiển thị thay tên tài khoản, gọn khoảng trắng');
+select pg_temp.expect(
+  (select author_name = 'Nam Cao' from public.studio_stories where slug = 'chi-pheo'),
+  'khu Sáng tác thấy bút danh');
+select pg_temp.expect(
+  exists (select 1 from public.search_stories('nam cao') s
+    where s.story_id = pg_temp.story_id('chi-pheo') and s.score = 1),
+  'tìm được theo bút danh');
+select * from public.update_story(
+  pg_temp.story_id('chi-pheo'), 'Chí Phèo', 'Truyện ngắn nổi tiếng về người nông dân bị tha hóa.',
+  'completed', array['the-loai-3'], null, '');
+select pg_temp.expect(
+  (select author_name = 'Tác giả A' and author_key is null
+    from public.story_cards where slug = 'chi-pheo'),
+  'xóa bút danh thì hiển thị lại tên tài khoản');
+reset role;
+
 -- ── Tự xóa tài khoản ────────────────────────────────────────────────────
 
 reset role;

@@ -14,6 +14,8 @@ export type ParsedChapter = {
 export type ParseResult = {
   chapters: ParsedChapter[]
   warnings: string[]
+  /** Phần trước dòng "Chương …" đầu tiên (lời mở đầu, giới thiệu); rỗng nếu không có */
+  preface: string
 }
 
 // "Chương 12: Tiêu đề", "CHƯƠNG 12 - Tiêu đề", "Chuong 12. Tiêu đề", "Chương 12"
@@ -60,6 +62,7 @@ export function parseChapters(raw: string): ParseResult {
         ? [{ sourceNumber: null, title: '', content, problem: problemOf(content) }]
         : [],
       warnings,
+      preface: '',
     }
   }
 
@@ -100,7 +103,7 @@ export function parseChapters(raw: string): ParseResult {
   const bad = chapters.filter((c) => c.problem).length
   if (bad) warnings.push(`${bad} chương quá ngắn hoặc quá dài, cần sửa trong file trước khi nhập.`)
 
-  return { chapters, warnings }
+  return { chapters, warnings, preface }
 }
 
 /** Đọc file người dùng chọn; báo lỗi rõ ràng nếu sai loại, quá lớn hoặc không phải UTF-8 */

@@ -52,6 +52,7 @@ function withCounts(story: StoredStory): MyStory {
     openReports: loadReports().filter((r) => r.storySlug === story.slug && r.status === 'open')
       .length,
     takedown: story.takedown ?? null,
+    authorName: story.authorName ?? null,
   }
 }
 

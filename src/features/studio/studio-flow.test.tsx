@@ -291,3 +291,21 @@ test('đổi số chương nháp rồi lưu thì quay về trang quản lý vớ
   expect(within(list).getByText('Chưa viết 3 chương')).toBeInTheDocument()
   expect(within(list).getByRole('link', { name: 'Sửa chương 4' })).toBeInTheDocument()
 })
+
+test('bút danh: đặt trong tab thông tin thì trang truyện hiện bút danh thay tên tài khoản', async () => {
+  signIn()
+  const { publishStory } = await import('@/test/helpers')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const { router, user } = renderApp(`/studio/story/${story.id}?tab=info`)
+
+  const pen = await screen.findByLabelText('Tác giả / bút danh (không bắt buộc)', {}, slow)
+  expect(pen).toHaveValue('')
+  await user.type(pen, 'Hạ Vy')
+  await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
+  expect(await screen.findByText('Đã lưu thay đổi.', {}, slow)).toBeInTheDocument()
+
+  await router.navigate(`/story/${story.slug}`)
+  // Trang Sáng tác cũng có tiêu đề truyện: chờ link tác giả của trang truyện
+  expect(await screen.findByRole('link', { name: 'Hạ Vy' }, slow)).toBeInTheDocument()
+  expect(screen.queryByText('Bạn đọc Demo')).not.toBeInTheDocument()
+})

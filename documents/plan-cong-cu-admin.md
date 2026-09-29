@@ -1,6 +1,10 @@
 # Plan: Công cụ admin và nhập truyện hàng loạt
 
-Trạng thái: chờ duyệt (28/09/2026). Nối tiếp `plan-trang-quan-tri.md` (trang `/admin` chỉ xem).
+Trạng thái: ✅ xong (29/09/2026). Nối tiếp `plan-trang-quan-tri.md` (trang `/admin` lúc đầu chỉ xem).
+
+Khác với plan ban đầu:
+- Thanh tab admin ở màn hẹp cuộn ngang (đủ 7 mục) và tự đưa tab đang mở vào tầm nhìn.
+- "Truyện cùng tác giả" tính theo chủ truyện **và** bút danh (`story_cards.author_key`), để truyện nhập của nhiều tác giả gốc dưới cùng tài khoản admin không bị gộp làm một.
 
 ## Phạm vi
 

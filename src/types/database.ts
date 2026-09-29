@@ -516,6 +516,7 @@ export type Database = {
       }
       stories: {
         Row: {
+          author_name: string | null
           cover_path: string | null
           created_at: string
           description: string
@@ -532,6 +533,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["publication_status"]
         }
         Insert: {
+          author_name?: string | null
           cover_path?: string | null
           created_at?: string
           description?: string
@@ -548,6 +550,7 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["publication_status"]
         }
         Update: {
+          author_name?: string | null
           cover_path?: string | null
           created_at?: string
           description?: string
@@ -718,6 +721,7 @@ export type Database = {
       }
       story_cards: {
         Row: {
+          author_key: string | null
           author_name: string | null
           chapter_count: number | null
           cover_path: string | null
@@ -753,6 +757,7 @@ export type Database = {
       }
       studio_stories: {
         Row: {
+          author_name: string | null
           chapter_count: number | null
           cover_path: string | null
           created_at: string | null
@@ -896,6 +901,7 @@ export type Database = {
       }
       create_story: {
         Args: {
+          p_author_name?: string
           p_cover_path?: string
           p_description: string
           p_first_chapter?: Json
@@ -905,6 +911,7 @@ export type Database = {
           p_title: string
         }
         Returns: {
+          author_name: string | null
           chapter_count: number | null
           cover_path: string | null
           created_at: string | null
@@ -1024,6 +1031,7 @@ export type Database = {
       studio_story_stats: { Args: { p_story_id: string }; Returns: Json }
       update_story: {
         Args: {
+          p_author_name?: string
           p_cover_path?: string
           p_description: string
           p_genres: string[]
@@ -1032,6 +1040,7 @@ export type Database = {
           p_title: string
         }
         Returns: {
+          author_name: string | null
           chapter_count: number | null
           cover_path: string | null
           created_at: string | null

@@ -47,7 +47,12 @@ function ManageStory({ story }: { story: MyStory }) {
 
       <header className="grid grid-cols-[5rem_minmax(0,1fr)] gap-5 sm:grid-cols-[6rem_minmax(0,1fr)]">
         <div className="self-start overflow-hidden rounded-lg ring-1 ring-border">
-          <StoryCover story={{ ...story, author: { slug: '', name: story.owner.displayName } }} />
+          <StoryCover
+            story={{
+              ...story,
+              author: { slug: '', name: story.authorName ?? story.owner.displayName },
+            }}
+          />
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -211,6 +216,7 @@ function EditStoryInfo({ story }: { story: MyStory }) {
         genreSlugs: story.genreSlugs,
         status: story.status,
         coverUrl: story.coverUrl,
+        authorName: story.authorName ?? '',
       }}
       submitLabel="Lưu thay đổi"
       pendingLabel="Đang lưu…"

@@ -73,6 +73,9 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `rate_limited` | Vượt giới hạn tần suất (bảng dưới) | `AuthError('rate_limited')` qua `limitError()` (`features/auth/shared.ts`) |
 | `duplicate_comment` | Gửi lại đúng bình luận vừa gửi (cùng truyện/chương, trong 10 phút) | `AuthError('rate_limited')` "Bạn vừa gửi bình luận này rồi." |
 | `forbidden` | Gọi RPC quản trị (`admin_*`) mà không phải quản trị viên | `AdminError` |
+| `cannot_ban_self`, `cannot_ban_admin` | Admin tự khóa mình / khóa admin khác | `AdminError` |
+| `genre_exists`, `same_genre` | Đổi tên thể loại trùng thể loại khác / gộp thể loại vào chính nó | `AdminError` |
+| `story_taken_down` | Tác giả công khai lại truyện đang bị admin gỡ | `StudioError('story_taken_down')` |
 | `23505` (unique) | Trùng số chương / trùng thể loại | `chapter_exists` / `GenreExistsError` |
 | `42501` | Không có quyền (RLS hoặc grant) | Lỗi chung |
 
@@ -149,7 +152,12 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `slugify(text)` | mọi người | Giống `src/lib/slugify.ts` |
 | `admin_overview(days)` | quản trị viên | jsonb giống kiểu `AdminOverview`: tổng số, chuỗi theo ngày (người dùng mới, lượt đọc, truyện mới, chương mới; giờ Việt Nam), truyện theo thể loại, top 10 lượt đọc |
 | `admin_users(query?)` | quản trị viên | Mọi tài khoản kèm email, provider, lần đăng nhập cuối, số truyện/bình luận/theo dõi; tìm tên/email không dấu |
-| `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp. `sort`: `updated` \| `views` \| `created` |
+| `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp, kèm trạng thái gỡ. `sort`: `updated` \| `views` \| `created` |
+| `admin_contact_messages(status?)`, `admin_set_contact_handled(id, handled)` | quản trị viên | Hộp thư liên hệ (`status`: `open` \| `handled`) |
+| `admin_reports(status?)`, `admin_set_report_status(id, status)` | quản trị viên | Báo lỗi chương của mọi truyện |
+| `admin_set_user_banned(user_id, banned)` | quản trị viên | `auth.users.banned_until = 'infinity'` / `null`; khóa thì xóa `auth.sessions` |
+| `admin_set_story_takedown(story_id, reason)` | quản trị viên | Gỡ truyện: về nháp + `taken_down_at`, `takedown_reason`; `reason` rỗng là khôi phục |
+| `admin_update_genre(slug, name, description)`, `admin_delete_genre(slug)`, `admin_merge_genres(from, into)` | quản trị viên | Sửa (slug đổi theo tên), xóa, gộp thể loại |
 
 ## 7. Storage
 
@@ -218,7 +226,9 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | feedback | `sendContactMessage` | `contact_messages.insert(...)` (không gọi `.select()`) |
 | feedback | `reportChapter` | `rpc('report_chapter')` |
 | admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |
-| admin | `getAdminUsers`, `getAdminStories` | `rpc('admin_users' / 'admin_stories', {...}, { count: 'exact' }).range()` qua `loadPage` |
+| admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports', {...}, { count: 'exact' }).range()` qua `loadPage` |
+| admin | `setMessageHandled`, `setAdminReportStatus`, `setUserBanned`, `setStoryTakedown`, `updateGenre`, `deleteGenre`, `mergeGenres` | RPC `admin_*` cùng tên (mục 6) |
+| admin | nhập truyện hàng loạt | Không có RPC riêng: `features/admin/bulkImport.ts` gọi `createStory` (kèm `p_author_name`) → `importChapters` → `publishStory` của studio |
 
 ## 9. Quy trình
 
@@ -238,7 +248,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
   - Bật Google/Facebook.
   - Mẫu email tiếng Việt.
 - ~~**Chống spam**~~ (xong 28/09/2026: giới hạn ở mục 4). Còn có thể thêm captcha (Cloudflare Turnstile) cho form liên hệ và đăng ký nếu vẫn bị spam.
-- **Vai trò quản trị:** đã có trang `/admin` chỉ để xem (tổng quan, người dùng, truyện; plan: `plan-trang-quan-tri.md`). Xử lý báo lỗi, quản lý thể loại và `curated_stories` vẫn làm qua Dashboard.
+- **Vai trò quản trị:** trang `/admin` có tổng quan, người dùng (khóa/mở khóa), truyện (gỡ/khôi phục), hộp thư, báo lỗi, thể loại, nhập truyện hàng loạt (plan: `plan-trang-quan-tri.md`, `plan-cong-cu-admin.md`). Còn `curated_stories` (truyện nổi bật) vẫn sửa qua Dashboard.
   - Cấp quyền (chạy trong SQL editor hoặc `supabase db query --linked`), rồi người đó đăng xuất và đăng nhập lại để JWT có vai trò mới:
     `update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role": "admin"}' where email = '...';`
   - Thu hồi: `raw_app_meta_data - 'role'`. JWT cũ vẫn còn quyền tới khi hết hạn (mặc định 1 giờ).

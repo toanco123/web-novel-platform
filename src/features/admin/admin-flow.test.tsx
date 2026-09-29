@@ -155,3 +155,42 @@ test('thể loại: sửa tên và gộp trên giao diện', async () => {
   await user.click(within(mergeDialog).getByRole('button', { name: 'Gộp' }))
   await expect.poll(() => screen.queryByRole('link', { name: 'Lãng mạn' }), slow).toBeNull()
 })
+
+test('nhập truyện hàng loạt: chọn 2 file, áp thể loại cho tất cả, nhập và xuất bản', async () => {
+  signInAs('demo')
+  const { user } = renderApp('/admin/import')
+  const body = (n: number) => `Nội dung chương ${n}. `.repeat(12)
+  const file = (name: string) =>
+    new File(
+      [
+        `Giới thiệu truyện ${name}, đủ dài để qua kiểm tra.\n\nChương 1: Mở đầu\n${body(1)}\n\nChương 2: Kết\n${body(2)}`,
+      ],
+      `${name}.txt`,
+      { type: 'text/plain' },
+    )
+
+  const input = (await screen.findByText(/Kéo các file .txt/, {}, slow))
+    .closest('.ant-upload')!
+    .querySelector('input[type="file"]') as HTMLInputElement
+  await user.upload(input, [file('Chí Phèo'), file('Lão Hạc')])
+  expect(await screen.findByText('Chí Phèo.txt', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Lão Hạc.txt')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Nhập 2 truyện' })).toBeDisabled()
+  expect(screen.getByText('Còn 2 truyện cần sửa trước khi nhập.')).toBeInTheDocument()
+
+  await user.type(screen.getAllByLabelText('Tác giả gốc')[0], 'Nam Cao')
+  await user.click(screen.getByRole('combobox', { name: 'Thể loại cho tất cả' }))
+  await user.click(await screen.findByTitle('Hiện đại', {}, slow))
+  await user.click(screen.getByRole('button', { name: 'Áp dụng' }))
+
+  await user.click(screen.getByRole('button', { name: 'Nhập 2 truyện' }))
+  expect(await screen.findByText('Đã nhập 2/2 truyện.', {}, { timeout: 8000 })).toBeInTheDocument()
+  expect(screen.getAllByRole('link', { name: 'Xem trang truyện' })).toHaveLength(2)
+
+  const { getStory } = await import('@/features/stories/api')
+  expect(await getStory('lao-hac')).toMatchObject({
+    author: { name: 'Nam Cao' },
+    chapterCount: 2,
+    description: 'Giới thiệu truyện Lão Hạc, đủ dài để qua kiểm tra.',
+  })
+}, 20_000)

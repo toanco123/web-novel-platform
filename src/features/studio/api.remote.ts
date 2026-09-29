@@ -64,6 +64,7 @@ function toMyStory(row: StudioStoryRow): MyStory {
       row.taken_down_at && row.takedown_reason
         ? { at: row.taken_down_at, reason: row.takedown_reason }
         : null,
+    authorName: row.author_name ?? null,
   }
 }
 
@@ -194,6 +195,7 @@ export async function createStory(
         ? { number: chapter.number, title: chapter.title.trim(), content: chapter.content.trim() }
         : null,
       p_publish: firstChapter?.publish ?? false,
+      p_author_name: story.authorName ?? undefined,
     })
     .single()
   if (error) {
@@ -216,6 +218,8 @@ export async function updateStory(id: string, input: StoryInput): Promise<MyStor
       p_genres: story.genreSlugs,
       // Không gửi thì là null: bỏ ảnh bìa
       p_cover_path: cover.path ?? undefined,
+      // Không gửi thì là null: bỏ bút danh
+      p_author_name: story.authorName ?? undefined,
     })
     .single()
   if (error) {

@@ -22,6 +22,8 @@ export type StoredStory = {
   publishedAt: string | null
   /** Bị admin gỡ (không có ở dữ liệu cũ) */
   takedown?: { at: string; reason: string } | null
+  /** Bút danh / tác giả gốc (không có ở dữ liệu cũ) */
+  authorName?: string | null
 }
 
 const GENRES_KEY = 'mock-user-genres'

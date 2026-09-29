@@ -1,5 +1,6 @@
 // Danh mục truyện công khai = truyện có sẵn + truyện người dùng đã xuất bản.
 // Các api đọc truyện/chương/thể loại đều lấy từ đây để truyện mới đăng hiện khắp nơi.
+import { slugify } from '@/lib/slugify'
 import type { ChapterSummary } from '@/types/chapter'
 import type { Genre, Story } from '@/types/story'
 import { loadViews, ratingsOf, totalViews } from './activity'
@@ -28,7 +29,13 @@ export function toStory(stored: StoredStory, genres = allGenres(), views = loadV
     id: stored.id,
     slug: stored.slug,
     title: stored.title,
-    author: { slug: `tac-gia-${stored.owner.id}`, name: stored.owner.displayName },
+    // Cùng chủ và cùng bút danh là "cùng tác giả" (giống author_key của story_cards)
+    author: stored.authorName
+      ? {
+          slug: `tac-gia-${stored.owner.id}-${slugify(stored.authorName)}`,
+          name: stored.authorName,
+        }
+      : { slug: `tac-gia-${stored.owner.id}`, name: stored.owner.displayName },
     genres: stored.genreSlugs
       .map((slug) => genres.find((g) => g.slug === slug))
       .filter((g): g is Genre => !!g),

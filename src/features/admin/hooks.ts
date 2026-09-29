@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/auth/hooks'
 import * as api from './api'
+import { importStory } from './bulkImport'
 
 export const adminKeys = {
   all: (userId: string) => ['admin', userId] as const,
@@ -114,3 +115,17 @@ export const useSetAdminReportStatus = () =>
   useAdminMutation(({ id, status }: { id: string; status: api.AdminReport['status'] }) =>
     api.setAdminReportStatus(id, status),
   )
+
+/** Nhập một truyện từ file: xong thì làm mới danh sách truyện (công khai, Sáng tác, admin) */
+export function useImportStory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: importStory,
+    onSettled: () =>
+      Promise.all(
+        [['admin'], ['studio'], ['stories'], ['genres']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+  })
+}

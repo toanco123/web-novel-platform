@@ -44,6 +44,8 @@ export type StoryInput = {
   genreSlugs: string[]
   status: StoryStatus
   coverUrl: string | null
+  /** Bút danh / tác giả gốc; trống: hiển thị tên tài khoản */
+  authorName?: string | null
 }
 
 export type ChapterInput = { title: string; content: string }
@@ -80,6 +82,8 @@ export type MyStory = {
   openReports: number
   /** Bị ban quản trị gỡ: truyện về nháp, không tự xuất bản lại được; null: bình thường */
   takedown: { at: string; reason: string } | null
+  /** Bút danh / tác giả gốc; null: dùng tên tài khoản */
+  authorName: string | null
 }
 
 export const STATS_DAYS = 7
@@ -105,5 +109,6 @@ export function normalizeStoryInput(input: StoryInput) {
     genreSlugs: [...new Set(input.genreSlugs)],
     status: input.status,
     coverUrl: input.coverUrl,
+    authorName: input.authorName?.trim().replace(/\s+/g, ' ') || null,
   }
 }
