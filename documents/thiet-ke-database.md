@@ -76,6 +76,8 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `cannot_ban_self`, `cannot_ban_admin` | Admin tự khóa mình / khóa admin khác | `AdminError` |
 | `genre_exists`, `same_genre` | Đổi tên thể loại trùng thể loại khác / gộp thể loại vào chính nó | `AdminError` |
 | `story_taken_down` | Tác giả công khai lại truyện đang bị admin gỡ | `StudioError('story_taken_down')` |
+| `story_limit`, `chapter_limit` | Vượt hạn mức tác giả mỗi ngày (bảng dưới) | `StudioError('story_limit' / 'chapter_limit')` |
+| `invalid_avatar_url` | Đặt `profiles.avatar_url` không phải ảnh trong thư mục `avatars/{uid}/` của mình (chỉ xảy ra khi gọi thẳng API) | Lỗi chung |
 | `23505` (unique) | Trùng số chương / trùng thể loại | `chapter_exists` / `GenreExistsError` |
 | `42501` | Không có quyền (RLS hoặc grant) | Lỗi chung |
 
@@ -96,6 +98,19 @@ Lỗi nghiệp vụ nằm trong `error.message` (mã `P0001`). Các luật tự 
 | Tin nhắn liên hệ | 3 / giờ mỗi email, 5 / giờ mỗi IP |
 | Báo lỗi chương | 10 / giờ mỗi người |
 | Tạo thể loại | 10 / ngày mỗi người |
+
+**Hạn mức tác giả** (migration `security_hardening`, bảng `private.author_daily_usage` theo ngày giờ Việt Nam; quản trị viên không bị giới hạn vì nhập truyện hàng loạt; bản giả làm giống trong `features/studio/api.mock.ts`, hằng số ở `features/studio/shared.ts`). Tính cả truyện/chương xóa sau đó, và tính dung lượng cả khi sửa nội dung chương (không thì tạo chương ngắn rồi sửa cho dài để né):
+
+| Việc | Giới hạn |
+|---|---|
+| Truyện mới | 10 / ngày mỗi người (`story_limit`) |
+| Chương mới | 500 / ngày mỗi người (`chapter_limit`) |
+| Nội dung chương ghi vào (tạo + sửa) | 10.000.000 byte UTF-8 / ngày mỗi người (`chapter_limit`); file `.txt` nhập tối đa 2 MB nên đủ ~5 lần nhập / ngày |
+| Ảnh tải lên (bìa + đại diện) | 30 ảnh mới / 24 giờ và 300 ảnh đang lưu mỗi người (policy `images_insert_own` qua `private.image_upload_allowed()`; vượt thì Storage trả lỗi RLS, client đổi sang `ImageLimitError`) |
+
+**Chống sửa dữ liệu qua API:** người gửi báo lỗi không có quyền sửa `chapter_reports.created_at` (trigger `chapter_reports_touch` đặt lại khi sửa ghi chú); `profiles.avatar_url` chỉ nhận `null` hoặc ảnh trong `avatars/{uid}/` của project (trigger `profiles_check_avatar`, URL project viết cứng trong hàm); lúc đăng ký chỉ lấy ảnh từ Google/Facebook, không lấy từ `options.data` của đăng ký email.
+
+**Captcha** (Cloudflare Turnstile, `features/auth/useCaptcha.tsx`): đăng nhập, đăng ký, quên mật khẩu và kiểm tra lại mật khẩu (đổi mật khẩu, xóa tài khoản) gửi `captchaToken`. Bật bằng `VITE_TURNSTILE_SITE_KEY` (Vercel) rồi mới bật Captcha ở Supabase Dashboard (Authentication > Attack Protection, dán Secret Key); làm ngược lại thì mọi form trên bị Supabase từ chối (`captcha_failed`).
 
 IP chỉ lưu dạng hash SHA-256 kèm bí mật ngẫu nhiên (`private.secrets`), không lưu IP gốc.
 
@@ -166,7 +181,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `covers` | 2 MB, webp/jpeg, công khai | `{user_id}/{uuid}.webp` | `stories.cover_path` (đường dẫn). Đổi ra URL bằng `supabase.storage.from('covers').getPublicUrl(path)` |
 | `avatars` | 512 KB, webp/jpeg, công khai | `{user_id}/{uuid}.webp` | `profiles.avatar_url` (URL đầy đủ, vì ảnh Google/Facebook là URL ngoài) |
 
-- Mỗi người chỉ ghi và xóa được trong thư mục `{user_id}/` của mình.
+- Mỗi người chỉ ghi và xóa được trong thư mục `{user_id}/` của mình, tối đa 30 ảnh mới / 24 giờ và 300 ảnh đang lưu (mục 4).
 - Tên file ngẫu nhiên nên không lo cache ảnh cũ. Khi đổi ảnh hoặc xóa truyện thì api xóa file cũ.
 - `prepareCover`/`prepareAvatar` (`src/lib/image.ts`) giữ nguyên, chỉ đổi đầu ra từ data URL sang Blob để upload.
 
@@ -190,7 +205,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | auth | `getSession`, `signIn…`, `signUp`, `sendPasswordReset`, `updatePassword`, `signOut` | `supabase.auth.*` (ánh xạ ở mục 6 `plan-dang-nhap-dang-ky.md`). `User` = user của session (email, `app_metadata.provider`) + `profiles` |
 | auth | `getProfiles(ids)` | `profiles.select('id, display_name, avatar_url').in('id', ids)` |
 | auth | `updateProfile` | Upload lên `avatars`, rồi `update profiles` |
-| auth | `deleteAccount(password)` | Tài khoản email: kiểm tra mật khẩu bằng cách đăng nhập lại. Xóa thư mục `{uid}/` trong `avatars` và `covers` (Storage không tự xóa theo), rồi `rpc('delete_account')` và `auth.signOut({ scope: 'local' })` |
+| auth | `deleteAccount({ password, captchaToken })` | Tài khoản email: kiểm tra mật khẩu bằng cách đăng nhập lại (kèm captcha). Xóa thư mục `{uid}/` trong `avatars` và `covers` (Storage không tự xóa theo), rồi `rpc('delete_account')` và `auth.signOut({ scope: 'local' })` |
 | auth | `changePassword` | `auth.updateUser({ password })`. Kiểm tra mật khẩu cũ bằng cách đăng nhập lại, hoặc bật "Secure password change" |
 | stories | `getFeaturedStories`, `getEditorPicks` | `curated_stories` (theo `list`, `position`), rồi `story_cards.in('id', …)`. Chưa có truyện chọn tay nào công khai thì lấy tự động: nổi bật là 4 truyện công khai nhiều lượt đọc nhất (rồi cập nhật gần nhất); biên tập chọn là 8 truyện theo `rating_avg`, `rating_count`, `created_at` giảm dần |
 | stories | `getLatestUpdated` / `getNewReleases` | `story_cards` công khai, `order('updated_at' / 'created_at', desc)` |

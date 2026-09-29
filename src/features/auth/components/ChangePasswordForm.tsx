@@ -3,6 +3,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import type { User } from '@/types/user'
 import { authErrorMessage, useChangePassword } from '../hooks'
 import { changePasswordSchema, type ChangePasswordValues } from '../schemas'
+import { useCaptcha } from '../useCaptcha'
 import { FormAlert } from './FormAlert'
 import { FormField } from './FormField'
 import { PasswordInput } from './PasswordInput'
@@ -13,12 +14,13 @@ const providerName = { google: 'Google', facebook: 'Facebook' } as const
 
 export function ChangePasswordForm({ user }: { user: User }) {
   const change = useChangePassword()
+  const captcha = useCaptcha()
   const {
     register,
     control,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<ChangePasswordValues>({
     resolver: zodResolver(changePasswordSchema),
     mode: 'onTouched',
@@ -34,9 +36,14 @@ export function ChangePasswordForm({ user }: { user: User }) {
     )
   }
 
-  const onSubmit = handleSubmit(({ currentPassword, password }) =>
-    change.mutate({ currentPassword, newPassword: password }, { onSuccess: () => reset() }),
-  )
+  const onSubmit = handleSubmit(async ({ currentPassword, password }) => {
+    const captchaToken = await captcha.token()
+    if (captchaToken === null) return
+    change.mutate(
+      { currentPassword, newPassword: password, captchaToken },
+      { onSuccess: () => reset(), onSettled: captcha.reset },
+    )
+  })
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
@@ -68,8 +75,9 @@ export function ChangePasswordForm({ user }: { user: User }) {
           <PasswordInput {...c} {...register('confirmPassword')} autoComplete="new-password" />
         )}
       </FormField>
+      {captcha.element}
       <div className="sm:w-48">
-        <SubmitButton pending={change.isPending} pendingLabel="Đang lưu…">
+        <SubmitButton pending={change.isPending || isSubmitting} pendingLabel="Đang lưu…">
           Đổi mật khẩu
         </SubmitButton>
       </div>

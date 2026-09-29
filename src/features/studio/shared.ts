@@ -10,6 +10,13 @@ export type StudioErrorCode =
   | 'too_many_genres'
   | 'report_already_open'
   | 'story_taken_down'
+  | 'story_limit'
+  | 'chapter_limit'
+
+/** Hạn mức mỗi ngày của tác giả (trigger charge_author của DB; quản trị viên không bị giới hạn) */
+export const STORIES_PER_DAY = 10
+export const CHAPTERS_PER_DAY = 500
+export const CONTENT_BYTES_PER_DAY = 10_000_000
 
 const messages: Record<StudioErrorCode, string> = {
   not_found: 'Không tìm thấy truyện này trong khu Sáng tác của bạn.',
@@ -22,6 +29,8 @@ const messages: Record<StudioErrorCode, string> = {
   too_many_genres: 'Chọn tối đa 5 thể loại.',
   story_taken_down:
     'Truyện đã bị ban quản trị gỡ nên chưa xuất bản lại được. Liên hệ ban quản trị nếu bạn cho rằng đây là nhầm lẫn.',
+  story_limit: `Mỗi ngày chỉ tạo được tối đa ${STORIES_PER_DAY} truyện mới. Thử lại vào ngày mai nhé.`,
+  chapter_limit: `Hôm nay bạn đã đăng hoặc sửa quá nhiều chương (tối đa ${CHAPTERS_PER_DAY} chương mới và khoảng ${CONTENT_BYTES_PER_DAY / 1_000_000} MB nội dung mỗi ngày). Thử lại vào ngày mai nhé.`,
   report_already_open:
     'Bạn đọc này đã gửi lại đúng báo lỗi này và báo lỗi mới vẫn chưa xử lý, nên không mở lại báo lỗi cũ được.',
 }

@@ -16,7 +16,13 @@ import { paths } from '@/lib/routes'
 import { db } from '@/lib/supabase'
 import type { User } from '@/types/user'
 import { safeNext } from './safeNext'
-import { AuthError, type SignUpResult, type SocialProvider, unauthenticated } from './shared'
+import {
+  AuthError,
+  type SignUpResult,
+  type SocialProvider,
+  unauthenticated,
+  type WithCaptcha,
+} from './shared'
 
 type Profile = { id: string; displayName: string; avatarUrl: string | null }
 
@@ -57,6 +63,11 @@ function authError(error: unknown): unknown {
       return new AuthError(
         'banned',
         'Tài khoản đã bị khóa do vi phạm quy định. Liên hệ ban quản trị nếu bạn cho rằng đây là nhầm lẫn.',
+      )
+    case 'captcha_failed':
+      return new AuthError(
+        'captcha_failed',
+        'Chưa xác minh được bạn không phải robot. Tải lại trang rồi thử lại nhé.',
       )
     case 'over_request_rate_limit':
     case 'over_email_send_rate_limit':
@@ -186,21 +197,20 @@ export async function completeAuthRedirect(): Promise<User | null> {
   return getSession()
 }
 
-export async function signInWithPassword(input: { email: string; password: string }) {
+export async function signInWithPassword(input: { email: string; password: string } & WithCaptcha) {
   cachedProfile = null
   const { data, error } = await db().auth.signInWithPassword({
     email: normalizeEmail(input.email),
     password: input.password,
+    options: { captchaToken: input.captchaToken },
   })
   if (error) throw authError(error)
   return userOf(data.session)
 }
 
-export async function signUp(input: {
-  displayName: string
-  email: string
-  password: string
-}): Promise<SignUpResult> {
+export async function signUp(
+  input: { displayName: string; email: string; password: string } & WithCaptcha,
+): Promise<SignUpResult> {
   cachedProfile = null
   const { data, error } = await db().auth.signUp({
     email: normalizeEmail(input.email),
@@ -208,6 +218,7 @@ export async function signUp(input: {
     options: {
       data: { display_name: input.displayName.trim() },
       emailRedirectTo: `${origin()}${paths.authCallback}`,
+      captchaToken: input.captchaToken,
     },
   })
   if (error) throw authError(error)
@@ -235,9 +246,10 @@ export async function signInWithProvider(provider: SocialProvider): Promise<User
 }
 
 /** Không báo email có tồn tại hay không (Supabase cũng không báo) */
-export async function sendPasswordReset(email: string) {
+export async function sendPasswordReset({ email, captchaToken }: { email: string } & WithCaptcha) {
   const { error } = await db().auth.resetPasswordForEmail(normalizeEmail(email), {
     redirectTo: `${origin()}${paths.resetPassword}`,
+    captchaToken,
   })
   if (error) throw authError(error)
 }
@@ -296,11 +308,14 @@ export async function updateProfile(input: { displayName: string; avatarUrl: str
 }
 
 /** Kiểm tra mật khẩu hiện tại bằng cách đăng nhập lại, rồi mới đổi */
-export async function changePassword(input: { currentPassword: string; newPassword: string }) {
+export async function changePassword(
+  input: { currentPassword: string; newPassword: string } & WithCaptcha,
+) {
   const user = await requireUser()
   const { error: checkError } = await db().auth.signInWithPassword({
     email: user.email,
     password: input.currentPassword,
+    options: { captchaToken: input.captchaToken },
   })
   if (checkError) {
     throw isAuthApiError(checkError) && checkError.code === 'invalid_credentials'
@@ -315,12 +330,16 @@ export async function changePassword(input: { currentPassword: string; newPasswo
  * Xóa hẳn tài khoản đang đăng nhập (RPC delete_account: DB xóa theo truyện, bình luận, tủ truyện...),
  * rồi bỏ phiên trên máy. password: bắt buộc với tài khoản email, kiểm tra bằng cách đăng nhập lại.
  */
-export async function deleteAccount(password: string | null) {
+export async function deleteAccount({
+  password,
+  captchaToken,
+}: { password: string | null } & WithCaptcha) {
   const user = await requireUser()
   if (user.provider === 'email') {
     const { error } = await db().auth.signInWithPassword({
       email: user.email,
       password: password ?? '',
+      options: { captchaToken },
     })
     if (error) {
       throw isAuthApiError(error) && error.code === 'invalid_credentials'

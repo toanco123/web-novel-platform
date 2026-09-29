@@ -16,7 +16,7 @@ test('xóa tài khoản xóa truyện của họ khỏi tủ truyện và bình 
   await addComment(story.slug, 'Demo bình luận truyện của Linh')
 
   signInAs(linh)
-  await deleteAccount('matkhau123')
+  await deleteAccount({ password: 'matkhau123' })
 
   expect(await getStory(story.slug)).toBeNull()
   signInAs('demo')

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { ImageLimitError } from '@/lib/image'
 import { StorageFullError } from '@/lib/mockStorage'
 import type { User } from '@/types/user'
 import * as api from './api'
@@ -102,6 +103,11 @@ export const useUpdatePassword = () => useMutation({ mutationFn: api.updatePassw
 
 /** Thông báo lỗi hiển thị cho người dùng từ lỗi bất kỳ của các hàm auth */
 export function authErrorMessage(error: unknown) {
-  if (error instanceof api.AuthError || error instanceof StorageFullError) return error.message
+  if (
+    error instanceof api.AuthError ||
+    error instanceof StorageFullError ||
+    error instanceof ImageLimitError
+  )
+    return error.message
   return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'
 }

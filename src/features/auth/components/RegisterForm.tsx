@@ -9,6 +9,7 @@ import { paths } from '@/lib/routes'
 import { authErrorMessage, useSignUp } from '../hooks'
 import { registerSchema, type RegisterValues } from '../schemas'
 import { useAuthRedirect } from '../useAuthRedirect'
+import { useCaptcha } from '../useCaptcha'
 import { FormAlert } from './FormAlert'
 import { authInputClass, FormField } from './FormField'
 import { PasswordInput } from './PasswordInput'
@@ -19,12 +20,13 @@ import { SubmitButton } from './SubmitButton'
 export function RegisterForm() {
   const { goNext } = useAuthRedirect()
   const signUp = useSignUp()
+  const captcha = useCaptcha()
   const [confirmEmail, setConfirmEmail] = useState<string | null>(null)
   const {
     register,
     control,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
     mode: 'onTouched',
@@ -38,17 +40,20 @@ export function RegisterForm() {
   })
   const password = useWatch({ control, name: 'password' })
 
-  const onSubmit = handleSubmit(({ displayName, email, password }) =>
+  const onSubmit = handleSubmit(async ({ displayName, email, password }) => {
+    const captchaToken = await captcha.token()
+    if (captchaToken === null) return
     signUp.mutate(
-      { displayName, email, password },
+      { displayName, email, password, captchaToken },
       {
         onSuccess: (result) => {
           if (result.needsEmailConfirmation) setConfirmEmail(email)
           else goNext()
         },
+        onSettled: captcha.reset,
       },
-    ),
-  )
+    )
+  })
 
   if (confirmEmail) return <CheckEmail email={confirmEmail} />
 
@@ -137,7 +142,8 @@ export function RegisterForm() {
           )}
         </div>
 
-        <SubmitButton pending={signUp.isPending} pendingLabel="Đang tạo tài khoản…">
+        {captcha.element}
+        <SubmitButton pending={signUp.isPending || isSubmitting} pendingLabel="Đang tạo tài khoản…">
           Tạo tài khoản
         </SubmitButton>
       </form>

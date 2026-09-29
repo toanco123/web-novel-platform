@@ -6,6 +6,7 @@ import { paths } from '@/lib/routes'
 import { authErrorMessage, useSignIn } from '../hooks'
 import { loginSchema, type LoginValues } from '../schemas'
 import { useAuthRedirect } from '../useAuthRedirect'
+import { useCaptcha } from '../useCaptcha'
 import { FormAlert } from './FormAlert'
 import { authInputClass, FormField } from './FormField'
 import { PasswordInput } from './PasswordInput'
@@ -15,17 +16,22 @@ import { SubmitButton } from './SubmitButton'
 export function LoginForm() {
   const { goNext } = useAuthRedirect()
   const signIn = useSignIn()
+  const captcha = useCaptcha()
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     mode: 'onTouched',
     defaultValues: { email: '', password: '' },
   })
 
-  const onSubmit = handleSubmit((values) => signIn.mutate(values, { onSuccess: goNext }))
+  const onSubmit = handleSubmit(async (values) => {
+    const captchaToken = await captcha.token()
+    if (captchaToken === null) return
+    signIn.mutate({ ...values, captchaToken }, { onSuccess: goNext, onSettled: captcha.reset })
+  })
 
   return (
     <div className="space-y-6">
@@ -61,7 +67,8 @@ export function LoginForm() {
             <PasswordInput {...control} {...register('password')} autoComplete="current-password" />
           )}
         </FormField>
-        <SubmitButton pending={signIn.isPending} pendingLabel="Đang đăng nhập…">
+        {captcha.element}
+        <SubmitButton pending={signIn.isPending || isSubmitting} pendingLabel="Đang đăng nhập…">
           Đăng nhập
         </SubmitButton>
       </form>

@@ -11,6 +11,14 @@ export class CoverError extends Error {
   }
 }
 
+/** Vượt hạn mức ảnh tải lên của Storage (policy images_insert_own; quản trị viên không bị giới hạn) */
+export class ImageLimitError extends CoverError {
+  constructor() {
+    super('Bạn đã tải lên quá nhiều ảnh (tối đa 30 ảnh mỗi ngày, 300 ảnh tất cả). Thử lại sau nhé.')
+    this.name = 'ImageLimitError'
+  }
+}
+
 export function validateCoverFile(file: File) {
   if (!COVER_TYPES.includes(file.type)) throw new CoverError('Chỉ nhận ảnh JPG, PNG hoặc WebP.')
   if (file.size > COVER_MAX_BYTES) throw new CoverError('Ảnh tối đa 2 MB. Chọn ảnh nhỏ hơn nhé.')

@@ -1,6 +1,7 @@
 // Ảnh bìa và ảnh đại diện trên Supabase Storage (chỉ dùng trong các api.remote.ts).
 // prepareCover/prepareAvatar (src/lib/image.ts) trả data URL; ở đây đổi sang file và upload vào
 // {user_id}/{uuid}.webp. Tên file ngẫu nhiên nên đổi ảnh không bị cache ảnh cũ.
+import { ImageLimitError } from './image'
 import { db } from './supabase'
 
 export type ImageBucket = 'covers' | 'avatars'
@@ -26,7 +27,8 @@ export async function uploadImage(bucket: ImageBucket, userId: string, dataUrl: 
   const { error } = await db()
     .storage.from(bucket)
     .upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false })
-  if (error) throw error
+  // Luôn ghi vào thư mục của chính mình nên bị RLS chặn nghĩa là vượt hạn mức ảnh
+  if (error) throw /row-level security/i.test(error.message) ? new ImageLimitError() : error
   return path
 }
 

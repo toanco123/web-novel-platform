@@ -7,6 +7,7 @@ import { paths } from '@/lib/routes'
 import type { User } from '@/types/user'
 import { authErrorMessage, useDeleteAccount } from '../hooks'
 import { deleteAccountSchema, type DeleteAccountValues } from '../schemas'
+import { useCaptcha } from '../useCaptcha'
 import { FormAlert } from './FormAlert'
 import { authInputClass, FormField } from './FormField'
 import { PasswordInput } from './PasswordInput'
@@ -20,25 +21,33 @@ export function DeleteAccountForm({ user }: { user: User }) {
   const navigate = useNavigate()
   const { data: stories = [] } = useMyStories()
   const hasPassword = user.provider === 'email'
+  // Chỉ tài khoản email phải kiểm tra lại mật khẩu (đăng nhập lại) nên mới cần captcha
+  const captcha = useCaptcha()
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<DeleteAccountValues>({
     resolver: zodResolver(deleteAccountSchema(user)),
     mode: 'onTouched',
     defaultValues: { password: '', confirm: '' },
   })
 
-  const onSubmit = handleSubmit(({ password }) =>
-    remove.mutate(hasPassword ? password : null, {
-      onSuccess: () =>
-        navigate(paths.home, {
-          replace: true,
-          state: { accountDeleted: true } satisfies AccountDeletedState,
-        }),
-    }),
-  )
+  const onSubmit = handleSubmit(async ({ password }) => {
+    const captchaToken = hasPassword ? await captcha.token() : undefined
+    if (captchaToken === null) return
+    remove.mutate(
+      { password: hasPassword ? password : null, captchaToken },
+      {
+        onSuccess: () =>
+          navigate(paths.home, {
+            replace: true,
+            state: { accountDeleted: true } satisfies AccountDeletedState,
+          }),
+        onSettled: captcha.reset,
+      },
+    )
+  })
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
@@ -83,8 +92,13 @@ export function DeleteAccountForm({ user }: { user: User }) {
           )}
         </FormField>
       )}
+      {hasPassword && captcha.element}
       <div className="sm:w-60">
-        <SubmitButton pending={remove.isPending} pendingLabel="Đang xóa…" variant="destructive">
+        <SubmitButton
+          pending={remove.isPending || isSubmitting}
+          pendingLabel="Đang xóa…"
+          variant="destructive"
+        >
           Xóa tài khoản vĩnh viễn
         </SubmitButton>
       </div>
