@@ -23,7 +23,9 @@ export function FormField({ id, label, error, labelAside, below, children }: Pro
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={id}>{label}</Label>
+        <Label id={`${id}-label`} htmlFor={id}>
+          {label}
+        </Label>
         {labelAside}
       </div>
       {children({ id, 'aria-invalid': !!error, 'aria-describedby': error ? errorId : undefined })}

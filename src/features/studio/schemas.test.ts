@@ -44,3 +44,26 @@ test('số chương trong trình soạn: số nguyên từ 1, không trùng chư
   expect(message(2.5)).toBe('Số chương phải là số nguyên')
   expect(message(Number.NaN)).toBe('Nhập số chương')
 })
+
+test('nội dung có định dạng: đếm độ dài trên chữ nhìn thấy và lưu HTML đã làm sạch', () => {
+  const schema = chapterFormSchema([])
+  const words = 'Nội dung chương. '.repeat(5)
+  // 85 ký tự chữ, thẻ định dạng không được tính cho đủ 100
+  expect(
+    schema.safeParse({ number: 1, title: '', content: `<p><strong>${words}</strong></p>` }).error
+      ?.issues[0]?.message,
+  ).toBe('Nội dung chương cần ít nhất 100 ký tự')
+
+  const long = 'Nội dung chương. '.repeat(10)
+  expect(
+    schema.parse({
+      number: 1,
+      title: '',
+      content: `<p onclick="x()"><b>${long}</b><script>alert(1)</script></p><p></p>`,
+    }).content,
+  ).toBe(`<p><strong>${long.trim()}</strong></p>`)
+  // Văn bản thuần (vd dán từ bản cũ) cũng được đổi sang HTML
+  expect(schema.parse({ number: 1, title: '', content: long }).content).toBe(
+    `<p>${long.trim()}</p>`,
+  )
+})

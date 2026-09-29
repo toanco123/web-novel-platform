@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { History } from 'lucide-react'
 import { useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useController, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FormAlert } from '@/features/auth/components/FormAlert'
@@ -78,6 +78,7 @@ export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props
     defaultValues: loaded,
   })
   const values = useWatch({ control }) as ChapterFormValues
+  const { field: contentField } = useController({ control, name: 'content' })
   const autosave = useEditorAutosave(
     `editor-draft:${story.id}:${chapter?.number ?? 'new'}`,
     values,
@@ -162,8 +163,7 @@ export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props
         <ChapterFields
           idPrefix="chapter"
           titleField={register('title')}
-          contentField={register('content')}
-          contentValue={values.content}
+          contentField={contentField}
           errors={{ title: errors.title?.message, content: errors.content?.message }}
         />
       </div>
