@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom/vitest'
+import 'fake-indexeddb/auto'
+import { IDBFactory } from 'fake-indexeddb'
+import { resetOfflineDatabase } from '@/features/offline/store'
+import { goOnline } from './offline'
 
 // jsdom thiếu một số API mà Radix UI dùng (menu, dropdown)
 Element.prototype.hasPointerCapture ??= () => false
@@ -29,3 +33,10 @@ const emptyRects = () => Object.assign([], { item: () => null }) as unknown as D
 Range.prototype.getBoundingClientRect ??= emptyRect
 Range.prototype.getClientRects ??= emptyRects
 document.elementFromPoint ??= () => null
+
+// Kho chương đọc offline (IndexedDB): mỗi test một kho trống; hết test thì có mạng lại
+beforeEach(async () => {
+  await resetOfflineDatabase()
+  vi.stubGlobal('indexedDB', new IDBFactory())
+})
+afterEach(() => goOnline())
