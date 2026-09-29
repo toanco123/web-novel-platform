@@ -34,3 +34,12 @@ const dateFormat = new Intl.DateTimeFormat('vi-VN', {
 export function formatDate(iso: string) {
   return dateFormat.format(new Date(iso))
 }
+
+const decimal = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 })
+
+/** Dung lượng: 870400 → "850 KB", 1310720 → "1,3 MB" */
+export function formatBytes(bytes: number) {
+  if (bytes === 0) return '0 KB'
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${decimal.format(bytes / (1024 * 1024))} MB`
+}

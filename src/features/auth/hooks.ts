@@ -8,8 +8,14 @@ export const authKeys = {
   session: ['auth', 'session'] as const,
 }
 
+/** networkMode 'always': phiên đọc trên máy, mở app lúc offline vẫn biết ai đang đăng nhập */
 export const useSession = () =>
-  useQuery({ queryKey: authKeys.session, queryFn: api.getSession, staleTime: Infinity })
+  useQuery({
+    queryKey: authKeys.session,
+    queryFn: api.getSession,
+    staleTime: Infinity,
+    networkMode: 'always',
+  })
 
 /** Tải lại phiên khi đăng nhập/đăng xuất xảy ra ngoài các hook ở đây (tab khác, link email, hết hạn) */
 export function useAuthSync() {

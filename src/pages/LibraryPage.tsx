@@ -8,10 +8,11 @@ import { useSession } from '@/features/auth/hooks'
 import { FollowingList } from '@/features/library/components/FollowingList'
 import { HistoryList } from '@/features/library/components/HistoryList'
 import { useLibraryUpdateCount } from '@/features/library/hooks'
+import { SavedList } from '@/features/offline/components/SavedList'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
 
-type Tab = 'following' | 'history'
+type Tab = 'following' | 'history' | 'saved'
 
 export default function LibraryPage() {
   const { data: user, isPending } = useSession()
@@ -20,11 +21,14 @@ export default function LibraryPage() {
   const current = useCurrentPath()
 
   if (isPending) return <PageLoader />
+  const requested = params.get('tab')
   // Khách mặc định xem lịch sử (tab theo dõi cần tài khoản)
   const tab: Tab =
-    params.get('tab') === 'history' || (!user && params.get('tab') !== 'following')
-      ? 'history'
-      : 'following'
+    requested === 'saved'
+      ? 'saved'
+      : requested === 'history' || (!user && requested !== 'following')
+        ? 'history'
+        : 'following'
 
   return (
     <Container className="py-10">
@@ -33,7 +37,7 @@ export default function LibraryPage() {
         <div>
           <h1 className="font-heading text-4xl font-semibold">Tủ truyện</h1>
           <p className="mt-1 text-muted-foreground">
-            Truyện bạn theo dõi và những chương đang đọc dở.
+            Truyện bạn theo dõi, những chương đang đọc dở và chương đã lưu để đọc offline.
           </p>
         </div>
         <SegmentedLinks
@@ -62,12 +66,20 @@ export default function LibraryPage() {
               active: tab === 'history',
               label: 'Lịch sử đọc',
             },
+            {
+              key: 'saved',
+              to: { search: '?tab=saved' },
+              active: tab === 'saved',
+              label: 'Đã lưu',
+            },
           ]}
         />
       </div>
 
       <div className="mt-8">
-        {tab === 'history' ? (
+        {tab === 'saved' ? (
+          <SavedList />
+        ) : tab === 'history' ? (
           <>
             {!user && (
               <p className="mb-4 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
