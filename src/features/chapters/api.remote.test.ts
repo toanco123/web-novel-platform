@@ -4,7 +4,13 @@
 // tích hợp kiểm tra.
 import { paginate } from '@/lib/pagination'
 import type { Story } from '@/types/story'
-import { getChapter, getChapterList, recordChapterView } from './api.remote'
+import {
+  countChaptersFrom,
+  getChapter,
+  getChapterList,
+  getChapterRange,
+  recordChapterView,
+} from './api.remote'
 import { CHAPTERS_PER_PAGE } from './shared'
 
 /** Một dòng của bảng chapters, kèm slug của truyện (thay cho join stories!inner(slug)) */
@@ -59,6 +65,7 @@ function fakeQuery(table: string) {
 function respond(calls: Call[]) {
   let rows = [...fake.rows]
   let exactCount = false
+  let head = false
   let single = false
   let range: [number, number] | undefined
   let limit = Infinity
@@ -71,6 +78,7 @@ function respond(calls: Call[]) {
         break
       case 'select':
         exactCount = (value as { count?: string } | undefined)?.count === 'exact'
+        head = (value as { head?: boolean } | undefined)?.head === true
         break
       case 'eq':
         rows = rows.filter((r) => r[column] === value)
@@ -80,6 +88,9 @@ function respond(calls: Call[]) {
         break
       case 'gt':
         rows = rows.filter((r) => (r[column] as number) > (value as number))
+        break
+      case 'gte':
+        rows = rows.filter((r) => (r[column] as number) >= (value as number))
         break
       case 'order': {
         const sign = (value as { ascending: boolean }).ascending ? 1 : -1
@@ -100,6 +111,8 @@ function respond(calls: Call[]) {
     }
   }
   const total = rows.length
+  // select(..., { count: 'exact', head: true }): chỉ đếm, không trả dòng
+  if (head) return { data: null, count: exactCount ? total : null, error: null }
   // Có đếm tổng mà vị trí bắt đầu vượt quá tổng số dòng: PostgREST trả 416, không kèm tổng
   if (range && exactCount && range[0] > total) {
     return {
@@ -178,28 +191,28 @@ describe('getChapterList', () => {
   })
 })
 
-describe('getChapter', () => {
-  const story: Story = {
-    id: 'story-a',
-    slug: 'truyen-a',
-    title: 'Truyện A',
-    author: { slug: 'tac-gia-u1', name: 'Tác giả A' },
-    genres: [],
-    status: 'ongoing',
-    description: '',
-    coverUrl: null,
-    chapterCount: 3,
-    viewCount: 0,
-    ratingAvg: 0,
-    ratingCount: 0,
-    firstChapterNumber: 1,
-    latestChapter: { number: 7, title: 'Chương 7' },
-    ownerId: 'u1',
-    visibility: 'published',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T07:00:00.000Z',
-  }
+const story: Story = {
+  id: 'story-a',
+  slug: 'truyen-a',
+  title: 'Truyện A',
+  author: { slug: 'tac-gia-u1', name: 'Tác giả A' },
+  genres: [],
+  status: 'ongoing',
+  description: '',
+  coverUrl: null,
+  chapterCount: 3,
+  viewCount: 0,
+  ratingAvg: 0,
+  ratingCount: 0,
+  firstChapterNumber: 1,
+  latestChapter: { number: 7, title: 'Chương 7' },
+  ownerId: 'u1',
+  visibility: 'published',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T07:00:00.000Z',
+}
 
+describe('getChapter', () => {
   beforeEach(() => {
     fake.story = story
     // Chương 2 là bản nháp, bỏ trống số 4–6; truyện B có chương cùng số
@@ -215,6 +228,7 @@ describe('getChapter', () => {
         author: story.author,
         status: 'ongoing',
         chapterCount: 3,
+        coverUrl: null,
       },
       number: 3,
       title: 'Chương 3',
@@ -267,5 +281,35 @@ describe('recordChapterView', () => {
     fake.getUserId.mockRejectedValueOnce(new Error('Mất mạng'))
     await expect(recordChapterView('thu-lai', 2)).resolves.toBeUndefined()
     expect(fake.rpc).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('getChapterRange và countChaptersFrom', () => {
+  beforeEach(() => {
+    fake.story = story
+    // Chương 5 là bản nháp, bỏ trống số 3 và 6; truyện B có chương cùng số
+    fake.rows = [1, 2, 4, 7, 8].map((n) => chapter('truyen-a', n))
+    fake.rows.push(chapter('truyen-a', 5, 'draft'), chapter('truyen-b', 4))
+  })
+
+  test('chương từ số `from`, trước/sau theo chương đã xuất bản như getChapter', async () => {
+    const range = await getChapterRange('truyen-a', 3, 2)
+    expect(range.map((c) => [c.prev?.number ?? null, c.number, c.next?.number ?? null])).toEqual([
+      [2, 4, 7],
+      [4, 7, 8],
+    ])
+    expect(range[0]).toEqual(await getChapter('truyen-a', 4))
+    expect((await getChapterRange('truyen-a', 8, 5)).map((c) => c.next)).toEqual([null])
+  })
+
+  test('không thấy truyện, hết chương hoặc count = 0 thì rỗng', async () => {
+    expect(await getChapterRange('khong-co', 1, 5)).toEqual([])
+    expect(await getChapterRange('truyen-a', 9, 5)).toEqual([])
+    expect(await getChapterRange('truyen-a', 1, 0)).toEqual([])
+  })
+
+  test('countChaptersFrom chỉ đếm chương đã xuất bản có số ≥ from', async () => {
+    expect(await countChaptersFrom('truyen-a', 3)).toBe(3)
+    expect(await countChaptersFrom('truyen-a', 9)).toBe(0)
   })
 })

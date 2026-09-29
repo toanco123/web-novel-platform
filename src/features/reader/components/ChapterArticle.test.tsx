@@ -10,6 +10,7 @@ const chapter = (content: string): ChapterContent => ({
     author: { slug: 'tac-gia', name: 'Tác giả' },
     status: 'ongoing',
     chapterCount: 1,
+    coverUrl: null,
   },
   number: 1,
   title: 'Mở đầu',

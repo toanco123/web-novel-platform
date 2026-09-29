@@ -7,6 +7,7 @@ export const chapterKeys = {
   list: (slug: string, page: number, order: ChapterOrder) =>
     ['chapters', slug, 'list', page, order] as const,
   detail: (slug: string, number: number) => ['chapters', slug, 'detail', number] as const,
+  countFrom: (slug: string, from: number) => ['chapters', slug, 'count-from', from] as const,
 }
 
 export const useChapterList = (slug: string, page: number, order: ChapterOrder) =>
@@ -33,6 +34,13 @@ export function usePrefetchChapter(slug: string, number: number | undefined) {
     })
   }, [queryClient, slug, number])
 }
+
+/** Số chương đã xuất bản từ chương `from` trở đi (hộp thoại tải về đọc offline) */
+export const useChapterCountFrom = (slug: string, from: number) =>
+  useQuery({
+    queryKey: chapterKeys.countFrom(slug, from),
+    queryFn: () => api.countChaptersFrom(slug, from),
+  })
 
 /** Tính 1 lượt đọc khi mở chương */
 export function useRecordChapterView(slug: string, number: number | undefined) {
