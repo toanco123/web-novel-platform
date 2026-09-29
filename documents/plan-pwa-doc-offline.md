@@ -15,9 +15,10 @@ Người đọc hay đọc trên điện thoại, lúc mạng yếu hoặc mất
 
 ## 1. Cài ứng dụng và khung app offline
 - Thêm `vite-plugin-pwa` (chế độ `generateSW`, Workbox).
-- **Manifest:** `name`/`short_name` từ `SITE_NAME`, `display: standalone`, `start_url: /`, `background_color`/`theme_color` lấy màu nền theme tối (`#1a0f1d`). Icon PNG 192, 512 và 512 maskable, `apple-touch-icon` 180, sinh từ `public/favicon.svg` (bằng `@vite-pwa/assets-generator`, dev dependency). `index.html` thêm `theme-color` và `apple-touch-icon`.
+- **Manifest:** `name`/`short_name` từ `SITE_NAME`, `display: standalone`, `start_url: /`, `background_color`/`theme_color` lấy màu nền theme tối (`#1a0f1d`). Icon PNG 64, 192, 512 và 512 maskable, `apple-touch-icon` 180, `favicon.ico`, sinh từ `public/favicon.svg` (bằng `@vite-pwa/assets-generator`, dev dependency, lệnh `npm run generate-pwa-assets`; file PNG được commit). `favicon.svg` hiện là logo mặc định của Vite nên được thay bằng icon riêng của web (sách mở màu vàng hồng, dải đánh dấu hồng neon trên nền tím mận). `index.html` thêm `theme-color` và `apple-touch-icon`.
 - **Precache:** `index.html`, CSS, JS của layout, trang đọc, tủ truyện, trang chi tiết truyện và các trang thường; font Literata/Be Vietnam Pro chỉ bộ `latin` và `vietnamese`. **Không** precache chunk khu quản trị (antd, `@ant-design/plots`) và Sáng tác (Tiptap): các khu này chỉ dùng khi có mạng. Nếu tên chunk không đủ ổn định để lọc bằng `globIgnores` thì đặt tên chunk qua cấu hình build.
 - **Điều hướng offline:** `navigateFallback: /index.html`, mở thẳng link chương khi offline vẫn vào app.
+- **Lỗi mở trang:** các route gốc có `ErrorBoundary` chung (`RouteError`): không tải được file JS của trang (mở khu Sáng tác/Quản trị lúc offline, hoặc web vừa lên bản mới) thì hiện "Bạn đang offline, trang này cần có mạng" (kèm link truyện đã lưu) hoặc "Không mở được trang này" + "Tải lại trang", thay cho màn hình lỗi mặc định của React Router.
 - **Ảnh bìa (Supabase Storage):** runtime cache `CacheFirst` cho `/storage/v1/object/public/`, tối đa 200 ảnh, 30 ngày, nhận cả response opaque (`statuses: [0, 200]`). Request tới REST/Auth của Supabase **không** qua cache service worker.
 - `StoryCover`: ảnh lỗi (offline, chưa cache) thì chuyển sang bìa chữ tự sinh (`onError`).
 - **Cập nhật phiên bản:** `registerType: 'prompt'`, không tự tải lại trang (tránh mất chỗ đang đọc). Có bản mới thì hiện thông báo nổi "Có phiên bản mới" + nút "Cập nhật"; không bấm thì lần mở app sau dùng bản mới. Phần đăng ký service worker và thông báo này nằm ở `src/app/pwa.tsx`, gắn trong `main.tsx` (ngoài `Providers`) để test không đụng tới module ảo `virtual:pwa-register`.
@@ -26,8 +27,9 @@ Người đọc hay đọc trên điện thoại, lúc mạng yếu hoặc mất
 - Dev server và Vitest: service worker tắt (`devOptions.enabled: false`).
 
 ## 2. Kho chương trên máy (`src/features/offline/`)
-- IndexedDB qua thư viện `idb`. Database `offline-reading`, store `chapters`, khóa `${slug}#${number}`, index theo `slug`.
-- Bản ghi: `{ id, slug, number, chapter: ChapterContent, bytes, pinned, savedAt, readAt: string | null, progress: number | null }`.
+- IndexedDB qua thư viện `idb`. Database `offline-reading`, khóa `${slug}#${number}`, hai store:
+  - `chapters`: thông tin chương `{ id, slug, number, meta: ChapterContent trừ content, bytes, pinned: 0 | 1, savedAt, readAt, usedAt, progress }`, index `bySlug` và `byUse` (`[pinned, usedAt]`, để dọn kho chỉ đọc khóa, không nạp nội dung);
+  - `contents`: nội dung chương. Liệt kê/dọn kho chỉ đọc store `chapters` (nhỏ), kể cả khi đã tải về hàng nghìn chương.
 - `ChapterContent.story` thêm `coverUrl: string | null` (bản mock và remote) để tab "Đã lưu" có bìa.
 - Kho dùng chung cho cả máy, **không** tách theo tài khoản (nội dung chương công khai, như cache trình duyệt). Đăng xuất không xóa; có nút "Xóa tất cả".
 - Hàm của kho (`store.ts`): lấy một chương, lưu nhiều chương (`pinned` hay không), ghi `readAt`/`progress`, số chương đã lưu của một truyện, danh sách truyện đã lưu, xóa một truyện, xóa tất cả, tổng dung lượng.
@@ -76,10 +78,12 @@ Người đọc hay đọc trên điện thoại, lúc mạng yếu hoặc mất
 - **Banner offline** trong `MainLayout`, dưới header: "Bạn đang offline. Xem truyện đã lưu →". Các trang cần mạng giữ nguyên trạng thái chờ hiện có.
 - **Trang đọc** (không có banner):
   - Mục lục (`ReaderChapterIndex`) không tải được khi offline → "Đang offline, các chương đã lưu:" + danh sách chương trong kho của truyện.
-  - Bình luận chương: offline và chưa có dữ liệu thì hiện "Cần có mạng để xem bình luận"; ô gửi bình luận và nút "Báo lỗi chương" bị khóa khi offline.
+  - Bình luận chương: offline thì thay cả khu bình luận bằng dòng "Cần có mạng để xem và gửi bình luận chương N"; nút "Báo lỗi chương" bị khóa khi offline.
+- **Phiên đăng nhập khi offline:** query `useSession` đặt `networkMode: 'always'` (đọc phiên trên máy, không bị dừng khi offline). Bản Supabase lưu hồ sơ lần trước (`auth-profile` trong localStorage); mở app lúc offline mà không tải được hồ sơ thì dùng bản này để vẫn nhận đúng tài khoản.
 
 ## 8. Đồng bộ lịch sử đọc
 Chỉ bản remote cho người đã đăng nhập (bản mock và lịch sử của khách vốn lưu trên máy).
+- Mutation `useSaveReadingProgress` đặt `networkMode: 'always'` (mặc định mutation bị dừng khi offline nên không tới được hàng chờ).
 - `saveReadingProgress` gặp lỗi mạng → ghi hàng chờ `features/library/pendingProgress.ts` (localStorage `reading-progress-pending`, tách theo `userId`, mỗi truyện giữ lần mới nhất) và vẫn trả `ReadingProgress` như đã lưu, để lịch sử và "Đọc tiếp" trên máy cập nhật ngay.
 - Component `OfflineSync` (cạnh `AuthSync` trong `Providers`): gửi hàng chờ của người đang đăng nhập khi mở app, khi có sự kiện `online` và khi đổi phiên. Gửi lần lượt qua RPC `save_reading_progress`, thành công thì xóa mục đó, lỗi mạng thì dừng chờ lần sau. Hàng chờ của tài khoản khác nằm yên tới khi tài khoản đó đăng nhập lại.
 - Bản gửi sau thắng: nếu đồng thời đọc truyện đó trên máy khác, lần đồng bộ có thể ghi đè vị trí mới hơn. Chấp nhận ở đợt này (muốn tránh phải thêm thời điểm đọc vào RPC).
