@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthSync } from '@/features/auth/components/AuthSync'
+import { OfflineSync } from '@/features/library/components/OfflineSync'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +25,7 @@ export function Providers({
   return (
     <QueryClientProvider client={client}>
       <AuthSync />
+      <OfflineSync />
       <TooltipProvider>{children}</TooltipProvider>
       <Toaster position="bottom-center" />
     </QueryClientProvider>

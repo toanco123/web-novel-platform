@@ -7,6 +7,7 @@ import type { PostgrestError } from '@supabase/supabase-js'
 import { getUserId, requireUserId, unauthenticated } from '@/features/auth/api'
 import { storiesByIds, storiesBySlugs, storyIdBySlug } from '@/features/stories/cards.remote'
 import { businessCode, isUniqueViolation, unwrap } from '@/lib/dbError'
+import { isNetworkError } from '@/lib/network'
 import { db } from '@/lib/supabase'
 import type { Tables } from '@/types/database'
 import type { HistoryItem, LibraryItem, ReadingProgress } from '@/types/library'
@@ -16,6 +17,7 @@ import {
   removeGuestHistory,
   saveGuestProgress,
 } from './guestHistory'
+import { dropPending, pendingProgress, queueProgress } from './pendingProgress'
 import { HISTORY_LIMIT, type ProgressInput } from './shared'
 
 type HistoryRow = Pick<
@@ -248,20 +250,59 @@ export function saveReadingProgress(input: ProgressInput): Promise<ReadingProgre
 async function writeProgress(input: ProgressInput, previous: Promise<unknown>) {
   // Biết chủ lịch sử ngay lúc gọi, rồi mới chờ tới lượt: đăng xuất trong lúc chờ thì lần ghi này
   // không bị tính thành lịch sử của khách
-  const userId = await historyOwner()
+  const userId = await getUserId()
   await previous
   if (!userId) return saveGuestProgress(input)
-  const row = unwrap(
-    await db().rpc('save_reading_progress', {
-      p_slug: input.slug,
-      p_chapter: input.chapter,
-      p_chapter_title: input.chapterTitle,
-      // Bỏ trống thì RPC nhận null: giữ vị trí cũ nếu vẫn chương đó
-      p_progress: input.progress,
-    }),
-    rpcError,
-  )
-  return toProgress(input.slug, row)
+  try {
+    await mergeGuestHistory()
+    const row = unwrap(
+      await db().rpc('save_reading_progress', {
+        p_slug: input.slug,
+        p_chapter: input.chapter,
+        p_chapter_title: input.chapterTitle,
+        // Bỏ trống thì RPC nhận null: giữ vị trí cũ nếu vẫn chương đó
+        p_progress: input.progress,
+      }),
+      rpcError,
+    )
+    // Lần ghi này mới hơn mục đang chờ (nếu có) của truyện
+    dropPending(userId, input.slug)
+    return toProgress(input.slug, row)
+  } catch (error) {
+    // Mất mạng: giữ trên máy, có mạng lại thì syncPendingProgress gửi lên
+    if (!isNetworkError(error)) throw error
+    return queueProgress(userId, input)
+  }
+}
+
+/**
+ * Gửi các chỗ đọc ghi lúc mất mạng của người đang đăng nhập, cũ trước mới sau; trả số mục đã gửi.
+ * Chạy nối đuôi các lần ghi khác (lastSave) để không ghi đè lần ghi mới hơn.
+ */
+export function syncPendingProgress(): Promise<number> {
+  const sync = sendPending(lastSave)
+  lastSave = sync.catch(() => undefined)
+  return sync
+}
+
+async function sendPending(previous: Promise<unknown>) {
+  const userId = await getUserId()
+  await previous
+  if (!userId) return 0
+  let sent = 0
+  for (const entry of pendingProgress(userId)) {
+    const { error } = await db().rpc('save_reading_progress', {
+      p_slug: entry.slug,
+      p_chapter: entry.chapter,
+      p_chapter_title: entry.chapterTitle,
+      p_progress: entry.progress,
+    })
+    // Mất mạng hay phiên hết hạn: để lần sau. Lỗi khác (truyện đã bị gỡ...) gửi lại cũng lỗi: bỏ
+    if (error && (isNetworkError(error) || businessCode(error) === 'unauthenticated')) break
+    dropPending(userId, entry.slug, entry.readAt)
+    if (!error) sent++
+  }
+  return sent
 }
 
 export async function removeFromHistory(slug: string): Promise<void> {

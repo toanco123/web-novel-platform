@@ -2,8 +2,14 @@
 // fake.respond quyết định theo chuỗi lệnh đã ghi (from/rpc, select, eq, in...). Ở đây chỉ kiểm phần
 // chạy trên máy: thứ tự ghi chỗ đọc, gộp lịch sử khách, lọc dòng hỏng và chia bộ lọc .in(); RLS,
 // trigger và RPC trên database thật do lượt test tích hợp kiểm tra.
-import { getLibrary, getLibraryUpdateCount, saveReadingProgress } from './api.remote'
+import {
+  getLibrary,
+  getLibraryUpdateCount,
+  saveReadingProgress,
+  syncPendingProgress,
+} from './api.remote'
 import { loadGuestHistory } from './guestHistory'
+import { pendingProgress, queueProgress } from './pendingProgress'
 
 type Call = [method: string, ...args: unknown[]]
 type Response = { data: unknown; error: unknown }
@@ -252,4 +258,62 @@ test('tủ truyện: theo dõi nhiều truyện thì chia id thành nhiều truy
     fake.queries.filter(([[, name]]) => name === table).map((calls) => inValues(calls).length)
   expect(chunkSizes('story_cards')).toEqual([100, 100, 50])
   expect(chunkSizes('reading_history')).toEqual([100, 100, 50])
+})
+
+const offline = { data: null, error: { message: 'TypeError: Failed to fetch', code: '' } }
+
+test('ghi chỗ đọc lúc mất mạng: vào hàng chờ, trả về như đã lưu', async () => {
+  fake.userId = USER
+  fake.respond = () => offline
+  await expect(
+    saveReadingProgress({ slug: 'mua-ha', chapter: 5, chapterTitle: 'Chương 5', progress: 0.4 }),
+  ).resolves.toMatchObject({ slug: 'mua-ha', chapter: 5, progress: 0.4 })
+  // Mở lại đúng chương đó (không kèm vị trí): giữ vị trí đang chờ, như RPC
+  await expect(
+    saveReadingProgress({ slug: 'mua-ha', chapter: 5, chapterTitle: 'Chương 5' }),
+  ).resolves.toMatchObject({ progress: 0.4 })
+  expect(pendingProgress(USER)).toMatchObject([{ slug: 'mua-ha', chapter: 5, progress: 0.4 }])
+})
+
+test('có mạng lại: gửi hàng chờ cũ trước, gửi được thì xóa', async () => {
+  queueProgress(USER, { slug: 'a', chapter: 1, chapterTitle: 'Chương 1', progress: 0.2 })
+  await new Promise((resolve) => setTimeout(resolve, 2))
+  queueProgress(USER, { slug: 'b', chapter: 3, chapterTitle: 'Chương 3' })
+  fake.userId = USER
+  fake.respond = () => ok(historyRow(1, 0.2))
+
+  await expect(syncPendingProgress()).resolves.toBe(2)
+  expect(rpcCalls('save_reading_progress').map((calls) => calls[0][2])).toEqual([
+    { p_slug: 'a', p_chapter: 1, p_chapter_title: 'Chương 1', p_progress: 0.2 },
+    { p_slug: 'b', p_chapter: 3, p_chapter_title: 'Chương 3', p_progress: undefined },
+  ])
+  expect(pendingProgress(USER)).toEqual([])
+})
+
+test('gửi hàng chờ: vẫn mất mạng thì giữ; lỗi khác (truyện đã bị gỡ) thì bỏ mục đó', async () => {
+  queueProgress(USER, { slug: 'a', chapter: 1, chapterTitle: 'Chương 1' })
+  fake.userId = USER
+  fake.respond = () => offline
+  await expect(syncPendingProgress()).resolves.toBe(0)
+  expect(pendingProgress(USER)).toHaveLength(1)
+
+  fake.respond = () => ({ data: null, error: { code: 'P0001', message: 'not_found' } })
+  await syncPendingProgress()
+  expect(pendingProgress(USER)).toEqual([])
+})
+
+test('hàng chờ tách theo tài khoản: người khác đăng nhập không gửi hàng chờ của người trước', async () => {
+  queueProgress('u-a', { slug: 'a', chapter: 1, chapterTitle: 'Chương 1' })
+  fake.userId = 'u-b'
+  await expect(syncPendingProgress()).resolves.toBe(0)
+  expect(rpcCalls('save_reading_progress')).toEqual([])
+  expect(pendingProgress('u-a')).toHaveLength(1)
+})
+
+test('ghi được lên máy chủ thì bỏ mục đang chờ (cũ hơn) của truyện đó', async () => {
+  queueProgress(USER, { slug: 'mua-ha', chapter: 2, chapterTitle: 'Chương 2' })
+  fake.userId = USER
+  fake.respond = () => ok(historyRow(6, 0))
+  await saveReadingProgress({ slug: 'mua-ha', chapter: 6, chapterTitle: 'Chương 6' })
+  expect(pendingProgress(USER)).toEqual([])
 })

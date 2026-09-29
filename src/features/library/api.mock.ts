@@ -177,3 +177,8 @@ export async function clearHistory() {
   await delay(300)
   saveHistory(await historyOwner(), [])
 }
+
+/** Bản giả ghi thẳng vào localStorage nên không có gì chờ gửi */
+export async function syncPendingProgress(): Promise<number> {
+  return 0
+}
