@@ -6,12 +6,7 @@ const chunk = (
   facadeModuleId: string | null,
   imports: string[] = [],
   isEntry = false,
-) => ({
-  fileName,
-  facadeModuleId,
-  imports,
-  isEntry,
-})
+) => ({ fileName, facadeModuleId, imports, isEntry, dynamicImports: [] as string[] })
 
 test('giữ chunk vào app và các trang thường cùng chunk chúng import; bỏ khu Quản trị và Sáng tác', () => {
   const files = offlineChunkFiles([
@@ -37,4 +32,17 @@ test('giữ chunk vào app và các trang thường cùng chunk chúng import; b
     'assets/reader.js',
     'assets/vendor.js',
   ])
+})
+
+test('giữ cả chunk import động (vd workbox-window của bản đăng ký service worker), trừ trang cần mạng', () => {
+  const files = offlineChunkFiles([
+    {
+      ...chunk('assets/index.js', '/app/index.html', [], true),
+      dynamicImports: ['assets/workbox-window.js', 'assets/AdminShell.js'],
+    },
+    chunk('assets/workbox-window.js', '/app/node_modules/workbox-window/build/index.mjs'),
+    chunk('assets/AdminShell.js', '/app/src/pages/admin/AdminShell.tsx', ['assets/antd.js']),
+    chunk('assets/antd.js', null),
+  ])
+  expect([...files].sort()).toEqual(['assets/index.js', 'assets/workbox-window.js'])
 })

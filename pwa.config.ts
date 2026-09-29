@@ -7,6 +7,7 @@ import { SITE_NAME, SITE_TAGLINE } from './src/config/site.ts'
 type Chunk = {
   fileName: string
   imports: string[]
+  dynamicImports: string[]
   isEntry: boolean
   facadeModuleId: string | null
 }
@@ -14,15 +15,19 @@ type Chunk = {
 /** Trang chỉ dùng khi có mạng: khu Quản trị (Ant Design, biểu đồ) và Sáng tác (trình soạn Tiptap) */
 const ONLINE_ONLY = /\/src\/pages\/(admin|studio)\//
 
-/** File JS cần để mở app offline: chunk vào app, các trang còn lại và mọi chunk chúng import tĩnh */
+/**
+ * File JS cần để mở app offline: chunk vào app, các trang còn lại và mọi chunk chúng import (tĩnh
+ * và động, vd workbox-window), trừ trang chỉ dùng khi có mạng cùng những gì chỉ chúng dùng
+ */
 export function offlineChunkFiles(chunks: Chunk[]): Set<string> {
   const byFile = new Map(chunks.map((c) => [c.fileName, c]))
   const files = new Set<string>()
   const visit = (file: string) => {
     const chunk = byFile.get(file)
-    if (!chunk || files.has(file)) return
+    if (!chunk || files.has(file) || ONLINE_ONLY.test(chunk.facadeModuleId ?? '')) return
     files.add(file)
     chunk.imports.forEach(visit)
+    chunk.dynamicImports.forEach(visit)
   }
   for (const c of chunks) {
     const id = c.facadeModuleId ?? ''
