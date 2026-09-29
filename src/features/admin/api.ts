@@ -9,4 +9,12 @@ export * from './shared'
 
 const api: typeof mock = supabase ? remote : mock
 
-export const { getAdminOverview, getAdminUsers, getAdminStories } = api
+export const {
+  getAdminOverview,
+  getAdminUsers,
+  getAdminStories,
+  getAdminMessages,
+  setMessageHandled,
+  getAdminReports,
+  setAdminReportStatus,
+} = api

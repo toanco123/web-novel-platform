@@ -56,3 +56,51 @@ test('quản trị viên thấy người dùng mới, truyện nháp và số li
   expect(overview.totals).toMatchObject({ newUsers: 1, viewsInPeriod: 2 })
   expect(overview.totals.draftStories).toBe(1)
 })
+
+test('hộp thư: đọc tin nhắn liên hệ, đánh dấu đã xử lý', async () => {
+  const { sendContactMessage } = await import('@/features/feedback/api')
+  await sendContactMessage({
+    name: 'Lan',
+    email: 'lan@gmail.com',
+    topic: 'bug',
+    message: 'Trang tìm kiếm bị lỗi.',
+  })
+  await registerUser()
+  await expect(admin.getAdminMessages({ status: 'open', page: 1 })).rejects.toBeInstanceOf(
+    admin.AdminError,
+  )
+
+  signInAs('demo')
+  const open = await admin.getAdminMessages({ status: 'open', page: 1 })
+  expect(open.items).toEqual([
+    expect.objectContaining({ name: 'Lan', topic: 'bug', handledAt: null }),
+  ])
+  expect((await admin.getAdminOverview(7)).totals.unhandledMessages).toBe(1)
+
+  await admin.setMessageHandled(open.items[0].id, true)
+  expect((await admin.getAdminMessages({ status: 'open', page: 1 })).total).toBe(0)
+  const handled = await admin.getAdminMessages({ status: 'handled', page: 1 })
+  expect(handled.items[0].handledAt).not.toBeNull()
+})
+
+test('báo lỗi toàn web: admin thấy báo lỗi truyện người khác và đánh dấu đã sửa', async () => {
+  const { reportChapter } = await import('@/features/feedback/api')
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 2)
+  await reportChapter({ slug: story.slug, chapter: 2, reason: 'typo', note: 'Sai chữ' })
+
+  signInAs('demo')
+  const open = await admin.getAdminReports({ status: 'open', page: 1 })
+  expect(open.items).toEqual([
+    expect.objectContaining({
+      storyTitle: 'Mùa Hạ Năm Ấy',
+      storyPublished: true,
+      chapterNumber: 2,
+      chapterTitle: 'Chương thử 2',
+      reporter: expect.objectContaining({ displayName: 'Linh' }),
+    }),
+  ])
+  await admin.setAdminReportStatus(open.items[0].id, 'resolved')
+  expect((await admin.getAdminReports({ status: 'open', page: 1 })).total).toBe(0)
+  expect((await admin.getAdminReports({ status: 'resolved', page: 1 })).total).toBe(1)
+})

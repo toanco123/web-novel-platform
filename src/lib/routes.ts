@@ -41,6 +41,10 @@ export const paths = {
   /** ownerId: chỉ hiện truyện của một người dùng */
   adminStories: (ownerId?: string) =>
     ownerId ? `/admin/stories?owner=${encodeURIComponent(ownerId)}` : '/admin/stories',
+  adminInbox: '/admin/inbox',
+  adminReports: '/admin/reports',
+  adminGenres: '/admin/genres',
+  adminImport: '/admin/import',
 }
 
 function withNext(path: string, next?: string) {

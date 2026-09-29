@@ -10,7 +10,11 @@ import type { Page } from '@/types/page'
 import {
   ADMIN_PAGE_SIZE,
   AdminError,
+  type AdminContactMessage,
+  type AdminMessageQuery,
   type AdminOverview,
+  type AdminReport,
+  type AdminReportQuery,
   type AdminStory,
   type AdminStoryQuery,
   type AdminUser,
@@ -19,6 +23,11 @@ import {
 
 const adminError = (error: PostgrestError) =>
   businessCode(error) === 'forbidden' ? new AdminError() : null
+
+/** Dùng trong .catch() của loadPage: lỗi quyền → AdminError, lỗi khác ném nguyên */
+const rethrow = (error: PostgrestError) => {
+  throw adminError(error) ?? error
+}
 
 export async function getAdminOverview(days: number): Promise<AdminOverview> {
   await requireUserId()
@@ -32,9 +41,7 @@ export async function getAdminUsers({ q, page }: AdminUserQuery): Promise<Page<A
     db()
       .rpc('admin_users', { p_query: q || undefined }, { count: 'exact' })
       .range(from, to),
-  ).catch((error: PostgrestError) => {
-    throw adminError(error) ?? error
-  })
+  ).catch(rethrow)
   return {
     ...result,
     items: result.items.map((r) => ({
@@ -71,9 +78,7 @@ export async function getAdminStories({
         { count: 'exact' },
       )
       .range(from, to),
-  ).catch((error: PostgrestError) => {
-    throw adminError(error) ?? error
-  })
+  ).catch(rethrow)
   return {
     ...result,
     items: result.items.map((r) => ({
@@ -96,4 +101,76 @@ export async function getAdminStories({
       updatedAt: r.updated_at,
     })),
   }
+}
+
+// ── Hộp thư & báo lỗi ───────────────────────────────────────────────────
+
+export async function getAdminMessages({
+  status,
+  page,
+}: AdminMessageQuery): Promise<Page<AdminContactMessage>> {
+  await requireUserId()
+  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
+    db()
+      .rpc(
+        'admin_contact_messages',
+        { p_status: status === 'all' ? undefined : status },
+        { count: 'exact' },
+      )
+      .range(from, to),
+  ).catch(rethrow)
+  return {
+    ...result,
+    items: result.items.map((r) => ({
+      id: String(r.id),
+      name: r.name,
+      email: r.email,
+      topic: r.topic,
+      message: r.message,
+      createdAt: r.created_at,
+      handledAt: r.handled_at ?? null,
+    })),
+  }
+}
+
+export async function setMessageHandled(id: string, handled: boolean) {
+  await requireUserId()
+  unwrap(
+    await db().rpc('admin_set_contact_handled', { p_id: Number(id), p_handled: handled }),
+    adminError,
+  )
+}
+
+export async function getAdminReports({
+  status,
+  page,
+}: AdminReportQuery): Promise<Page<AdminReport>> {
+  await requireUserId()
+  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
+    db()
+      .rpc('admin_reports', { p_status: status === 'all' ? undefined : status }, { count: 'exact' })
+      .range(from, to),
+  ).catch(rethrow)
+  return {
+    ...result,
+    items: result.items.map((r) => ({
+      id: r.id,
+      storySlug: r.story_slug,
+      storyTitle: r.story_title,
+      storyPublished: r.story_visibility === 'published',
+      chapterNumber: r.chapter_number,
+      chapterTitle: r.chapter_title,
+      reason: r.reason,
+      note: r.note,
+      status: r.status,
+      reporter: { id: r.reporter_id, displayName: r.reporter_name },
+      createdAt: r.created_at,
+    })),
+  }
+}
+
+export async function setAdminReportStatus(id: string, status: AdminReport['status']) {
+  await requireUserId()
+  if (!isUuid(id)) throw new Error('Id báo lỗi không hợp lệ')
+  unwrap(await db().rpc('admin_set_report_status', { p_id: id, p_status: status }), adminError)
 }

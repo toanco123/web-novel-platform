@@ -1,6 +1,6 @@
 import { App, ConfigProvider, Grid, Layout, Menu } from 'antd'
 import viVN from 'antd/locale/vi_VN'
-import { ArrowLeft, BookOpen, LayoutDashboard, Users } from 'lucide-react'
+import { ArrowLeft, BookOpen, Flag, Inbox, LayoutDashboard, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
@@ -15,6 +15,8 @@ const menu = [
   { key: paths.admin, icon: LayoutDashboard, label: 'Tổng quan' },
   { key: paths.adminUsers, icon: Users, label: 'Người dùng' },
   { key: paths.adminStories(), icon: BookOpen, label: 'Truyện' },
+  { key: paths.adminInbox, icon: Inbox, label: 'Hộp thư' },
+  { key: paths.adminReports, icon: Flag, label: 'Báo lỗi' },
 ]
 
 /** Khung trang quản trị: menu bên trái (màn rộng) hoặc trên đầu (màn hẹp), theo theme của web */
@@ -28,17 +30,17 @@ export function AdminLayout({ user, children }: { user: User; children: ReactNod
     icon: <Icon className="size-4" aria-hidden />,
     label: <Link to={key}>{label}</Link>,
   }))
-  // Màn hẹp: 3 tab chia đều (Menu ngang của antd sẽ giấu mục cuối vào "···")
+  // Màn hẹp: dải tab cuộn ngang (Menu ngang của antd sẽ giấu các mục cuối vào "···")
   const nav = wide ? (
     <Menu mode="inline" selectedKeys={[pathname]} items={items} className="border-none!" />
   ) : (
-    <ul className="grid grid-cols-3">
+    <ul className="relative flex overflow-x-auto">
       {menu.map(({ key, icon: Icon, label }) => (
         <li key={key}>
           <Link
             to={key}
             aria-current={pathname === key ? 'page' : undefined}
-            className="flex items-center justify-center gap-1.5 border-b-2 border-transparent py-3 text-sm text-muted-foreground aria-[current=page]:border-primary aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+            className="flex items-center justify-center gap-1.5 border-b-2 border-transparent px-4 py-3 text-sm whitespace-nowrap text-muted-foreground aria-[current=page]:border-primary aria-[current=page]:font-medium aria-[current=page]:text-foreground"
           >
             <Icon className="size-4" aria-hidden />
             {label}

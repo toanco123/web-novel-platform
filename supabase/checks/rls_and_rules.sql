@@ -504,6 +504,44 @@ select pg_temp.expect_error(
   'rate_limited');
 select pg_temp.expect_error($$select public.delete_account()$$, '42501');
 
+-- ── Admin: hộp thư và báo lỗi toàn web ─────────────────────────────────
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated"}', true);
+set local role authenticated;
+select public.report_chapter('truyen-chong-spam', 1, 'typo', 'Sai chính tả');
+select pg_temp.expect_error($$select * from public.admin_reports()$$, 'forbidden');
+select pg_temp.expect_error($$select * from public.admin_contact_messages()$$, 'forbidden');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_reports('open')
+    where story_slug = 'truyen-chong-spam' and chapter_title = 'Một'
+      and reporter_name = 'khach-c'),
+  'admin thấy báo lỗi của truyện người khác, kèm tên truyện, chương, người báo');
+select public.admin_set_report_status(
+  (select id from public.admin_reports('open') where story_slug = 'truyen-chong-spam'), 'resolved');
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_reports('resolved') where resolved_at is not null),
+  'admin đánh dấu báo lỗi đã sửa');
+select pg_temp.expect(
+  (select count(*) >= 3 from public.admin_contact_messages('open')),
+  'admin đọc được tin nhắn liên hệ chưa xử lý');
+select public.admin_set_contact_handled(
+  (select id from public.admin_contact_messages('open') where message = 'Tin nhắn thứ nhất.'),
+  true);
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_contact_messages('handled')
+    where message = 'Tin nhắn thứ nhất.' and handled_at is not null)
+    and (select (o -> 'totals' ->> 'unhandledMessages')::int >= 2
+      from public.admin_overview(7) as o),
+  'đánh dấu tin nhắn đã xử lý; tổng quan đếm tin chưa xử lý');
+
 -- ── Tự xóa tài khoản ────────────────────────────────────────────────────
 
 reset role;

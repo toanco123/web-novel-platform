@@ -219,6 +219,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          handled_at: string | null
           id: number
           ip_hash: string | null
           message: string
@@ -229,6 +230,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          handled_at?: string | null
           id?: never
           ip_hash?: string | null
           message: string
@@ -239,6 +241,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          handled_at?: string | null
           id?: never
           ip_hash?: string | null
           message?: string
@@ -776,7 +779,50 @@ export type Database = {
       }
     }
     Functions: {
+      admin_contact_messages: {
+        Args: { p_status?: string }
+        Returns: {
+          created_at: string
+          email: string
+          handled_at: string
+          id: number
+          message: string
+          name: string
+          topic: Database["public"]["Enums"]["contact_topic"]
+          user_id: string
+        }[]
+      }
       admin_overview: { Args: { p_days?: number }; Returns: Json }
+      admin_reports: {
+        Args: { p_status?: Database["public"]["Enums"]["report_status"] }
+        Returns: {
+          chapter_number: number
+          chapter_title: string
+          created_at: string
+          id: string
+          note: string
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+          reporter_name: string
+          resolved_at: string
+          status: Database["public"]["Enums"]["report_status"]
+          story_id: string
+          story_slug: string
+          story_title: string
+          story_visibility: Database["public"]["Enums"]["publication_status"]
+        }[]
+      }
+      admin_set_contact_handled: {
+        Args: { p_handled: boolean; p_id: number }
+        Returns: undefined
+      }
+      admin_set_report_status: {
+        Args: {
+          p_id: string
+          p_status: Database["public"]["Enums"]["report_status"]
+        }
+        Returns: undefined
+      }
       admin_stories: {
         Args: {
           p_owner_id?: string

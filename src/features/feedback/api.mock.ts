@@ -1,18 +1,21 @@
-// Góp ý giả lưu trong localStorage (báo lỗi ở src/mocks/activity.ts): dùng cho test tự động và khi
+// Góp ý giả lưu trong localStorage (tin nhắn liên hệ và báo lỗi ở src/mocks/activity.ts): dùng cho test tự động và khi
 // chạy không có Supabase (xem api.ts). Bản thật: api.remote.ts.
 import { rateLimited, requireUser } from '@/features/auth/api'
-import { mockDelay as delay, readMock, writeMock } from '@/lib/mockStorage'
-import { loadReports, saveReports } from '@/mocks/activity'
+import { mockDelay as delay } from '@/lib/mockStorage'
+import {
+  loadContactMessages,
+  loadReports,
+  saveContactMessages,
+  saveReports,
+} from '@/mocks/activity'
 import { countSince, HOUR } from '@/mocks/rateLimit'
 import type { ChapterReport } from '@/types/report'
 import type { ContactValues } from './schemas'
 import type { ReportChapterInput } from './shared'
 
-const CONTACT_KEY = 'mock-contact-messages'
-
 export async function sendContactMessage(input: ContactValues) {
   await delay(600)
-  const messages = readMock<(ContactValues & { sentAt: string })[]>(CONTACT_KEY, [])
+  const messages = loadContactMessages()
   const email = input.email.trim().toLowerCase()
   const sameEmail = messages.filter((m) => m.email.trim().toLowerCase() === email)
   if (
@@ -22,7 +25,10 @@ export async function sendContactMessage(input: ContactValues) {
     ) >= 3
   )
     throw rateLimited()
-  writeMock(CONTACT_KEY, [...messages, { ...input, sentAt: new Date().toISOString() }])
+  saveContactMessages([
+    ...messages,
+    { ...input, id: crypto.randomUUID(), sentAt: new Date().toISOString(), handledAt: null },
+  ])
 }
 
 /**

@@ -69,3 +69,30 @@ test('quản trị viên xem tổng quan, người dùng và truyện của mộ
   expect(await screen.findByText('Tác giả: Linh', {}, slow)).toBeInTheDocument()
   expect(screen.getByText('Công khai', { selector: '.ant-tag' })).toBeInTheDocument()
 })
+
+test('hộp thư và báo lỗi: đánh dấu đã xử lý thì rời khỏi danh sách đang mở', async () => {
+  const { sendContactMessage, reportChapter } = await import('@/features/feedback/api')
+  await sendContactMessage({
+    name: 'Lan',
+    email: 'lan@gmail.com',
+    topic: 'copyright',
+    message: 'Truyện này đăng lại khi chưa xin phép tác giả.',
+  })
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  await reportChapter({ slug: story.slug, chapter: 1, reason: 'violation', note: 'Nội dung lạ' })
+  signInAs('demo')
+  const { user } = renderApp('/admin/inbox')
+
+  expect(await screen.findByText('lan@gmail.com', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Bản quyền nội dung')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Đã xử lý' }))
+  expect(await screen.findByText('Không còn tin nhắn nào cần xử lý', {}, slow)).toBeInTheDocument()
+
+  const nav = screen.getAllByRole('navigation', { name: 'Quản trị' })[0]
+  await user.click(within(nav).getByRole('link', { name: 'Báo lỗi' }))
+  expect(await screen.findByText('Nội dung lạ', {}, slow)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Chương 1: Chương thử 1' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Đã sửa' }))
+  expect(await screen.findByText('Không có báo lỗi nào đang mở', {}, slow)).toBeInTheDocument()
+})

@@ -1,4 +1,6 @@
 // Phần dùng chung của hai backend trang quản trị (api.mock.ts, api.remote.ts)
+import type { ContactTopic } from '@/features/feedback/schemas'
+import type { ReportReason, ReportStatus } from '@/types/report'
 import type { StoryStatus, StoryVisibility } from '@/types/story'
 
 export const ADMIN_PAGE_SIZE = 20
@@ -19,6 +21,7 @@ export type AdminOverview = {
     viewsInPeriod: number
     comments: number
     openReports: number
+    unhandledMessages: number
   }
   /** Mỗi ngày trong kỳ (cũ trước), day dạng 2026-09-25 */
   days: { day: string; signups: number; views: number; stories: number; chapters: number }[]
@@ -106,6 +109,40 @@ const longDay = new Intl.DateTimeFormat('vi-VN', {
 export const formatShortDay = (day: string) => shortDay.format(parseDay(day))
 /** "2026-09-25" → "Thứ Sáu, 25/9/2026" */
 export const formatLongDay = (day: string) => longDay.format(parseDay(day))
+
+// ── Hộp thư & báo lỗi ───────────────────────────────────────────────────
+
+/** Lọc hộp thư: chưa xử lý | đã xử lý | tất cả */
+export type AdminMessageStatus = 'open' | 'handled' | 'all'
+
+export type AdminContactMessage = {
+  id: string
+  name: string
+  email: string
+  topic: ContactTopic
+  message: string
+  createdAt: string
+  /** null: chưa xử lý */
+  handledAt: string | null
+}
+
+export type AdminReport = {
+  id: string
+  storySlug: string
+  storyTitle: string
+  /** Truyện đang công khai (có link sang trang đọc) */
+  storyPublished: boolean
+  chapterNumber: number
+  chapterTitle: string
+  reason: ReportReason
+  note: string
+  status: ReportStatus
+  reporter: { id: string; displayName: string }
+  createdAt: string
+}
+
+export type AdminMessageQuery = { status: AdminMessageStatus; page: number }
+export type AdminReportQuery = { status: ReportStatus | 'all'; page: number }
 
 export class AdminError extends Error {
   code = 'forbidden' as const

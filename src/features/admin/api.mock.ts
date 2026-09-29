@@ -8,11 +8,15 @@ import {
   dayKey,
   followerCount,
   loadAllFollows,
+  loadContactMessages,
   loadReports,
   loadUserComments,
   loadViews,
+  saveContactMessages,
+  saveReports,
 } from '@/mocks/activity'
 import { allGenres, toStory } from '@/mocks/catalog'
+import { mockChapters } from '@/mocks/chapters'
 import { stories as seedStories } from '@/mocks/stories'
 import { loadChapters, loadUserStories } from '@/mocks/userContent'
 import { loadUsers } from '@/mocks/users'
@@ -20,7 +24,11 @@ import type { Page } from '@/types/page'
 import {
   ADMIN_PAGE_SIZE,
   AdminError,
+  type AdminContactMessage,
+  type AdminMessageQuery,
   type AdminOverview,
+  type AdminReport,
+  type AdminReportQuery,
   type AdminStory,
   type AdminStoryQuery,
   type AdminUser,
@@ -157,6 +165,7 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
       viewsInPeriod: [...viewsByDay.values()].reduce((a, b) => a + b, 0),
       comments: loadUserComments().length,
       openReports: loadReports().filter((r) => r.status === 'open').length,
+      unhandledMessages: loadContactMessages().filter((m) => !m.handledAt).length,
     },
     days: keys.map((day) => ({
       day,
@@ -241,4 +250,84 @@ export async function getAdminStories({
       return String(kb).localeCompare(String(ka))
     })
   return paginate(stories, page, ADMIN_PAGE_SIZE)
+}
+
+// ── Hộp thư & báo lỗi ───────────────────────────────────────────────────
+
+export async function getAdminMessages({
+  status,
+  page,
+}: AdminMessageQuery): Promise<Page<AdminContactMessage>> {
+  await delay()
+  await requireAdmin()
+  const messages = loadContactMessages()
+    .filter((m) => status === 'all' || (status === 'open') === !m.handledAt)
+    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
+    .map(({ sentAt, ...m }) => ({ ...m, createdAt: sentAt }))
+  return paginate(messages, page, ADMIN_PAGE_SIZE)
+}
+
+export async function setMessageHandled(id: string, handled: boolean) {
+  await delay()
+  await requireAdmin()
+  const now = new Date().toISOString()
+  saveContactMessages(
+    loadContactMessages().map((m) =>
+      m.id === id ? { ...m, handledAt: handled ? (m.handledAt ?? now) : null } : m,
+    ),
+  )
+}
+
+/** Tên truyện, trạng thái công khai và tên chương cho một báo lỗi */
+function reportTarget(slug: string, number: number) {
+  const seed = seedStories.find((s) => s.slug === slug)
+  if (seed) {
+    const chapter = mockChapters(seed).find((c) => c.number === number)
+    return { title: seed.title, published: true, chapterTitle: chapter?.title ?? '' }
+  }
+  const stored = loadUserStories().find((s) => s.slug === slug)
+  if (!stored) return null
+  const chapter = loadChapters(stored.id).find((c) => c.number === number)
+  return {
+    title: stored.title,
+    published: stored.visibility === 'published',
+    chapterTitle: chapter?.title ?? '',
+  }
+}
+
+export async function getAdminReports({
+  status,
+  page,
+}: AdminReportQuery): Promise<Page<AdminReport>> {
+  await delay()
+  await requireAdmin()
+  const reports = loadReports()
+    .filter((r) => status === 'all' || r.status === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .flatMap((r): AdminReport[] => {
+      const target = reportTarget(r.storySlug, r.chapterNumber)
+      if (!target) return []
+      return [
+        {
+          id: r.id,
+          storySlug: r.storySlug,
+          storyTitle: target.title,
+          storyPublished: target.published,
+          chapterNumber: r.chapterNumber,
+          chapterTitle: target.chapterTitle,
+          reason: r.reason,
+          note: r.note,
+          status: r.status,
+          reporter: r.reporter,
+          createdAt: r.createdAt,
+        },
+      ]
+    })
+  return paginate(reports, page, ADMIN_PAGE_SIZE)
+}
+
+export async function setAdminReportStatus(id: string, status: AdminReport['status']) {
+  await delay()
+  await requireAdmin()
+  saveReports(loadReports().map((r) => (r.id === id ? { ...r, status } : r)))
 }
