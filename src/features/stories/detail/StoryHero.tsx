@@ -4,6 +4,7 @@ import { Container } from '@/components/common/Container'
 import { Button } from '@/components/ui/button'
 import { useSession } from '@/features/auth/hooks'
 import { FollowButton } from '@/features/library/components/FollowButton'
+import { DownloadButton } from '@/features/offline/components/DownloadButton'
 import { useStoryProgress } from '@/features/library/hooks'
 import { resumeState } from '@/features/library/resume'
 import { formatCount, formatRelativeTime } from '@/lib/format'
@@ -127,6 +128,7 @@ export function StoryHero({ story }: { story: Story }) {
               ) : (
                 <FollowButton slug={story.slug} onDark />
               )}
+              <StoryDownloadButton story={story} />
             </div>
           </div>
         </div>
@@ -195,5 +197,19 @@ export function StoryHeroSkeleton() {
         </div>
       </Container>
     </div>
+  )
+}
+
+/** Tải từ chỗ đọc dở, chưa đọc thì từ chương đầu */
+function StoryDownloadButton({ story }: { story: Story }) {
+  const { data: progress } = useStoryProgress(story.slug)
+  if (story.firstChapterNumber === null) return null
+  return (
+    <DownloadButton
+      slug={story.slug}
+      title={story.title}
+      from={progress?.chapter ?? story.firstChapterNumber}
+      className={onDarkOutline}
+    />
   )
 }
