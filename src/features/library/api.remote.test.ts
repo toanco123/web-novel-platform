@@ -302,6 +302,30 @@ test('gửi hàng chờ: vẫn mất mạng thì giữ; lỗi khác (truyện đ
   expect(pendingProgress(USER)).toEqual([])
 })
 
+test('gửi hàng chờ: lỗi tạm thời của máy chủ (cổng API, quá giờ) thì giữ mục đó, vẫn gửi mục khác', async () => {
+  queueProgress(USER, { slug: 'a', chapter: 1, chapterTitle: 'Chương 1' })
+  await new Promise((resolve) => setTimeout(resolve, 2))
+  queueProgress(USER, { slug: 'b', chapter: 3, chapterTitle: 'Chương 3' })
+  await new Promise((resolve) => setTimeout(resolve, 2))
+  queueProgress(USER, { slug: 'c', chapter: 5, chapterTitle: 'Chương 5' })
+  fake.userId = USER
+  const errors: Record<string, object> = {
+    a: { message: '<html>502 Bad Gateway</html>' },
+    b: { code: '57014', message: 'canceling statement due to statement timeout' },
+  }
+  fake.respond = ([[, , args]]) => {
+    const error = errors[(args as { p_slug: string }).p_slug]
+    return error ? { data: null, error } : ok(historyRow(5, 0))
+  }
+  await expect(syncPendingProgress()).resolves.toBe(1)
+  expect(pendingProgress(USER).map((p) => p.slug)).toEqual(['a', 'b'])
+
+  // Lỗi dữ liệu thì gửi lại bao nhiêu lần cũng vậy: bỏ
+  fake.respond = () => ({ data: null, error: { code: '22003', message: 'out of range' } })
+  await syncPendingProgress()
+  expect(pendingProgress(USER)).toEqual([])
+})
+
 test('hàng chờ tách theo tài khoản: người khác đăng nhập không gửi hàng chờ của người trước', async () => {
   queueProgress('u-a', { slug: 'a', chapter: 1, chapterTitle: 'Chương 1' })
   fake.userId = 'u-b'

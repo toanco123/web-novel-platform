@@ -12,6 +12,12 @@ type Chunk = {
   facadeModuleId: string | null
 }
 
+/**
+ * Bộ ký tự font không cần precache. Giữ latin-ext: bộ này khai báo sau bộ vietnamese và cũng chứa
+ * Đ, Ă, Ơ, Ư, Ĩ, Ũ, ỹ..., nên trình duyệt lấy các chữ đó từ file latin-ext
+ */
+export const SKIPPED_FONT_SUBSETS = ['cyrillic', 'greek']
+
 /** Trang chỉ dùng khi có mạng: khu Quản trị (Ant Design, biểu đồ) và Sáng tác (trình soạn Tiptap) */
 const ONLINE_ONLY = /\/src\/pages\/(admin|studio)\//
 
@@ -88,8 +94,7 @@ export function pwa() {
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Font chỉ cần bộ ký tự Latin và tiếng Việt
-        globIgnores: ['**/*-cyrillic*', '**/*-greek*'],
+        globIgnores: SKIPPED_FONT_SUBSETS.map((subset) => `**/*-${subset}*`),
         manifestTransforms: [precache.transform],
         navigateFallback: '/index.html',
         runtimeCaching: [

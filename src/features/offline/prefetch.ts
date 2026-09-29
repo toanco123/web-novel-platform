@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { getChapterRange } from '@/features/chapters/api'
 import { chapterKeys } from '@/features/chapters/hooks'
 import type { ChapterContent } from '@/types/chapter'
-import { offlineAvailable, saveChapters, walkSaved } from './store'
+import { isSavable, offlineAvailable, saveChapters, walkSaved } from './store'
 
 /** Số chương tải trước sau chương đang đọc */
 export const PREFETCH_COUNT = 5
@@ -33,10 +33,13 @@ export async function prefetchFrom(slug: string, from: number): Promise<ChapterC
   return chapters
 }
 
-/** Trang đọc: mở chương xong thì tải trước các chương sau; chương ngay sau vào luôn cache */
+/**
+ * Trang đọc: mở chương xong thì tải trước các chương sau; chương ngay sau vào luôn cache. Truyện
+ * chưa công khai không lưu vào kho nên không tải trước.
+ */
 export function usePrefetchChapters(chapter: ChapterContent | null | undefined) {
   const queryClient = useQueryClient()
-  const slug = chapter?.story.slug
+  const slug = chapter && isSavable(chapter) ? chapter.story.slug : undefined
   const next = chapter?.next?.number
   useEffect(() => {
     if (slug === undefined || next === undefined) return

@@ -67,21 +67,44 @@ const encoder = new TextEncoder()
 const isQuotaError = (error: unknown) =>
   (error as { name?: unknown } | null)?.name === 'QuotaExceededError'
 
+/** Mở kho quá bấy nhiêu ms thì coi như không có kho (WebKit đôi khi treo, không báo xong) */
+export const OFFLINE_OPEN_TIMEOUT_MS = 3000
+
 let dbPromise: Promise<IDBPDatabase<OfflineDB> | null> | undefined
 
 function database() {
-  dbPromise ??=
-    typeof indexedDB === 'undefined'
-      ? Promise.resolve(null)
-      : openDB<OfflineDB>('offline-reading', 1, {
-          upgrade(db) {
-            const chapters = db.createObjectStore('chapters', { keyPath: 'id' })
-            chapters.createIndex('bySlug', 'slug')
-            chapters.createIndex('byUse', ['pinned', 'usedAt'])
-            db.createObjectStore('contents')
-          },
-        }).catch(() => null)
+  dbPromise ??= open()
   return dbPromise
+}
+
+async function open(): Promise<IDBPDatabase<OfflineDB> | null> {
+  if (typeof indexedDB === 'undefined') return null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let timedOut = false
+  try {
+    // indexedDB.open có thể ném ngay (SecurityError trong khung bị sandbox)
+    const opening = openDB<OfflineDB>('offline-reading', 1, {
+      upgrade(db) {
+        const chapters = db.createObjectStore('chapters', { keyPath: 'id' })
+        chapters.createIndex('bySlug', 'slug')
+        chapters.createIndex('byUse', ['pinned', 'usedAt'])
+        db.createObjectStore('contents')
+      },
+    })
+    // Mở xong sau khi đã bỏ cuộc: đóng lại, lần tải trang sau mở lại
+    void opening.then((db) => timedOut && db.close()).catch(() => {})
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
+        timedOut = true
+        resolve(null)
+      }, OFFLINE_OPEN_TIMEOUT_MS)
+    })
+    return await Promise.race([opening, timeout])
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Kho dùng được không (trình duyệt cho dùng IndexedDB) */
@@ -174,15 +197,19 @@ async function evict(db: IDBPDatabase<OfflineDB>, keep: string, fraction = 0) {
   await tx.done
 }
 
+/** Kho dùng chung cho cả máy nên chỉ giữ chương của truyện công khai */
+export const isSavable = (chapter: ChapterContent) => chapter.story.visibility === 'published'
+
 /**
- * Lưu (hoặc làm mới) các chương; giữ readAt/progress đã có, chương đã ghim vẫn ghim. Sau đó dọn
- * chương không ghim vượt giới hạn (trừ truyện vừa lưu). Bộ nhớ đầy thì dọn 20% rồi thử lại một
- * lần; vẫn đầy thì ném OfflineStorageFullError.
+ * Lưu (hoặc làm mới) các chương của truyện công khai (bỏ qua chương khác); giữ readAt/progress đã
+ * có, chương đã ghim vẫn ghim. Sau đó dọn chương không ghim vượt giới hạn (trừ truyện vừa lưu). Bộ
+ * nhớ đầy thì dọn 20% rồi thử lại một lần; vẫn đầy thì ném OfflineStorageFullError.
  */
 export async function saveChapters(
-  chapters: ChapterContent[],
+  all: ChapterContent[],
   { pinned = false }: { pinned?: boolean } = {},
 ) {
+  const chapters = all.filter(isSavable)
   const db = await database()
   if (!db || chapters.length === 0) return
   const keep = chapters[0].story.slug
@@ -235,8 +262,9 @@ export async function pinChapters(slug: string, numbers: number[]) {
 
 /**
  * Lần theo chương sau (`next`) của các chương đã lưu từ chương `from`, tối đa `limit` chương. Trả
- * các chương đã có và số chương để hỏi tiếp máy chủ (null: đã đủ `limit` chương). Bản lưu ghi "không
- * có chương sau" có thể đã cũ (truyện ra thêm chương sau khi lưu) nên vẫn hỏi từ số kế tiếp.
+ * các chương đã có và số chương để hỏi tiếp máy chủ (null: đã đủ `limit` chương). Chương sau trong
+ * bản lưu có thể đã cũ nên vẫn hỏi từ số kế tiếp khi bản lưu ghi "không có chương sau" (truyện ra
+ * thêm chương sau khi lưu) hoặc nhảy cóc số (chương ở giữa lúc lưu còn là nháp, nay có thể đã đăng).
  */
 export async function walkSaved(
   slug: string,
@@ -247,14 +275,15 @@ export async function walkSaved(
   if (!db) return { saved: [], missing: from }
   const store = db.transaction('chapters').store
   const saved: number[] = []
-  let next = from
+  let number = from
   while (saved.length < limit) {
-    const record = await store.get(idOf(slug, next))
-    if (!record) return { saved, missing: next }
-    saved.push(next)
-    next = record.meta.next?.number ?? next + 1
+    const record = await store.get(idOf(slug, number))
+    if (!record) return { saved, missing: number }
+    saved.push(number)
+    number++
+    if (record.meta.next?.number !== number) break
   }
-  return { saved, missing: null }
+  return { saved, missing: saved.length < limit ? number : null }
 }
 
 /** Các truyện có chương trong kho, dùng gần nhất trước */

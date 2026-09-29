@@ -82,6 +82,7 @@ const readerStory = (story: Story): ChapterContent['story'] => ({
   // Số chương đã xuất bản (story_stats)
   chapterCount: story.chapterCount,
   coverUrl: story.coverUrl,
+  visibility: story.visibility,
 })
 
 /** Một chương để đọc, kèm chương trước/sau; null khi không có truyện hoặc chương */

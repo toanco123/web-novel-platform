@@ -301,13 +301,19 @@ async function sendPending(previous: Promise<unknown>) {
       p_chapter_title: entry.chapterTitle,
       p_progress: entry.progress,
     })
-    // Mất mạng hay phiên hết hạn: để lần sau. Lỗi khác (truyện đã bị gỡ...) gửi lại cũng lỗi: bỏ
+    // Mất mạng hay phiên hết hạn: để lần sau
     if (error && (isNetworkError(error) || businessCode(error) === 'unauthenticated')) break
+    // Lỗi tạm thời của máy chủ (cổng API, quá giờ...): giữ mục này, gửi tiếp mục khác
+    if (error && !isPermanent(error)) continue
     dropPending(userId, entry.slug, entry.readAt)
     if (!error) sent++
   }
   return sent
 }
+
+/** Lỗi gửi lại bao nhiêu lần cũng vậy: lỗi nghiệp vụ (truyện đã bị gỡ...) và lỗi dữ liệu */
+const isPermanent = (error: PostgrestError) =>
+  businessCode(error) !== null || isDataException(error)
 
 export async function removeFromHistory(slug: string): Promise<void> {
   const userId = await historyOwner()

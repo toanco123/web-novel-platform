@@ -1,6 +1,8 @@
 import { act, cleanup, screen } from '@testing-library/react'
 import { getChapterRange } from '@/features/chapters/api'
 import { READER_DEFAULTS, useReaderSettings } from '@/features/reader/useReaderSettings'
+import * as studio from '@/features/studio/api'
+import { registerUser } from '@/test/helpers'
 import { goOffline } from '@/test/offline'
 import { renderApp } from '@/test/renderApp'
 import { getSavedChapter } from './store'
@@ -68,4 +70,23 @@ test('máy bật tiết kiệm dữ liệu thì không tải trước', async ()
   } finally {
     delete (navigator as { connection?: unknown }).connection
   }
+})
+
+test('truyện chưa công khai (chủ truyện xem trước) thì không tải trước', async () => {
+  await registerUser()
+  const story = await studio.createStory({
+    title: 'Truyện Nháp',
+    description: 'Một câu chuyện còn đang viết dở, chưa công khai.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  for (const title of ['Mở đầu', 'Gặp gỡ']) {
+    const chapter = { title, content: 'Nội dung chương. '.repeat(20) }
+    await studio.saveChapter(story.id, chapter, { publish: true })
+  }
+  renderApp(`/story/${story.slug}/chapter-1`)
+  await heading()
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  expect(getChapterRange).not.toHaveBeenCalled()
 })

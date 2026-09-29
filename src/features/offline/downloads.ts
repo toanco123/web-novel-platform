@@ -36,8 +36,14 @@ const update = (slug: string, download: Download) =>
 const controllers = new Map<string, AbortController>()
 const encoder = new TextEncoder()
 
+/** Dừng ngay: đợt đang tải dở không lưu, bấm tải lại được luôn (không chờ đợt đó về) */
 export function cancelDownload(slug: string) {
-  controllers.get(slug)?.abort()
+  const controller = controllers.get(slug)
+  if (!controller) return
+  controller.abort()
+  controllers.delete(slug)
+  const current = useDownloads.getState().bySlug[slug]
+  if (current) update(slug, { ...current, status: 'cancelled' })
 }
 
 type Request = {
@@ -59,36 +65,38 @@ export async function downloadChapters({ slug, title, from, total, onChange }: R
   if (controllers.has(slug)) return
   const controller = new AbortController()
   controllers.set(slug, controller)
+  const cancelled = () => controller.signal.aborted
+  // Đã hủy thì lượt này thôi ghi trạng thái (có thể đã có lượt tải mới của truyện)
+  const report = (download: Download) => !cancelled() && update(slug, download)
   let done = 0
   let bytes = 0
-  update(slug, { status: 'running', done, total, bytes })
+  report({ status: 'running', done, total, bytes })
   try {
     // Không lưu được thì đừng tải rồi báo "đã tải"
     if (!(await offlineAvailable())) throw new OfflineUnavailableError()
     const { saved, missing } = await walkSaved(slug, from, total)
     await pinChapters(slug, saved)
     done = saved.length
-    update(slug, { status: 'running', done, total, bytes })
+    report({ status: 'running', done, total, bytes })
     let next = missing
-    while (next !== null && done < total && !controller.signal.aborted) {
+    while (next !== null && done < total && !cancelled()) {
       const chapters = await getChapterRange(slug, next, Math.min(DOWNLOAD_BATCH, total - done))
-      if (chapters.length === 0) break
+      if (chapters.length === 0 || cancelled()) break
       await saveChapters(chapters, { pinned: true })
       done += chapters.length
       bytes += chapters.reduce((sum, c) => sum + encoder.encode(c.content).length, 0)
       next = chapters.at(-1)!.next?.number ?? null
-      update(slug, { status: 'running', done, total, bytes })
+      report({ status: 'running', done, total, bytes })
       onChange?.()
     }
-    if (controller.signal.aborted) {
-      update(slug, { status: 'cancelled', done, total, bytes })
-    } else {
-      update(slug, { status: 'done', done, total, bytes })
+    if (!cancelled()) {
+      report({ status: 'done', done, total, bytes })
       toast.success(`Đã tải ${done} chương "${title}"`, {
         description: `${formatBytes(bytes)} · đọc được cả khi không có mạng`,
       })
     }
   } catch (error) {
+    if (cancelled()) return
     const message =
       error instanceof OfflineUnavailableError
         ? error.message
@@ -97,10 +105,10 @@ export async function downloadChapters({ slug, title, from, total, onChange }: R
           : isNetworkError(error)
             ? `Mất mạng, đã tải được ${done} chương. Có mạng lại thì bấm tải tiếp.`
             : `Không tải được, đã tải được ${done} chương. Thử lại sau.`
-    update(slug, { status: 'failed', done, total, bytes, error: message })
+    report({ status: 'failed', done, total, bytes, error: message })
     toast.error(message)
   } finally {
-    controllers.delete(slug)
+    if (controllers.get(slug) === controller) controllers.delete(slug)
     onChange?.()
   }
 }

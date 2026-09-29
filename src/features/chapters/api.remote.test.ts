@@ -229,6 +229,7 @@ describe('getChapter', () => {
         status: 'ongoing',
         chapterCount: 3,
         coverUrl: null,
+        visibility: 'published',
       },
       number: 3,
       title: 'Chương 3',

@@ -200,10 +200,10 @@ export function StoryHeroSkeleton() {
   )
 }
 
-/** Tải từ chỗ đọc dở, chưa đọc thì từ chương đầu */
+/** Tải từ chỗ đọc dở, chưa đọc thì từ chương đầu; truyện chưa công khai không lưu offline */
 function StoryDownloadButton({ story }: { story: Story }) {
   const { data: progress } = useStoryProgress(story.slug)
-  if (story.firstChapterNumber === null) return null
+  if (story.firstChapterNumber === null || story.visibility !== 'published') return null
   return (
     <DownloadButton
       slug={story.slug}

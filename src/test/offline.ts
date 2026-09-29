@@ -36,6 +36,7 @@ export function fakeChapter(
       status: 'ongoing',
       chapterCount: last,
       coverUrl: null,
+      visibility: 'published',
     },
     number,
     title: `Chương ${number}`,

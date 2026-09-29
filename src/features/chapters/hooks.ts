@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query'
 import { useCallback, useEffect } from 'react'
 import { ChapterNotSavedError, readChapter } from '@/features/offline/readChapter'
-import type { ChapterOrder } from '@/types/chapter'
+import type { ChapterContent, ChapterOrder } from '@/types/chapter'
 import * as api from './api'
 
 export const chapterKeys = {
@@ -31,10 +31,18 @@ export const useChapterList = (slug: string, page: number, order: ChapterOrder) 
 export const chapterQuery = (queryClient: QueryClient, slug: string, number: number) =>
   queryOptions({
     queryKey: chapterKeys.detail(slug, number),
-    queryFn: () =>
-      readChapter(slug, number, (fresh) =>
-        queryClient.setQueryData(chapterKeys.detail(slug, number), fresh),
-      ),
+    queryFn: async () => {
+      // Bản trên máy chủ có thể về trước khi truy vấn trả bản lưu: khi đó trả luôn bản mới, vì ghi
+      // cache lúc truy vấn chưa xong sẽ bị bản lưu đè lại
+      let settled = false
+      let early: { chapter: ChapterContent | null } | undefined
+      const saved = await readChapter(slug, number, (fresh) => {
+        if (settled) queryClient.setQueryData(chapterKeys.detail(slug, number), fresh)
+        else early = { chapter: fresh }
+      })
+      settled = true
+      return early ? early.chapter : saved
+    },
     networkMode: 'always',
     // Chưa lưu mà mất mạng: báo ngay, thử lại cũng vậy
     retry: (count, error) => !(error instanceof ChapterNotSavedError) && count < 3,

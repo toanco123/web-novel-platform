@@ -5,6 +5,8 @@ import {
   listSavedStories,
   markRead,
   MAX_AUTO_CHAPTERS,
+  OFFLINE_OPEN_TIMEOUT_MS,
+  offlineAvailable,
   OfflineStorageFullError,
   pinChapters,
   removeSavedChapter,
@@ -74,6 +76,12 @@ test('walkSaved lần theo chương sau của bản lưu, dừng ở chương c�
   expect(await walkSaved('mua-ha', 1, 5)).toEqual({ saved: [], missing: 1 })
 })
 
+test('walkSaved: bản lưu nhảy cóc số chương (chương giữa lúc đó còn là nháp) thì hỏi máy chủ chương bị nhảy', async () => {
+  const skipped = { ...fakeChapter('mua-ha', 10), next: { number: 12, title: 'Chương 12' } }
+  await saveChapters([skipped, ...range('mua-ha', 12, 14)])
+  expect(await walkSaved('mua-ha', 10, 5)).toEqual({ saved: [10], missing: 11 })
+})
+
 test('ghim, xóa một chương, xóa một truyện, xóa tất cả', async () => {
   await saveChapters([...range('a', 1, 3), ...range('b', 1, 2)])
   await pinChapters('a', [2])
@@ -130,4 +138,28 @@ test('trình duyệt không cho dùng IndexedDB: kho coi như trống, không b�
   expect(await walkSaved('mua-ha', 1, 5)).toEqual({ saved: [], missing: 1 })
   await resetOfflineDatabase()
   vi.unstubAllGlobals()
+})
+
+test('mở IndexedDB ném lỗi ngay (khung bị sandbox): kho coi như trống', async () => {
+  await resetOfflineDatabase()
+  vi.stubGlobal('indexedDB', {
+    open() {
+      throw new DOMException('Bị chặn', 'SecurityError')
+    },
+  })
+  expect(await offlineAvailable()).toBe(false)
+  expect(await listSavedStories()).toEqual([])
+  await resetOfflineDatabase()
+})
+
+test(`mở IndexedDB treo (lỗi WebKit): sau ${OFFLINE_OPEN_TIMEOUT_MS / 1000} giây coi như không có kho`, async () => {
+  await resetOfflineDatabase()
+  // Yêu cầu mở không bao giờ báo xong
+  vi.stubGlobal('indexedDB', { open: () => new IDBOpenDBRequest() })
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  const available = offlineAvailable()
+  await vi.advanceTimersByTimeAsync(OFFLINE_OPEN_TIMEOUT_MS)
+  expect(await available).toBe(false)
+  expect(await getSavedChapter('mua-ha', 1)).toBeNull()
+  await resetOfflineDatabase()
 })

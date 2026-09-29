@@ -22,6 +22,8 @@ type Props = {
   slug: string
   /** Tên truyện (thông báo tải về) */
   title: string
+  /** Có nút tải về đọc offline (chỉ truyện công khai) */
+  downloadable: boolean
   current: number
   /** Số chương lớn nhất (để kiểm tra ô "đi tới chương") */
   max: number
@@ -29,7 +31,7 @@ type Props = {
 }
 
 /** Mục lục trong trang đọc: mở sẵn trang chứa chương đang đọc và cuộn tới chương đó */
-export function ReaderChapterIndex({ slug, title, current, max, onNavigate }: Props) {
+export function ReaderChapterIndex({ slug, title, downloadable, current, max, onNavigate }: Props) {
   const [page, setPage] = useState(() => Math.max(1, Math.ceil(current / CHAPTERS_PER_PAGE)))
   const { data, isPending, isError, isPlaceholderData } = useChapterList(slug, page, 'asc')
   const online = useOnline()
@@ -66,7 +68,9 @@ export function ReaderChapterIndex({ slug, title, current, max, onNavigate }: Pr
           </Select>
         )}
         <JumpToChapter slug={slug} max={max} />
-        <DownloadButton slug={slug} title={title} from={current} className="h-9" />
+        {downloadable && (
+          <DownloadButton slug={slug} title={title} from={current} className="h-9" />
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">

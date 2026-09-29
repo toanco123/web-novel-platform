@@ -56,8 +56,8 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
   - **Lịch sử và lượt đọc:** ghi bằng `useReadingTracker` + `useRecordChapterView` (không tính lượt của chính tác giả).
   - **Cuối chương:** có "Báo lỗi chương" (`features/feedback`) và bình luận của chương (`CommentsSection` với prop `chapter`).
 - **Đọc offline & PWA** (`features/offline`, plan `documents/plan-pwa-doc-offline.md`):
-  - `vite-plugin-pwa` cấu hình ở `pwa.config.ts` (precache bỏ chunk khu Quản trị/Sáng tác và font ngoài Latin/tiếng Việt; tắt ở dev và test). Icon sinh từ `public/favicon.svg` bằng `npm run generate-pwa-assets`. Có bản mới thì hỏi (`src/app/PwaUpdater.tsx`).
-  - Chương đọc qua `readChapter` → kho IndexedDB `features/offline/store.ts` (có bản lưu thì trả ngay và làm mới ở nền; mất mạng mà chưa lưu → `ChapterNotSavedError`). Tải trước 5 chương (`usePrefetchChapters`), tải về chủ động thì ghim (`downloads.ts`), tối đa 300 chương không ghim. Tab `/library?tab=saved`.
+  - `vite-plugin-pwa` cấu hình ở `pwa.config.ts` (precache bỏ chunk khu Quản trị/Sáng tác và font `cyrillic`/`greek`, phải giữ `latin-ext` vì bộ này chứa cả Đ, Ơ, Ư...; tắt ở dev và test). Icon sinh từ `public/favicon.svg` bằng `npm run generate-pwa-assets`. Có bản mới thì hỏi (`src/app/PwaUpdater.tsx`).
+  - Chương đọc qua `readChapter` → kho IndexedDB `features/offline/store.ts` (có bản lưu thì trả ngay và làm mới ở nền; mất mạng mà chưa lưu → `ChapterNotSavedError`). Tải trước 5 chương (`usePrefetchChapters`), tải về chủ động thì ghim (`downloads.ts`), tối đa 300 chương không ghim. Chỉ lưu chương của truyện công khai (`isSavable`). Tab `/library?tab=saved`.
   - Query/mutation cần chạy khi offline đặt `networkMode: 'always'` (chương, kho, phiên đăng nhập, ghi lịch sử).
   - Lịch sử đọc lỗi mạng (bản Supabase) vào hàng chờ `features/library/pendingProgress.ts`, `OfflineSync` gửi khi có mạng lại.
   - Thông báo nổi dùng `toast` của `sonner`.

@@ -1,5 +1,7 @@
 import { act, screen, within } from '@testing-library/react'
 import { getChapterRange } from '@/features/chapters/api'
+import * as studio from '@/features/studio/api'
+import { registerUser } from '@/test/helpers'
 import { goOffline } from '@/test/offline'
 import { renderApp } from '@/test/renderApp'
 import { cancelDownload, downloadChapters, useDownloads } from './downloads'
@@ -53,13 +55,21 @@ test('tải 20 chương từ trang truyện; mất mạng vẫn đọc được 
   expect(screen.getAllByText('Chương 20').length).toBeGreaterThan(0)
 })
 
-test('hủy giữa chừng giữ chương đã tải; tải lại chỉ lấy phần còn thiếu', async () => {
-  vi.mocked(getChapterRange).mockImplementationOnce(async (...args) => {
-    const chapters = await actual.getChapterRange(...args)
-    cancelDownload(slug)
-    return chapters
-  })
-  await downloadChapters({ slug, title, from: 1, total: 50 })
+test('hủy giữa chừng: báo đã hủy ngay, đợt đang tải dở không lưu; tải lại chỉ lấy phần còn thiếu', async () => {
+  let release = () => {}
+  vi.mocked(getChapterRange)
+    .mockImplementationOnce(actual.getChapterRange)
+    .mockImplementationOnce(async (...args) => {
+      // Đợt thứ hai chỉ trả về khi test cho phép (đang tải dở thì người đọc bấm hủy)
+      await new Promise<void>((resolve) => (release = resolve))
+      return actual.getChapterRange(...args)
+    })
+  const running = downloadChapters({ slug, title, from: 1, total: 50 })
+  await expect.poll(() => vi.mocked(getChapterRange).mock.calls.length, { timeout: 3000 }).toBe(2)
+  cancelDownload(slug)
+  expect(useDownloads.getState().bySlug[slug]).toMatchObject({ status: 'cancelled', done: 20 })
+  release()
+  await running
   expect(useDownloads.getState().bySlug[slug]).toMatchObject({ status: 'cancelled', done: 20 })
   expect(await savedChapterList(slug)).toHaveLength(20)
 
@@ -74,6 +84,23 @@ test('hủy giữa chừng giữ chương đã tải; tải lại chỉ lấy ph
     done: 50,
     total: 50,
   })
+})
+
+test('hủy rồi bấm tải lại ngay khi đợt cũ chưa về: lượt mới vẫn chạy', async () => {
+  let release = () => {}
+  vi.mocked(getChapterRange).mockImplementationOnce(async (...args) => {
+    await new Promise<void>((resolve) => (release = resolve))
+    return actual.getChapterRange(...args)
+  })
+  const first = downloadChapters({ slug, title, from: 1, total: 20 })
+  await expect.poll(() => vi.mocked(getChapterRange).mock.calls.length, { timeout: 3000 }).toBe(1)
+  cancelDownload(slug)
+  await downloadChapters({ slug, title, from: 1, total: 20 })
+  expect(useDownloads.getState().bySlug[slug]).toMatchObject({ status: 'done', done: 20 })
+  release()
+  await first
+  // Lượt cũ về sau không ghi đè trạng thái của lượt mới
+  expect(useDownloads.getState().bySlug[slug]).toMatchObject({ status: 'done', done: 20 })
 })
 
 test('bộ nhớ đầy: dừng và báo đã tải được bao nhiêu chương', async () => {
@@ -118,4 +145,31 @@ test('trình duyệt không cho lưu (không có IndexedDB): báo lỗi, không 
   expect(await prefetchFrom(slug, 13)).toEqual([])
   expect(getChapterRange).not.toHaveBeenCalled()
   await resetOfflineDatabase()
+})
+
+test('truyện chưa công khai (chủ truyện xem trước): không có nút tải về', async () => {
+  await registerUser()
+  const story = await studio.createStory({
+    title: 'Truyện Nháp',
+    description: 'Một câu chuyện còn đang viết dở, chưa công khai.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  await studio.saveChapter(
+    story.id,
+    { title: 'Mở đầu', content: 'Nội dung chương. '.repeat(20) },
+    { publish: true },
+  )
+  const { user, router } = renderApp(`/story/${story.slug}`)
+  expect(
+    await screen.findByRole('link', { name: 'Quản lý truyện' }, { timeout: 3000 }),
+  ).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Tải về đọc offline' })).not.toBeInTheDocument()
+
+  await act(() => router.navigate(`/story/${story.slug}/chapter-1`))
+  await screen.findByRole('heading', { level: 1, name: /Mở đầu/ }, { timeout: 3000 })
+  await user.click(screen.getByRole('button', { name: 'Mục lục' }))
+  const index = await screen.findByRole('dialog', { name: 'Mục lục' })
+  expect(within(index).queryByRole('button', { name: 'Tải về đọc offline' })).toBeNull()
 })

@@ -1,4 +1,4 @@
-import type { Author, StoryStatus } from './story'
+import type { Author, StoryStatus, StoryVisibility } from './story'
 
 export type ChapterSummary = {
   number: number
@@ -35,6 +35,8 @@ export type ChapterContent = {
     chapterCount: number
     /** Ảnh bìa (tab "Đã lưu" hiện bìa của truyện đã lưu trên máy) */
     coverUrl: string | null
+    /** Chủ truyện đọc được cả truyện chưa công khai; loại này không lưu vào kho đọc offline */
+    visibility: StoryVisibility
   }
   number: number
   title: string
