@@ -22,3 +22,10 @@ window.matchMedia ??= (query: string) =>
     removeEventListener: () => {},
     dispatchEvent: () => false,
   }) as MediaQueryList
+
+// jsdom không tính bố cục; ProseMirror (trình soạn chương Tiptap) cần các hàm đo vị trí này
+const emptyRect = () => new DOMRect(0, 0, 0, 0)
+const emptyRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList
+Range.prototype.getBoundingClientRect ??= emptyRect
+Range.prototype.getClientRects ??= emptyRects
+document.elementFromPoint ??= () => null

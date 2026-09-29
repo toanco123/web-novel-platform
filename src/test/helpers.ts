@@ -1,4 +1,5 @@
 // Tiện ích dùng chung cho test có dữ liệu giả (localStorage)
+import type { UserEvent } from '@testing-library/user-event'
 import { signUp } from '@/features/auth/api'
 import * as studio from '@/features/studio/api'
 
@@ -30,4 +31,13 @@ export async function publishStory(title = 'Mùa Hạ Năm Ấy', chapters = 2) 
   }
   await studio.publishStory(story.id)
   return story
+}
+
+/**
+ * Viết vào trình soạn chương (Tiptap). jsdom không mô phỏng được việc gõ từng phím vào vùng
+ * contenteditable của ProseMirror (mất ký tự), nên đưa con trỏ vào ô rồi dán cả đoạn văn.
+ */
+export async function writeInEditor(user: UserEvent, editor: HTMLElement, text: string) {
+  await user.click(editor)
+  await user.paste(text)
 }

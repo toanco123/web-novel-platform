@@ -4,7 +4,9 @@ import type { UseFormRegisterReturn } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { authInputClass, FormField } from '@/features/auth/components/FormField'
 import { cn } from '@/lib/utils'
+import { contentText } from '@/features/chapters/richText'
 import { CHAPTER_NUMBER_MAX, CONTENT_MAX, countWords } from '../schemas'
+import { ChapterContentEditor } from '../editor/ChapterContentEditor'
 
 const number = new Intl.NumberFormat('vi-VN')
 
@@ -12,13 +14,19 @@ type Props = {
   /** Tiền tố id của hai ô: `${idPrefix}-title`, `${idPrefix}-content` */
   idPrefix: string
   titleField: UseFormRegisterReturn
-  contentField: UseFormRegisterReturn
-  /** Nội dung hiện tại, để đếm chữ */
-  contentValue: string
+  /** `field` của useController cho nội dung (trình soạn không dùng được `register`) */
+  contentField: {
+    value: string
+    onChange: (value: string) => void
+    onBlur: () => void
+    /** Để react-hook-form đưa con trỏ vào ô khi có lỗi */
+    ref: (instance: { focus: () => void } | null) => void
+  }
   errors: { title?: string; content?: string }
   titleLabel?: string
   contentLabel?: string
-  textareaClassName?: string
+  /** Chiều cao tối thiểu của vùng soạn */
+  editorClassName?: string
 }
 
 /** Ô tiêu đề + nội dung chương (trình soạn chương và phần chương 1 của form tạo truyện) */
@@ -26,12 +34,13 @@ export function ChapterFields({
   idPrefix,
   titleField,
   contentField,
-  contentValue,
   errors,
   titleLabel = 'Tiêu đề chương (không bắt buộc)',
   contentLabel = 'Nội dung',
-  textareaClassName = 'min-h-[50vh]',
+  editorClassName = 'min-h-[50vh]',
 }: Props) {
+  // Đếm trên chữ nhìn thấy, không tính thẻ định dạng
+  const text = contentText(contentField.value)
   return (
     <>
       <FormField id={`${idPrefix}-title`} label={titleLabel} error={errors.title}>
@@ -53,23 +62,25 @@ export function ChapterFields({
           <p
             className={cn(
               'text-xs text-muted-foreground tabular-nums',
-              contentValue.length > CONTENT_MAX && 'text-destructive',
+              text.length > CONTENT_MAX && 'text-destructive',
             )}
           >
-            {number.format(countWords(contentValue))} chữ, {number.format(contentValue.length)}/
-            {number.format(CONTENT_MAX)} ký tự. Các đoạn cách nhau bằng một dòng trống.
+            {number.format(countWords(text))} chữ, {number.format(text.length)}/
+            {number.format(CONTENT_MAX)} ký tự. Nhấn Enter để sang đoạn mới.
           </p>
         }
       >
         {(c) => (
-          <textarea
-            {...c}
-            {...contentField}
-            placeholder="Bắt đầu viết chương của bạn…"
-            className={cn(
-              'field-sizing-content w-full rounded-lg border border-input bg-transparent px-4 py-3 font-heading text-lg leading-relaxed outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive dark:bg-input/30',
-              textareaClassName,
-            )}
+          <ChapterContentEditor
+            id={c.id}
+            labelId={`${c.id}-label`}
+            value={contentField.value}
+            onChange={contentField.onChange}
+            onBlur={contentField.onBlur}
+            focusRef={contentField.ref}
+            invalid={c['aria-invalid']}
+            describedBy={c['aria-describedby']}
+            className={editorClassName}
           />
         )}
       </FormField>

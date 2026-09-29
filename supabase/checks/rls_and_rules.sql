@@ -144,6 +144,17 @@ select pg_temp.expect(
     where story_id = pg_temp.story_id('truong-an-khong-tuyet') and number = 5$$) = 1,
   'chương nháp chưa xuất bản lần nào thì đổi số được');
 
+-- Nội dung có định dạng (HTML rút gọn) được dài hơn 100.000 ký tự, tối đa 200.000
+select pg_temp.expect(
+  pg_temp.affected($$insert into public.chapters (story_id, number, content)
+    values (pg_temp.story_id('truong-an-khong-tuyet'), 6,
+      '<p><strong>' || repeat('x', 150000) || '</strong></p>')$$) = 1,
+  'chương 150.000 ký tự (có thẻ định dạng) lưu được');
+select pg_temp.expect_error(
+  $$insert into public.chapters (story_id, number, content)
+    values (pg_temp.story_id('truong-an-khong-tuyet'), 7, repeat('x', 200001))$$,
+  '23514');
+
 -- Quyền theo cột: không sửa được slug, số liệu, mốc xuất bản
 select pg_temp.expect_error(
   $$update public.stories set slug = 'doi-slug' where slug = 'truong-an-khong-tuyet'$$, '42501');

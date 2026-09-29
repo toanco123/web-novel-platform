@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { renderApp } from '@/test/renderApp'
+import { writeInEditor } from '@/test/helpers'
 
 const slow = { timeout: 4000 }
 beforeEach(() => localStorage.clear())
@@ -44,7 +45,7 @@ test('đăng truyện → viết chương → xuất bản → truyện hiện c
     await screen.findByLabelText('Tiêu đề chương (không bắt buộc)', {}, slow),
     'Gặp lại',
   )
-  await user.type(screen.getByLabelText('Nội dung'), content)
+  await writeInEditor(user, screen.getByLabelText('Nội dung'), content)
   await user.click(screen.getByRole('button', { name: 'Xuất bản chương' }))
 
   const publish = await screen.findByRole('button', { name: 'Xuất bản truyện' }, slow)
@@ -83,7 +84,7 @@ test('tạo truyện kèm chương đầu tiên (chọn số chương) rồi b�
   await user.clear(number)
   await user.type(number, '50')
   await user.type(screen.getByLabelText('Tiêu đề chương'), 'Gặp lại')
-  await user.type(screen.getByLabelText('Nội dung chương'), content)
+  await writeInEditor(user, screen.getByLabelText('Nội dung chương'), content)
   await user.click(screen.getByRole('button', { name: 'Đăng truyện' }))
 
   // Sang trang quản lý: truyện đã công khai, có chương 50
@@ -113,7 +114,7 @@ test('rời trình soạn chương khi chưa lưu thì hỏi lại', async () =>
     coverUrl: null,
   })
   const { router, user } = renderApp(`/studio/story/${story.id}/new-chapter`)
-  await user.type(await screen.findByLabelText('Nội dung', {}, slow), 'Đang viết dở…')
+  await writeInEditor(user, await screen.findByLabelText('Nội dung', {}, slow), 'Đang viết dở…')
   await user.click(screen.getByRole('link', { name: 'Hủy' }))
 
   const dialog = await screen.findByRole('dialog', {}, slow)
@@ -250,7 +251,7 @@ test('chọn số chương: bỏ trống chương 2 để viết chương 3, r�
   await user.clear(number)
   await user.type(number, '3')
   expect(await screen.findByText(/Chương 2 chưa xuất bản/)).toBeInTheDocument()
-  await user.type(screen.getByLabelText('Nội dung'), content)
+  await writeInEditor(user, screen.getByLabelText('Nội dung'), content)
   await user.click(screen.getByRole('button', { name: 'Xuất bản chương' }))
 
   // Trang quản lý: chương 2 hiện là chỗ trống, bấm để viết bù
@@ -308,4 +309,40 @@ test('bút danh: đặt trong tab thông tin thì trang truyện hiện bút dan
   // Trang Sáng tác cũng có tiêu đề truyện: chờ link tác giả của trang truyện
   expect(await screen.findByRole('link', { name: 'Hạ Vy' }, slow)).toBeInTheDocument()
   expect(screen.queryByText('Bạn đọc Demo')).not.toBeInTheDocument()
+})
+
+test('chương có định dạng: soạn chữ đậm → xuất bản → trang đọc hiện đúng định dạng', async () => {
+  signIn()
+  const { createStory, saveChapter } = await import('./api')
+  const story = await createStory({
+    title: 'Truyện định dạng',
+    description: 'Mô tả đủ dài cho truyện thử nghiệm trong test.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+  })
+  // Chương cũ kiểu văn bản thuần vẫn đọc như trước
+  await saveChapter(
+    story.id,
+    { title: 'Một', content: `${content}\n\n${content}` },
+    { publish: true },
+  )
+  const { router, user } = renderApp(`/studio/story/${story.id}/new-chapter`)
+
+  await writeInEditor(user, await screen.findByLabelText('Nội dung', {}, slow), content)
+  await user.click(screen.getByRole('button', { name: 'Chọn tất cả' }))
+  await user.click(screen.getByRole('button', { name: 'Đậm' }))
+  await user.click(screen.getByRole('button', { name: 'Xuất bản chương' }))
+  await expect.poll(() => router.state.location.pathname, slow).toBe(`/studio/story/${story.id}`)
+
+  await router.navigate(`/story/${story.slug}/chapter-2`)
+  const article = await screen.findByRole('article', {}, slow)
+  const paragraph = article.querySelector('[data-paragraph="0"]')!
+  expect(paragraph.querySelector('strong')).toHaveTextContent(content.trim())
+
+  await router.navigate(`/story/${story.slug}/chapter-1`)
+  await expect
+    .poll(() => document.querySelectorAll('[data-chapter="1"] [data-paragraph]').length, slow)
+    .toBe(2)
+  expect(document.querySelector('[data-chapter="1"] strong')).toBeNull()
 })

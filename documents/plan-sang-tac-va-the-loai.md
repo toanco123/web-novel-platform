@@ -127,7 +127,7 @@ Thông tin | Chương (12)                                  (tabs)
 - **Xem trước:** chủ truyện mở được `/story/:slug` kể cả khi truyện còn nháp; đầu trang có dải "Bản nháp, chỉ bạn thấy trang này".
 
 ### 1.5 Soạn chương
-- Tiêu đề chương (không bắt buộc, ≤ 120 ký tự) và nội dung là `textarea` lớn tự giãn, các đoạn cách nhau bằng dòng trống.
+- Tiêu đề chương (không bắt buộc, ≤ 120 ký tự) và nội dung là `textarea` lớn tự giãn, các đoạn cách nhau bằng dòng trống. *(29/09/2026: thay bằng trình soạn có thanh định dạng, xem `plan-trinh-soan-dinh-dang.md`.)*
 - Nội dung phải có ≥ 100 ký tự và ≤ 100.000 ký tự; hiện số chữ và số ký tự.
 - **Tự lưu nháp soạn thảo** vào trình duyệt mỗi 5 giây ("Đã lưu nháp lúc 10:42"). Mở lại trang thì hỏi "Khôi phục bản đang viết dở?".
 - Nút "Lưu nháp", "Xuất bản chương", "Hủy". Rời trang khi còn thay đổi chưa lưu thì hỏi lại (`useBlocker` của React Router + `beforeunload`).
@@ -138,7 +138,7 @@ Thông tin | Chương (12)                                  (tabs)
   - Xóa chương thì xóa luôn bình luận và báo lỗi của chương, để chương viết lại với số đó không nhận nhầm. Lượt đọc giữ nguyên trong tổng của truyện.
   - Nhập file `.txt` vẫn đánh số tiếp nối sau chương lớn nhất.
   - Giới hạn đã biết: "chương mới" trong tủ truyện tính theo số chương lớn hơn mốc đã đọc, nên chương viết bù phía trước (vd chương 2 xuất bản sau chương 3) không được đếm là chương mới.
-- Nội dung luôn hiển thị dạng **văn bản thuần** (không render HTML) nên không có nguy cơ chèn mã.
+- Nội dung luôn hiển thị dạng **văn bản thuần** (không render HTML) nên không có nguy cơ chèn mã. *(29/09/2026: chương có định dạng giới hạn, vẫn không render HTML thô: trang đọc dựng từ mô hình đã lọc, xem `plan-trinh-soan-dinh-dang.md`.)*
 
 ### 1.6 Nhập file `.txt` (giai đoạn C)
 1. **Chọn file:** chỉ nhận `.txt` UTF-8, ≤ 2 MB. Nếu phát hiện ký tự lỗi `�` thì báo "File không phải mã UTF-8. Mở file bằng Notepad → Lưu thành → chọn UTF-8 rồi thử lại."

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFetchChapter } from '@/features/chapters/hooks'
-import { toParagraphs } from '../text'
+import { blockTexts, parseContent } from '@/features/chapters/richText'
 import { splitForSpeech } from './splitForSpeech'
 import { useSpeechSettings } from './useSpeechSettings'
 import { pickVoice, speechSupported, useVoices } from './useVoices'
@@ -72,7 +72,8 @@ export function useChapterSpeech(slug: string, onAdvance: (next: number) => void
         setState(IDLE)
         return
       }
-      const paragraphs = toParagraphs(data.content)
+      // Mỗi đoạn, tiêu đề, mục danh sách là một đơn vị đọc, khớp với `data-paragraph` trên trang
+      const paragraphs = blockTexts(parseContent(data.content))
 
       const speakParagraph = (i: number) => {
         if (id !== run.current) return

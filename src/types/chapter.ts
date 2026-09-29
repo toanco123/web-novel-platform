@@ -30,7 +30,7 @@ export type ChapterContent = {
   story: { slug: string; title: string; author: Author; status: StoryStatus; chapterCount: number }
   number: number
   title: string
-  /** Văn bản thuần, các đoạn cách nhau bằng dòng trống */
+  /** HTML rút gọn của trình soạn hoặc văn bản thuần kiểu cũ: đọc qua `parseContent` (`features/chapters/richText`) */
   content: string
   publishedAt: string
   prev: ChapterNeighbor | null

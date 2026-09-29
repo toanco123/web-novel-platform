@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm, useWatch } from 'react-hook-form'
+import { Controller, useController, useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -81,6 +81,7 @@ export function StoryForm({
     defaultValues: { ...defaultValues, chapter: { number: 1, title: '', content: '' } },
   })
   const values = useWatch({ control }) as StoryFormValues
+  const { field: chapterContent } = useController({ control, name: 'chapter.content' })
   const previewSlug = slug ?? (slugify(values.title) || 'ten-truyen')
   const leave = useUnsavedChangesPrompt(
     firstChapter && values.chapter.content.trim() !== '' && !pending,
@@ -265,15 +266,14 @@ export function StoryForm({
               <ChapterFields
                 idPrefix="first-chapter"
                 titleField={register('chapter.title')}
-                contentField={register('chapter.content')}
-                contentValue={values.chapter.content}
+                contentField={chapterContent}
                 errors={{
                   title: errors.chapter?.title?.message,
                   content: errors.chapter?.content?.message,
                 }}
                 titleLabel="Tiêu đề chương"
                 contentLabel="Nội dung chương"
-                textareaClassName="min-h-72"
+                editorClassName="min-h-72"
               />
             </section>
 
