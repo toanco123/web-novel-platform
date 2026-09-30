@@ -158,6 +158,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          parent_id: string | null
           story_id: string
           user_id: string
         }
@@ -166,6 +167,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          parent_id?: string | null
           story_id: string
           user_id?: string
         }
@@ -174,10 +176,18 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          parent_id?: string | null
           story_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "comments_story_id_chapter_number_fkey"
             columns: ["story_id", "chapter_number"]
@@ -792,6 +802,24 @@ export type Database = {
       }
     }
     Functions: {
+      admin_comments: {
+        Args: { p_query?: string; p_reported?: boolean }
+        Returns: {
+          chapter_number: number
+          content: string
+          created_at: string
+          id: string
+          is_reply: boolean
+          last_reported_at: string
+          reply_count: number
+          reports: Json
+          story_slug: string
+          story_title: string
+          story_visibility: Database["public"]["Enums"]["publication_status"]
+          user_id: string
+          user_name: string
+        }[]
+      }
       admin_contact_messages: {
         Args: { p_status?: string }
         Returns: {
@@ -815,7 +843,12 @@ export type Database = {
           title: string
         }[]
       }
+      admin_delete_comment: { Args: { p_id: string }; Returns: undefined }
       admin_delete_genre: { Args: { p_slug: string }; Returns: undefined }
+      admin_dismiss_comment_reports: {
+        Args: { p_comment_id: string }
+        Returns: undefined
+      }
       admin_merge_genres: {
         Args: { p_from: string; p_into: string }
         Returns: number
@@ -913,6 +946,19 @@ export type Database = {
           story_count: number
         }[]
       }
+      comment_threads: {
+        Args: { p_chapter?: number; p_story_id: string }
+        Returns: {
+          avatar_url: string
+          chapter_number: number
+          content: string
+          created_at: string
+          display_name: string
+          id: string
+          reply_count: number
+          user_id: string
+        }[]
+      }
       create_story: {
         Args: {
           p_author_name?: string
@@ -1004,6 +1050,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      report_comment: {
+        Args: {
+          p_comment_id: string
+          p_note?: string
+          p_reason: Database["public"]["Enums"]["comment_report_reason"]
+        }
+        Returns: undefined
+      }
       save_reading_progress: {
         Args: {
           p_chapter: number
@@ -1086,6 +1140,7 @@ export type Database = {
       }
     }
     Enums: {
+      comment_report_reason: "spam" | "offensive" | "spoiler" | "other"
       contact_topic: "general" | "bug" | "copyright" | "partnership"
       publication_status: "draft" | "published"
       report_reason: "typo" | "missing" | "order" | "violation" | "other"
@@ -1218,6 +1273,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      comment_report_reason: ["spam", "offensive", "spoiler", "other"],
       contact_topic: ["general", "bug", "copyright", "partnership"],
       publication_status: ["draft", "published"],
       report_reason: ["typo", "missing", "order", "violation", "other"],

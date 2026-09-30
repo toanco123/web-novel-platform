@@ -60,6 +60,8 @@ export function seedComments(story: Story): Comment[] {
       user: { id: `seed-user-${name}`, displayName: name, avatarUrl: null },
       content: pick(rand, texts),
       createdAt: new Date(Date.now() - hoursAgo * HOUR).toISOString(),
+      parentId: null,
+      replyCount: 0,
     }
   })
 }
@@ -81,6 +83,8 @@ export function seedChapterComments(story: Story, number: number): Comment[] {
       user: { id: `seed-user-${name}`, displayName: name, avatarUrl: null },
       content: pick(rand, chapterTexts),
       createdAt: new Date(Date.now() - hoursAgo * HOUR).toISOString(),
+      parentId: null,
+      replyCount: 0,
     }
   })
 }

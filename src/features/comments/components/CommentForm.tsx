@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { LoaderCircle } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,11 +17,32 @@ type Props = {
   user: User
   /** Có số: bình luận cho chương đó */
   chapter?: number | null
+  /** Có giá trị: ô viết trả lời cho bình luận gốc này */
+  parentId?: string | null
+  /** Nội dung điền sẵn (trả lời một câu trả lời: "@Tên ") */
+  initialContent?: string
+  /** Gửi xong */
+  onDone?: () => void
+  /** Có thì hiện nút "Hủy" */
+  onCancel?: () => void
 }
 
-export function CommentForm({ slug, user, chapter = null }: Props) {
-  const add = useAddComment(slug, chapter)
-  const id = chapter === null ? 'comment-content' : `comment-content-${chapter}`
+export function CommentForm({
+  slug,
+  user,
+  chapter = null,
+  parentId = null,
+  initialContent = '',
+  onDone,
+  onCancel,
+}: Props) {
+  const add = useAddComment(slug, chapter, parentId)
+  const isReply = parentId !== null
+  const id = isReply
+    ? `reply-content-${parentId}`
+    : chapter === null
+      ? 'comment-content'
+      : `comment-content-${chapter}`
   const {
     register,
     control,
@@ -29,32 +51,55 @@ export function CommentForm({ slug, user, chapter = null }: Props) {
     formState: { errors },
   } = useForm<CommentValues>({
     resolver: zodResolver(commentSchema),
-    defaultValues: { content: '' },
+    defaultValues: { content: initialContent },
   })
   const length = useWatch({ control, name: 'content' }).length
+  const field = register('content')
+  const textarea = useRef<HTMLTextAreaElement | null>(null)
 
-  const onSubmit = handleSubmit(({ content }) => add.mutate(content, { onSuccess: () => reset() }))
+  // Ô trả lời vừa mở: đưa con trỏ vào cuối phần điền sẵn để viết tiếp ngay
+  useEffect(() => {
+    const el = textarea.current
+    if (!isReply || !el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [isReply])
+
+  const onSubmit = handleSubmit(({ content }) =>
+    add.mutate(content, {
+      onSuccess: () => {
+        reset({ content: '' })
+        onDone?.()
+      },
+    }),
+  )
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex gap-3">
-      <UserAvatar user={user} className="size-9 shrink-0" />
+      <UserAvatar user={user} className={cn('shrink-0', isReply ? 'size-7' : 'size-9')} />
       <div className="min-w-0 flex-1 space-y-2">
         {add.isError && <FormAlert>{authErrorMessage(add.error)}</FormAlert>}
         <label htmlFor={id} className="sr-only">
-          Viết bình luận
+          {isReply ? 'Viết trả lời' : 'Viết bình luận'}
         </label>
         <Textarea
           id={id}
-          {...register('content')}
-          rows={3}
+          {...field}
+          ref={(el) => {
+            field.ref(el)
+            textarea.current = el
+          }}
+          rows={isReply ? 2 : 3}
           placeholder={
-            chapter === null
-              ? 'Chia sẻ cảm nhận của bạn về truyện này…'
-              : 'Bạn nghĩ gì về chương này?'
+            isReply
+              ? 'Viết trả lời…'
+              : chapter === null
+                ? 'Chia sẻ cảm nhận của bạn về truyện này…'
+                : 'Bạn nghĩ gì về chương này?'
           }
           aria-invalid={!!errors.content}
           aria-describedby={`${id}-hint`}
-          className="min-h-24 resize-y rounded-lg px-3.5 py-3"
+          className={cn('resize-y rounded-lg px-3.5 py-3', isReply ? 'min-h-16' : 'min-h-24')}
         />
         <div className="flex items-center justify-between gap-3">
           <p
@@ -66,10 +111,23 @@ export function CommentForm({ slug, user, chapter = null }: Props) {
           >
             {errors.content?.message ?? `${length}/${COMMENT_MAX}`}
           </p>
-          <Button type="submit" disabled={add.isPending} className="h-9 rounded-full px-5">
-            {add.isPending && <LoaderCircle className="animate-spin" aria-hidden />}
-            {add.isPending ? 'Đang gửi…' : 'Gửi bình luận'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {onCancel && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onCancel}
+                disabled={add.isPending}
+                className="h-9 rounded-full px-4"
+              >
+                Hủy
+              </Button>
+            )}
+            <Button type="submit" disabled={add.isPending} className="h-9 rounded-full px-5">
+              {add.isPending && <LoaderCircle className="animate-spin" aria-hidden />}
+              {add.isPending ? 'Đang gửi…' : isReply ? 'Gửi trả lời' : 'Gửi bình luận'}
+            </Button>
+          </div>
         </div>
       </div>
     </form>

@@ -13,6 +13,8 @@ import {
   ADMIN_PAGE_SIZE,
   AdminError,
   isAdminErrorCode,
+  type AdminComment,
+  type AdminCommentQuery,
   type AdminContactMessage,
   type AdminMessageQuery,
   type AdminOverview,
@@ -185,6 +187,56 @@ export async function setAdminReportStatus(id: string, status: AdminReport['stat
   await requireUserId()
   if (!isUuid(id)) throw new Error('Id báo lỗi không hợp lệ')
   unwrap(await db().rpc('admin_set_report_status', { p_id: id, p_status: status }), adminError)
+}
+
+// ── Bình luận ───────────────────────────────────────────────────────────
+
+export async function getAdminComments({
+  view,
+  q,
+  page,
+}: AdminCommentQuery): Promise<Page<AdminComment>> {
+  await requireUserId()
+  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
+    db()
+      .rpc(
+        'admin_comments',
+        { p_query: q || undefined, p_reported: view === 'reported' },
+        { count: 'exact' },
+      )
+      .range(from, to),
+  ).catch(rethrow)
+  return {
+    ...result,
+    items: result.items.map((r) => ({
+      id: r.id,
+      content: r.content,
+      createdAt: r.created_at,
+      isReply: r.is_reply,
+      replyCount: r.reply_count,
+      author: { id: r.user_id, displayName: r.user_name },
+      storySlug: r.story_slug,
+      storyTitle: r.story_title,
+      storyPublished: r.story_visibility === 'published',
+      chapterNumber: r.chapter_number ?? null,
+      // RPC dựng sẵn mảng đúng dạng AdminComment['reports']
+      reports: r.reports as unknown as AdminComment['reports'],
+    })),
+  }
+}
+
+/** Xóa bình luận của bất kỳ ai, kèm trả lời và báo cáo của nó */
+export async function deleteAdminComment(id: string) {
+  await requireUserId()
+  if (!isUuid(id)) throw new AdminError('not_found')
+  unwrap(await db().rpc('admin_delete_comment', { p_id: id }), adminError)
+}
+
+/** Đóng mọi báo cáo đang mở của một bình luận, bình luận giữ nguyên */
+export async function dismissCommentReports(commentId: string) {
+  await requireUserId()
+  if (!isUuid(commentId)) throw new AdminError('not_found')
+  unwrap(await db().rpc('admin_dismiss_comment_reports', { p_comment_id: commentId }), adminError)
 }
 
 // ── Khóa tài khoản, gỡ truyện ───────────────────────────────────────────

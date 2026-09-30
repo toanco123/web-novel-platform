@@ -8,6 +8,7 @@ import {
   Home,
   Inbox,
   LayoutDashboard,
+  MessageSquare,
   Tags,
   Users,
 } from 'lucide-react'
@@ -28,6 +29,7 @@ const menu = [
   { key: paths.adminFeatured, icon: Home, label: 'Trang chủ' },
   { key: paths.adminInbox, icon: Inbox, label: 'Hộp thư' },
   { key: paths.adminReports, icon: Flag, label: 'Báo lỗi' },
+  { key: paths.adminComments, icon: MessageSquare, label: 'Bình luận' },
   { key: paths.adminGenres, icon: Tags, label: 'Thể loại' },
   { key: paths.adminImport, icon: FileUp, label: 'Nhập truyện' },
 ]

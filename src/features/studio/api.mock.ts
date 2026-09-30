@@ -12,7 +12,7 @@ import {
   ratingsOf,
   recentViews,
   saveReports,
-  saveUserComments,
+  removeComments,
   totalViews,
 } from '@/mocks/activity'
 import { takenStorySlugs } from '@/mocks/catalog'
@@ -335,7 +335,7 @@ export async function deleteChapter(storyId: string, number: number) {
   // không nhận nhầm của chương cũ
   const ofChapter = (c: { storySlug: string; chapterNumber: number | null }) =>
     c.storySlug === story.slug && c.chapterNumber === number
-  saveUserComments(loadUserComments().filter((c) => !ofChapter(c)))
+  removeComments(ofChapter)
   saveReports(loadReports().filter((r) => !ofChapter(r)))
   touch(stories, story)
 }

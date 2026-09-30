@@ -92,7 +92,7 @@ Desktop
 - **Danh sách bình luận:** avatar (`UserAvatar`), tên, thời gian, nội dung; mới nhất trước; mỗi lần 10 bình luận, nút "Xem thêm bình luận" (`useInfiniteQuery`).
 - Bình luận của chính mình có nút "Xóa", hỏi xác nhận bằng `ui/dialog`.
 - Bình luận mới hiện ngay sau khi gửi.
-- Phạm vi: chưa có trả lời bình luận (reply) và báo cáo vi phạm, để làm sau.
+- Trả lời bình luận (một cấp) và báo cáo bình luận vi phạm: thêm ngày 30/09/2026, xem `plan-tra-loi-va-kiem-duyet-binh-luan.md`.
 
 **Cột phụ:** "Cùng tác giả" (loại trừ truyện đang xem, ẩn khối nếu không có) và "Cùng thể loại" (xếp theo số thể loại trùng, rồi theo lượt xem, tối đa 6). Mỗi truyện hiển thị như danh sách Top tuần: bìa nhỏ (`compact`), tên, lượt đọc.
 

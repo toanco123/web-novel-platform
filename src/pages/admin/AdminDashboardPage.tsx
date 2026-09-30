@@ -91,7 +91,14 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
       value: totals.views,
       hint: `${number.format(totals.viewsInPeriod)} trong kỳ`,
     },
-    { title: 'Bình luận', value: totals.comments },
+    {
+      title: 'Bình luận',
+      value: totals.comments,
+      hint: totals.reportedComments
+        ? `${number.format(totals.reportedComments)} bị báo cáo`
+        : 'Xem bình luận',
+      to: paths.adminComments,
+    },
     {
       title: 'Báo lỗi đang mở',
       value: totals.openReports,

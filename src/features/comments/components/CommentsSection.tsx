@@ -67,7 +67,7 @@ export function CommentsSection({ slug, chapter = null }: Props) {
           >
             {items.map((c) => (
               <li key={c.id}>
-                <CommentItem comment={c} isOwn={c.user.id === user?.id} />
+                <CommentItem comment={c} viewer={user ?? null} />
               </li>
             ))}
           </ul>

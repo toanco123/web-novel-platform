@@ -61,6 +61,15 @@ export function useAdminReports(query: api.AdminReportQuery) {
   })
 }
 
+export function useAdminComments(query: api.AdminCommentQuery) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: [...adminKeys.all(userId), 'comments', query],
+    queryFn: () => api.getAdminComments(query),
+    placeholderData: keepPreviousData,
+  })
+}
+
 /** Thao tác của admin: xong thì làm mới mọi dữ liệu admin (danh sách, ô số ở Tổng quan) */
 function useAdminMutation<T>(mutationFn: (input: T) => Promise<unknown>) {
   const queryClient = useQueryClient()
@@ -85,6 +94,24 @@ export const useSetStoryTakedown = () =>
   useAdminMutation(({ storyId, reason }: { storyId: string; reason: string | null }) =>
     api.setStoryTakedown(storyId, reason),
   )
+
+export const useDismissCommentReports = () =>
+  useAdminMutation((commentId: string) => api.dismissCommentReports(commentId))
+
+/** Xóa bình luận: làm mới cả bình luận ở phần công khai */
+export function useDeleteAdminComment() {
+  const queryClient = useQueryClient()
+  const userId = useUserId()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteAdminComment(id),
+    onSettled: () =>
+      Promise.all(
+        [adminKeys.all(userId), ['comments']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+  })
+}
 
 /** Sửa/xóa/gộp thể loại: làm mới cả danh sách thể loại và truyện ở phần công khai */
 function useGenreMutation<T>(mutationFn: (input: T) => Promise<unknown>) {

@@ -8,6 +8,7 @@ export const commentKeys = {
   /** chapter = null: bình luận của cả truyện */
   list: (slug: string, chapter: number | null = null) =>
     ['comments', slug, chapter ?? 'story'] as const,
+  replies: (slug: string, commentId: string) => ['comments', slug, 'replies', commentId] as const,
   rating: (slug: string) => ['rating', slug] as const,
   myRating: (slug: string, userId: string) => ['rating', slug, 'me', userId] as const,
 }
@@ -20,11 +21,40 @@ export const useComments = (slug: string, chapter: number | null = null) =>
     getNextPageParam: (last) => last.nextCursor,
   })
 
-export function useAddComment(slug: string, chapter: number | null = null) {
+/** Trả lời của một bình luận; chỉ tải khi người đọc mở nhóm trả lời */
+export const useReplies = (slug: string, commentId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: commentKeys.replies(slug, commentId),
+    queryFn: () => api.getReplies(commentId),
+    enabled,
+  })
+
+/** parentId có giá trị: gửi trả lời cho bình luận gốc đó */
+export function useAddComment(
+  slug: string,
+  chapter: number | null = null,
+  parentId: string | null = null,
+) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (content: string) => api.addComment(slug, content, chapter),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: commentKeys.list(slug, chapter) }),
+    mutationFn: (content: string) => api.addComment(slug, content, chapter, parentId),
+    // Trả lời: làm mới cả danh sách gốc (số trả lời) và nhóm trả lời của bình luận đó
+    onSuccess: () =>
+      Promise.all(
+        [
+          commentKeys.list(slug, chapter),
+          ...(parentId ? [commentKeys.replies(slug, parentId)] : []),
+        ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      ),
+  })
+}
+
+export function useReportComment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: api.reportComment,
+    // Quản trị viên đang mở trang kiểm duyệt (tab khác) sẽ thấy báo cáo mới khi quay lại
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
   })
 }
 
