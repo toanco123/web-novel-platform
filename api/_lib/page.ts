@@ -6,9 +6,10 @@ import {
   homeSeo,
   metaDescription,
   type PageSeo,
+  staticPageSeo,
   storySeo,
 } from '../../src/lib/seo.js'
-import { matchRoute, missingSeo, privateSeo, staticPageSeo } from './html.js'
+import { matchRoute, missingSeo, privateSeo } from './html.js'
 
 export type StoryInfo = {
   slug: string
@@ -30,7 +31,13 @@ export type PageData = {
   genre(slug: string): Promise<{ slug: string; name: string; description: string | null } | null>
 }
 
-export type ResolvedPage = { status: 200 | 404; seo: PageSeo; jsonLd?: object }
+export type ResolvedPage = {
+  status: 200 | 404
+  seo: PageSeo
+  jsonLd?: object
+  /** Không đọc được dữ liệu nên chỉ có thẻ chung của web: không được cache */
+  degraded?: true
+}
 
 const found = (seo: PageSeo, jsonLd?: object): ResolvedPage => ({ status: 200, seo, jsonLd })
 const missing = (): ResolvedPage => ({ status: 404, seo: missingSeo() })
@@ -105,6 +112,17 @@ export async function resolvePage(
   try {
     return await resolve(pathname, data, siteUrl)
   } catch {
-    return found({ title: SITE_NAME, description: SITE_TAGLINE })
+    return { status: 200, seo: { title: SITE_NAME, description: SITE_TAGLINE }, degraded: true }
   }
+}
+
+/**
+ * Cache ở CDN của Vercel (mỗi bản deploy có cache riêng nên không giữ index.html cũ). Không dùng
+ * stale-while-revalidate: tác giả sửa tên truyện hay truyện bị gỡ thì sau 5 phút bot phải thấy bản mới.
+ * hasShell = false: không tải được index.html, đang trả trang tối giản.
+ */
+export function cacheControl(page: ResolvedPage, hasShell: boolean) {
+  // Bản thiếu dữ liệu hoặc thiếu index.html không được cache, kẻo bot và người đọc sau cũng nhận nó
+  if (page.degraded || !hasShell) return 'no-store'
+  return `public, max-age=0, s-maxage=${page.status === 200 ? 300 : 60}`
 }

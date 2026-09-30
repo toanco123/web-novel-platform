@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { SectionError } from '@/components/common/SectionHeading'
 import { Button } from '@/components/ui/button'
-import { SITE_NAME } from '@/config/site'
 import { useSession } from '@/features/auth/hooks'
 import { CreateGenreDialog } from '@/features/genres/components/CreateGenreDialog'
 import { useGenres } from '@/features/genres/hooks'
@@ -12,6 +11,7 @@ import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
 import { slugify } from '@/lib/slugify'
 import { Seo } from '@/components/common/Seo'
+import { staticPageSeo } from '@/lib/seo'
 
 export default function GenresPage() {
   const { data: genres, isPending, isError } = useGenres()
@@ -23,11 +23,7 @@ export default function GenresPage() {
 
   return (
     <Container className="py-10">
-      <Seo
-        title={`Thể loại truyện | ${SITE_NAME}`}
-        description="Tất cả thể loại truyện chữ: ngôn tình, cổ đại, xuyên không, hiện đại và nhiều thể loại khác."
-        path={paths.genres}
-      />
+      <Seo {...staticPageSeo(paths.genres)} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-4xl font-semibold">Thể loại</h1>

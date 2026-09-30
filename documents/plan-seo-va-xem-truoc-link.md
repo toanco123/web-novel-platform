@@ -30,6 +30,7 @@ Một module thuần, dùng ở cả client và hàm Vercel, để hai nơi ra c
 - `PageSeo = { title, description?, path?, image?, type?, noindex?, jsonLd? }`.
 - `seoTags(seo, siteUrl)` → danh sách thẻ `meta`/`link` (description, canonical, `og:*`, `twitter:card`, robots).
 - `storySeo`, `chapterSeo`, `genreSeo`, `homeSeo`: dựng `PageSeo` từ dữ liệu.
+- `STATIC_PAGES` + `staticPageSeo(path)`: tiêu đề và mô tả của các trang tĩnh (thể loại, ba danh sách, bảng xếp hạng, bốn trang thông tin). Trang trong app cũng lấy chữ hiển thị từ bảng này. React chỉ nhận lại thẻ có sẵn trong head khi nội dung giống hệt, nên thẻ của hàm và thẻ của app phải trùng nhau, nếu không bot chạy JS sẽ thấy hai thẻ description.
 - `metaDescription(text)`: gom khoảng trắng, cắt ở 160 ký tự theo ranh giới từ.
 
 Quy tắc:
@@ -51,7 +52,7 @@ Quy tắc:
 
 ## 3. Hàm `api/meta` cho bot
 
-- `vercel.json` thêm một rewrite đứng trước rewrite SPA: request có `user-agent` của bot (Facebook, Zalo, Telegram, Twitter/X, Slack, Discord, WhatsApp, LinkedIn, Skype, Pinterest, Googlebot, Bingbot, Cốc Cốc...) và đường dẫn không bắt đầu bằng `api/`, `assets/` thì chuyển sang `/api/meta`. Người đọc thường vẫn nhận `index.html` tĩnh.
+- `vercel.json` thêm một rewrite đứng trước rewrite SPA: request có `user-agent` của bot (Facebook, Zalo, Telegram, Twitter/X, Slack, Discord, WhatsApp, LinkedIn, Skype, Pinterestbot, Googlebot, Bingbot, Cốc Cốc...) và đường dẫn không bắt đầu bằng `api/`, `assets/` thì chuyển sang `/api/meta`. Người đọc thường vẫn nhận `index.html` tĩnh.
 - Hàm nhận URL gốc trong `request.url`, tự tách đường dẫn:
 
 | Đường dẫn | Dữ liệu | Không có |
@@ -61,7 +62,8 @@ Quy tắc:
 | `/story/:slug/chapter-:n` | chương đã xuất bản + truyện | 404 + `noindex` |
 | `/genres/:slug` | `genre_cards` | 404 + `noindex` |
 | `/search`, `/library`, `/account`, `/login`, `/register`, `/forgot-password`, `/reset-password`, `/auth/*`, `/studio/*`, `/admin/*` | – | `noindex` |
-| còn lại | tên web + tagline, canonical theo đường dẫn | – |
+| trang tĩnh trong `STATIC_PAGES` (`/genres`, `/list/*`, `/ranking`, trang thông tin) | tiêu đề và mô tả riêng của trang | – |
+| còn lại | – | 404 + `noindex` |
 
 - Đọc Supabase qua REST bằng anon key (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`), nên RLS vẫn áp dụng. Slug sai định dạng coi như không có. Supabase lỗi hoặc quá 4 giây thì trả thẻ mặc định với mã 200 (không báo 404 oan).
 - Hàm tải `/index.html` của chính bản deploy (thử 2 lần), gỡ thẻ mặc định, thay `<title>` và chèn thẻ trước `</head>`. Bot có chạy JS (Google) vẫn nhận đúng app.
@@ -69,7 +71,8 @@ Quy tắc:
 - Bản preview trên Vercel có lớp đăng nhập nên hàm không tải được `index.html` của chính nó: ở preview, bot luôn nhận trang tối giản. Production không có lớp này.
 - `includeFiles` của Vercel không dùng được để gói sẵn `dist/index.html` vào hàm (hàm được đóng gói trước khi `dist` có), nên phải tải qua mạng.
 - Trang truyện có thêm JSON-LD kiểu `Book` (tên, tác giả, mô tả, ảnh, thể loại, điểm đánh giá nếu có).
-- Cache ở CDN: `s-maxage=300, stale-while-revalidate=86400` cho mã 200; `s-maxage=60` cho 404.
+- Cache ở CDN: `s-maxage=300` cho mã 200, `s-maxage=60` cho 404, không dùng `stale-while-revalidate` (tác giả sửa tên truyện hay truyện bị gỡ thì sau 5 phút bot thấy bản mới). Bản thiếu dữ liệu (Supabase lỗi) hoặc thiếu `index.html` thì `no-store`.
+- Hạn chế đã biết: khóa cache của CDN gồm cả query string, nên bot gửi `?x=<ngẫu nhiên>` luôn gọi hàm (tốn một lượt đọc Supabase mỗi request). Chưa giới hạn tần suất ở đây; nếu bị lạm dụng thì thêm luật trong Vercel Firewall.
 
 ## 3b. Thẻ mặc định trong `index.html`
 
@@ -82,7 +85,7 @@ Trang chủ `/` là file tĩnh nên Vercel trả thẳng `index.html`, không qu
 ## 4. Sitemap và robots
 
 - `/sitemap.xml` → rewrite sang `api/sitemap`: trang chủ, `/genres`, ba danh sách, bảng xếp hạng, bốn trang thông tin, từng thể loại có truyện, từng truyện công khai (`lastmod` = `updated_at`). Đọc `story_cards` theo lô 1.000, tối đa 45.000 truyện. Cache `s-maxage=3600`. Supabase lỗi thì vẫn trả các trang tĩnh.
-- `robots.txt`: plugin Vite `seo.config.ts` sinh lúc build (cần địa chỉ tuyệt đối của sitemap). Chặn `/admin`, `/studio`, `/account`, `/library`, `/auth`, `/api`, `/search`.
+- `robots.txt`: plugin Vite `seo.config.ts` sinh lúc build (cần địa chỉ tuyệt đối của sitemap). Chỉ chặn `/api/` và `/search` (số URL `?q=` là vô hạn). Khu cần đăng nhập không chặn ở đây mà đặt `noindex`: bot phải tải được trang mới thấy `noindex`.
 - PWA: `navigateFallbackDenylist` thêm `/api/`, `/sitemap.xml`, `/robots.txt`; ảnh `og-default.png` không precache.
 
 ## 5. File

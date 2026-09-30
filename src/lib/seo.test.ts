@@ -1,5 +1,14 @@
 import { SITE_NAME, SITE_TAGLINE } from '@/config/site'
-import { chapterSeo, genreSeo, homeSeo, metaDescription, seoTags, storySeo } from './seo'
+import {
+  chapterSeo,
+  genreSeo,
+  homeSeo,
+  metaDescription,
+  seoTags,
+  STATIC_PAGES,
+  staticPageSeo,
+  storySeo,
+} from './seo'
 
 const SITE = 'https://web.example'
 const story = {
@@ -90,4 +99,16 @@ test('trang không có đường dẫn chuẩn thì không có canonical và og:
   expect(keys).not.toContain('canonical')
   expect(keys).not.toContain('og:url')
   expect(keys).toContain('og:title')
+})
+
+test('trang tĩnh: tiêu đề và mô tả riêng của từng trang, canonical là đường dẫn chuẩn', () => {
+  expect(staticPageSeo('/ranking')).toEqual({
+    title: `Bảng xếp hạng truyện | ${SITE_NAME}`,
+    description: 'Truyện đọc nhiều, đánh giá cao và được theo dõi nhiều nhất.',
+    path: '/ranking',
+  })
+  for (const page of Object.values(STATIC_PAGES)) {
+    expect(page.title).not.toBe('')
+    expect(page.description.length).toBeGreaterThan(20)
+  }
 })

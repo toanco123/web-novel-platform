@@ -35,6 +35,7 @@ test.each([
   'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
   'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
   'Mozilla/5.0 (compatible; coccocbot-web/1.0; +http://help.coccoc.com/searchengine)',
+  'Mozilla/5.0 (compatible; Pinterestbot/1.0; +http://www.pinterest.com/bot.html)',
 ])('bot được chuyển sang api/meta: %s', (userAgent) => {
   expect(isBot(userAgent)).toBe(true)
 })
@@ -45,6 +46,8 @@ test.each([
   // Trình duyệt trong app Facebook của người đọc thật
   'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/140.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/480.0.0.0;]',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0',
+  // Trình duyệt trong app Pinterest
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 [Pinterest/iOS]',
 ])('người đọc thường nhận index.html tĩnh: %s', (userAgent) => {
   expect(isBot(userAgent)).toBe(false)
 })

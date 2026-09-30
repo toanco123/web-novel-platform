@@ -118,7 +118,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*(facebookexternalhit|Facebot|Twitterbot|Zalo|TelegramBot|Slackbot|Discordbot|WhatsApp|LinkedInBot|SkypeUriPreview|Pinterest|redditbot|vkShare|Viber|Embedly|Googlebot|Google-InspectionTool|bingbot|coccocbot|YandexBot|DuckDuckBot|Applebot|Baiduspider).*"
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|Zalo|TelegramBot|Slackbot|Discordbot|WhatsApp|LinkedInBot|SkypeUriPreview|Pinterestbot|redditbot|Googlebot|Google-InspectionTool|bingbot|coccocbot|YandexBot|DuckDuckBot|Applebot|Baiduspider).*"
         }
       ],
       "destination": "/api/meta"

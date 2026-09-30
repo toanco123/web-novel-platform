@@ -4,8 +4,11 @@
 import type { HtmlTagDescriptor, Plugin } from 'vite'
 import { homeSeo, seoTags } from './src/lib/seo.ts'
 
-/** Khu không có nội dung cho máy tìm kiếm (cần đăng nhập, hoặc trùng lặp như trang tìm kiếm) */
-const DISALLOWED = ['/admin', '/studio', '/account', '/library', '/auth', '/api/', '/search']
+/**
+ * Chỉ chặn hàm api và trang tìm kiếm (số URL ?q= là vô hạn). Khu cần đăng nhập không chặn ở đây mà
+ * đặt noindex trong trang: bot phải tải được trang mới thấy noindex và gỡ khỏi chỉ mục.
+ */
+const DISALLOWED = ['/api/', '/search']
 
 export function robotsTxt(siteUrl: string) {
   return [

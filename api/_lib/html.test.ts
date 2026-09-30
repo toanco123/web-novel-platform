@@ -2,8 +2,8 @@ import { expect, test } from 'vitest'
 import indexHtml from '../../index.html?raw'
 import { SITE_NAME } from '../../src/config/site.js'
 import { paths } from '../../src/lib/routes.js'
-import { storySeo } from '../../src/lib/seo.js'
-import { fallbackHtml, injectSeo, isAppShell, matchRoute, staticPageSeo } from './html.js'
+import { STATIC_PAGES, storySeo } from '../../src/lib/seo.js'
+import { fallbackHtml, injectSeo, isAppShell, matchRoute } from './html.js'
 
 const SITE = 'https://web.example'
 
@@ -59,11 +59,11 @@ test('mọi đường dẫn trong paths đều được matchRoute nhận ra (th
   }
 })
 
-test('trang tĩnh có tiêu đề riêng và canonical', () => {
-  expect(staticPageSeo('/ranking')).toMatchObject({
-    title: `Bảng xếp hạng truyện | ${SITE_NAME}`,
-    path: '/ranking',
-  })
+test('mọi trang tĩnh trong STATIC_PAGES đều được nhận ra', () => {
+  for (const path of Object.keys(STATIC_PAGES)) {
+    expect(matchRoute(path)).toEqual({ kind: 'page', path })
+    expect(matchRoute(`${path}/`)).toEqual({ kind: 'page', path })
+  }
 })
 
 test('injectSeo thay <title> và chèn thẻ vào head của index.html', () => {

@@ -1,14 +1,13 @@
 import { expect, test } from 'vitest'
 import { defaultHeadTags, robotsTxt } from './seo.config.ts'
 
-test('robots.txt chặn khu riêng tư và trỏ tới sitemap bằng địa chỉ tuyệt đối', () => {
+test('robots.txt chỉ chặn hàm api và trang tìm kiếm, trỏ tới sitemap bằng địa chỉ tuyệt đối', () => {
   const lines = robotsTxt('https://web.example/').split('\n')
   expect(lines).toContain('User-agent: *')
-  for (const path of ['/admin', '/studio', '/account', '/library', '/auth', '/api/', '/search']) {
-    expect(lines).toContain(`Disallow: ${path}`)
-  }
-  expect(lines).not.toContain('Disallow: /')
-  expect(lines).not.toContain('Disallow: /story')
+  expect(lines.filter((l) => l.startsWith('Disallow:'))).toEqual([
+    'Disallow: /api/',
+    'Disallow: /search',
+  ])
   expect(lines).toContain('Sitemap: https://web.example/sitemap.xml')
 })
 

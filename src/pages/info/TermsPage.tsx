@@ -5,11 +5,7 @@ import { paths } from '@/lib/routes'
 
 export default function TermsPage() {
   return (
-    <InfoPage
-      title="Điều khoản sử dụng"
-      description={`Những điều bạn đồng ý khi đọc, bình luận và đăng truyện trên ${SITE_NAME}.`}
-      updatedAt="2026-09-25"
-    >
+    <InfoPage path={paths.terms} updatedAt="2026-09-25">
       <InfoNote>
         Đây là bản thử nghiệm. Nội dung điều khoản có thể thay đổi trước khi trang chính thức hoạt
         động; khi có thay đổi quan trọng chúng tôi sẽ thông báo trên trang.

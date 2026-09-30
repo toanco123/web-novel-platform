@@ -1,14 +1,14 @@
 // Phần thuần của hàm api/meta: nhận ra trang từ đường dẫn và chèn thẻ SEO vào index.html.
 // Import tương đối ghi đuôi .js: Vercel biên dịch từng file .ts thành .js và giữ nguyên đường dẫn.
-import { SITE_NAME, SITE_TAGLINE } from '../../src/config/site.js'
-import { type PageSeo, seoTags } from '../../src/lib/seo.js'
+import { SITE_NAME } from '../../src/config/site.js'
+import { type PageSeo, seoTags, STATIC_PAGES } from '../../src/lib/seo.js'
 
 export type Route =
   | { kind: 'home' }
   | { kind: 'story'; slug: string }
   | { kind: 'chapter'; slug: string; number: number }
   | { kind: 'genre'; slug: string }
-  /** Trang công khai không cần đọc dữ liệu (danh sách, bảng xếp hạng, trang thông tin) */
+  /** Trang công khai không cần đọc dữ liệu (STATIC_PAGES: danh sách, bảng xếp hạng, trang thông tin) */
   | { kind: 'page'; path: string }
   /** Khu cần đăng nhập và trang không có nội dung riêng: không cho lập chỉ mục */
   | { kind: 'private' }
@@ -21,19 +21,6 @@ const STORY = new RegExp(`^/story/(${SLUG})$`)
 const CHAPTER = new RegExp(`^/story/(${SLUG})/chapter-([1-9][0-9]{0,8})$`)
 const GENRE = new RegExp(`^/genres/(${SLUG})$`)
 
-/** Tiêu đề các trang công khai tĩnh (như <title> của chính trang đó trong src/pages) */
-const PAGES: Record<string, string> = {
-  '/genres': 'Thể loại truyện',
-  '/list/latest': 'Truyện mới cập nhật',
-  '/list/completed': 'Truyện full',
-  '/list/ongoing': 'Truyện đang ra',
-  '/ranking': 'Bảng xếp hạng truyện',
-  '/about': `Về ${SITE_NAME}`,
-  '/contact': 'Liên hệ',
-  '/terms': 'Điều khoản sử dụng',
-  '/privacy': 'Chính sách bảo mật',
-}
-
 const PRIVATE =
   /^\/(search|library|account|login|register|forgot-password|reset-password|auth|studio|admin)(\/|$)/
 
@@ -42,7 +29,7 @@ export function matchRoute(pathname: string): Route {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
   if (path === '' || path === '/') return { kind: 'home' }
   if (PRIVATE.test(path)) return { kind: 'private' }
-  if (path in PAGES) return { kind: 'page', path }
+  if (Object.hasOwn(STATIC_PAGES, path)) return { kind: 'page', path }
   const chapter = CHAPTER.exec(path)
   if (chapter) return { kind: 'chapter', slug: chapter[1], number: Number(chapter[2]) }
   const story = STORY.exec(path)
@@ -51,12 +38,6 @@ export function matchRoute(pathname: string): Route {
   if (genre) return { kind: 'genre', slug: genre[1] }
   return { kind: 'missing' }
 }
-
-export const staticPageSeo = (path: string): PageSeo => ({
-  title: `${PAGES[path]} | ${SITE_NAME}`,
-  description: SITE_TAGLINE,
-  path,
-})
 
 export const privateSeo = (): PageSeo => ({ title: SITE_NAME, noindex: true })
 export const missingSeo = (): PageSeo => ({

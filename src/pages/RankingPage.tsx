@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { SectionError } from '@/components/common/SectionHeading'
 import { SegmentedLinks } from '@/components/common/SegmentedLinks'
-import { SITE_NAME } from '@/config/site'
 import type { RankedStory, RankingCriterion, RankingPeriod } from '@/features/stories/api'
 import { useRanking } from '@/features/stories/hooks'
 import { StoryCover } from '@/features/stories/StoryCover'
@@ -11,6 +10,7 @@ import { formatCount } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import { Seo } from '@/components/common/Seo'
+import { staticPageSeo } from '@/lib/seo'
 
 const criteria: { value: RankingCriterion; param: string; label: string; hint: string }[] = [
   {
@@ -57,11 +57,7 @@ export default function RankingPage() {
 
   return (
     <Container className="py-10">
-      <Seo
-        title={`Bảng xếp hạng truyện | ${SITE_NAME}`}
-        description="Truyện đọc nhiều, đánh giá cao và được theo dõi nhiều nhất."
-        path={paths.ranking}
-      />
+      <Seo {...staticPageSeo(paths.ranking)} />
       <h1 className="flex items-center gap-3 font-heading text-4xl font-semibold">
         <Trophy className="size-8 text-rose-gold" aria-hidden />
         Bảng xếp hạng

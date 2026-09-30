@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { SITE_NAME, SITE_TAGLINE } from '../../src/config/site.js'
-import { type PageData, resolvePage, type StoryInfo } from './page.js'
+import { cacheControl, type PageData, resolvePage, type StoryInfo } from './page.js'
 
 const SITE = 'https://web.example'
 const story: StoryInfo = {
@@ -104,5 +104,25 @@ test('Supabase lỗi thì trả thẻ mặc định với mã 200, không báo 4
     const page = await resolvePage(path, failing, SITE)
     expect(page.status).toBe(200)
     expect(page.seo).toEqual({ title: SITE_NAME, description: SITE_TAGLINE })
+    expect(page.degraded).toBe(true)
   }
+  expect((await resolvePage('/story/mua-ha', data, SITE)).degraded).toBeUndefined()
+})
+
+test('trang tĩnh dùng mô tả riêng của trang, giống thẻ app tự đặt', async () => {
+  expect((await resolvePage('/ranking', data, SITE)).seo).toEqual({
+    title: `Bảng xếp hạng truyện | ${SITE_NAME}`,
+    description: 'Truyện đọc nhiều, đánh giá cao và được theo dõi nhiều nhất.',
+    path: '/ranking',
+  })
+})
+
+test('cache ở CDN: chỉ cache trang đủ dữ liệu, không giữ bản cũ sau khi hết hạn', async () => {
+  const ok = await resolvePage('/story/mua-ha', data, SITE)
+  expect(cacheControl(ok, true)).toBe('public, max-age=0, s-maxage=300')
+  const notFound = await resolvePage('/story/khong-co', data, SITE)
+  expect(cacheControl(notFound, true)).toBe('public, max-age=0, s-maxage=60')
+  // Thiếu dữ liệu (Supabase lỗi) hoặc thiếu index.html: không cache, lần sau thử lại ngay
+  expect(cacheControl(await resolvePage('/story/mua-ha', failing, SITE), true)).toBe('no-store')
+  expect(cacheControl(ok, false)).toBe('no-store')
 })

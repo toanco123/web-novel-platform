@@ -1,15 +1,10 @@
 import { Link } from 'react-router'
 import { InfoNote, InfoPage } from '@/components/common/InfoPage'
-import { SITE_NAME } from '@/config/site'
 import { paths } from '@/lib/routes'
 
 export default function PrivacyPage() {
   return (
-    <InfoPage
-      title="Chính sách bảo mật"
-      description={`${SITE_NAME} thu thập dữ liệu gì, dùng vào việc gì và bạn kiểm soát nó ra sao.`}
-      updatedAt="2026-09-25"
-    >
+    <InfoPage path={paths.privacy} updatedAt="2026-09-25">
       <InfoNote>
         Bản thử nghiệm hiện lưu mọi dữ liệu (tài khoản, tủ truyện, lịch sử đọc, bình luận) ngay trên
         trình duyệt của bạn, chưa gửi lên máy chủ. Xóa dữ liệu trình duyệt là mất các dữ liệu này.

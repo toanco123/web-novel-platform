@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router'
-import { SITE_NAME } from '@/config/site'
+import { NavLink } from 'react-router'
 import { formatDate } from '@/lib/format'
 import { paths } from '@/lib/routes'
+import { STATIC_PAGES, staticPageSeo } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { Container } from './Container'
 import { Seo } from './Seo'
@@ -15,19 +15,19 @@ const pages = [
 ]
 
 type Props = {
-  title: string
-  description: string
+  /** Đường dẫn của trang (lấy từ `paths`); tiêu đề và mô tả nằm ở STATIC_PAGES */
+  path: string
   /** Ngày cập nhật nội dung (ISO), hiện dưới tiêu đề */
   updatedAt?: string
   children: ReactNode
 }
 
 /** Khung chung cho các trang thông tin: menu chuyển trang + nội dung dạng bài viết */
-export function InfoPage({ title, description, updatedAt, children }: Props) {
-  const { pathname } = useLocation()
+export function InfoPage({ path, updatedAt, children }: Props) {
+  const { title, description } = STATIC_PAGES[path]
   return (
     <Container className="grid gap-8 py-10 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-14">
-      <Seo title={`${title} | ${SITE_NAME}`} description={description} path={pathname} />
+      <Seo {...staticPageSeo(path)} />
       {/* Màn hẹp: các nút xuống dòng; màn rộng: cột dính khi cuộn */}
       <nav aria-label="Trang thông tin" className="lg:sticky lg:top-36 lg:self-start">
         <ul className="flex flex-wrap gap-1 lg:flex-col">

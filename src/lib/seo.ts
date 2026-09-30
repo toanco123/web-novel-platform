@@ -69,6 +69,56 @@ type StorySeoInput = {
   coverUrl: string | null
 }
 
+/**
+ * Tiêu đề (chưa kèm tên web) và mô tả của các trang công khai tĩnh, theo đường dẫn. Trang trong app
+ * lấy chữ từ đây để thẻ do app đặt và thẻ do hàm api/meta chèn cho bot giống hệt nhau.
+ */
+export const STATIC_PAGES: Record<string, { title: string; description: string }> = {
+  [paths.genres]: {
+    title: 'Thể loại truyện',
+    description:
+      'Tất cả thể loại truyện chữ: ngôn tình, cổ đại, xuyên không, hiện đại và nhiều thể loại khác.',
+  },
+  [paths.latest]: {
+    title: 'Truyện mới cập nhật',
+    description: 'Truyện vừa có chương mới, xếp theo lần cập nhật gần nhất.',
+  },
+  [paths.ongoing]: {
+    title: 'Truyện đang ra',
+    description: 'Truyện còn đang ra chương mới. Theo dõi để biết ngay khi có chương.',
+  },
+  [paths.completed]: {
+    title: 'Truyện full',
+    description: 'Truyện đã hoàn thành, đọc một mạch tới chương cuối.',
+  },
+  [paths.ranking]: {
+    title: 'Bảng xếp hạng truyện',
+    description: 'Truyện đọc nhiều, đánh giá cao và được theo dõi nhiều nhất.',
+  },
+  [paths.about]: {
+    title: `Về ${SITE_NAME}`,
+    description: 'Nơi đọc và đăng truyện chữ tiếng Việt, gọn nhẹ và dễ chịu cho mắt.',
+  },
+  [paths.contact]: {
+    title: 'Liên hệ',
+    description: 'Góp ý, báo lỗi, bản quyền hay hợp tác: gửi cho chúng tôi ở đây.',
+  },
+  [paths.terms]: {
+    title: 'Điều khoản sử dụng',
+    description: `Những điều bạn đồng ý khi đọc, bình luận và đăng truyện trên ${SITE_NAME}.`,
+  },
+  [paths.privacy]: {
+    title: 'Chính sách bảo mật',
+    description: `${SITE_NAME} thu thập dữ liệu gì, dùng vào việc gì và bạn kiểm soát nó ra sao.`,
+  },
+}
+
+/** path: một khóa của STATIC_PAGES (lấy từ `paths`) */
+export function staticPageSeo(path: string): PageSeo {
+  const page = STATIC_PAGES[path]
+  return { title: `${page.title} | ${SITE_NAME}`, description: page.description, path }
+}
+
 export const homeSeo = (): PageSeo => ({
   title: `${SITE_NAME}: đọc truyện chữ online`,
   description: SITE_TAGLINE,

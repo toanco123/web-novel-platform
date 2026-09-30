@@ -5,7 +5,7 @@
 import { DEFAULT_SITE_URL } from '../src/config/site.js'
 import { supabaseData } from './_lib/data.js'
 import { fallbackHtml, injectSeo, isAppShell } from './_lib/html.js'
-import { resolvePage } from './_lib/page.js'
+import { cacheControl, resolvePage } from './_lib/page.js'
 
 /** index.html của chính bản deploy này (file tĩnh), thử 2 lần; null nếu không tải được */
 async function loadShell(origin: string) {
@@ -19,15 +19,6 @@ async function loadShell(origin: string) {
     }
   }
   return null
-}
-
-/** Thời gian cache ở CDN của Vercel; mỗi bản deploy có cache riêng nên không giữ index.html cũ */
-function cacheControl(status: number, hasShell: boolean) {
-  // Trang tối giản (không tải được index.html) không được cache, kẻo người đọc sau cũng nhận nó
-  if (!hasShell) return 'no-store'
-  return status === 200
-    ? 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400'
-    : 'public, max-age=0, s-maxage=60'
 }
 
 export async function GET(request: Request) {
@@ -46,7 +37,7 @@ export async function GET(request: Request) {
     status: page.status,
     headers: {
       'content-type': 'text/html; charset=utf-8',
-      'cache-control': cacheControl(page.status, shell !== null),
+      'cache-control': cacheControl(page, shell !== null),
       ...(page.seo.noindex ? { 'x-robots-tag': 'noindex' } : {}),
     },
   })

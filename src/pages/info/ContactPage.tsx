@@ -5,10 +5,7 @@ import { paths } from '@/lib/routes'
 
 export default function ContactPage() {
   return (
-    <InfoPage
-      title="Liên hệ"
-      description="Góp ý, báo lỗi, bản quyền hay hợp tác: gửi cho chúng tôi ở đây."
-    >
+    <InfoPage path={paths.contact}>
       <p>
         Gặp lỗi trong một chương cụ thể? Dùng nút <strong>Báo lỗi chương</strong> ở cuối chương để
         tác giả nhận được ngay. Với câu hỏi khác, điền form dưới đây. Xem thêm{' '}

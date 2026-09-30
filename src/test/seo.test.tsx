@@ -91,3 +91,12 @@ test.each([
   expect(content('meta[name="robots"]')).toBe('noindex')
   expect(head('link[rel="canonical"]')).toBeNull()
 })
+
+test('trang thông tin: canonical là đường dẫn chuẩn dù URL có dấu / ở cuối', async () => {
+  renderApp('/about/')
+  await screen.findByRole('heading', { level: 1, name: `Về ${SITE_NAME}` }, slow)
+  expect(head('link[rel="canonical"]')).toHaveAttribute('href', `${SITE_URL}/about`)
+  expect(content('meta[name="description"]')).toBe(
+    'Nơi đọc và đăng truyện chữ tiếng Việt, gọn nhẹ và dễ chịu cho mắt.',
+  )
+})
