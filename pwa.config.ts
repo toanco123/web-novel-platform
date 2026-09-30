@@ -94,9 +94,12 @@ export function pwa() {
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        globIgnores: SKIPPED_FONT_SUBSETS.map((subset) => `**/*-${subset}*`),
+        // Ảnh xem trước khi chia sẻ link chỉ bot dùng, không cần khi offline
+        globIgnores: [...SKIPPED_FONT_SUBSETS.map((subset) => `**/*-${subset}*`), 'og-default.png'],
         manifestTransforms: [precache.transform],
         navigateFallback: '/index.html',
+        // Không phải trang của app: để trình duyệt tải thẳng từ máy chủ
+        navigateFallbackDenylist: [/^\/api\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
         runtimeCaching: [
           {
             // Ảnh bìa trên Supabase Storage: truyện đã lưu vẫn có bìa khi offline

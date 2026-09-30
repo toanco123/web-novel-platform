@@ -20,6 +20,7 @@ npm test             # vitest run (jsdom)
 npx vitest run src/test/smoke.test.tsx   # chạy 1 file test
 npx vitest run -t "tên test"             # chạy test theo tên
 npx shadcn@latest add <component>        # thêm component shadcn vào src/components/ui
+npx vitest run api                       # test của hàm Vercel (api/_lib)
 ```
 
 ## Kiến trúc
@@ -79,7 +80,13 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
   - **Hàm:** hàm `security definer` để ở schema `private` với `set search_path = ''`. Khách cũng cần gọi thì làm lớp vỏ `security invoker` ở `public` gọi sang (như `record_chapter_view`). `supabase db advisors` không được còn cảnh báo mức WARN.
   - **Luật nghiệp vụ** nằm ở trigger, ném lỗi có mã trong `error.message` (`no_published_chapters`, `last_published_chapter`, `chapter_number_locked`, `too_many_genres`, `not_found`, `unauthenticated`); trùng số chương/thể loại là `23505`.
   - **Số liệu:** `story_stats` do trigger/RPC ghi, client chỉ đọc. Danh sách công khai lấy từ view `story_cards`, lọc `visibility = 'published'` và `chapter_count > 0`.
-- **SEO**: dùng thẻ `<title>`/`<meta>` native của React 19 đặt thẳng trong component trang (không dùng react-helmet).
+- **SEO** (plan `documents/plan-seo-va-xem-truoc-link.md`):
+  - Trang công khai dùng `<Seo {...}>` (`components/common/Seo`: title, description, canonical, Open Graph; thẻ native của React 19, không dùng react-helmet). Trang riêng tư, tìm kiếm, 404 đặt `noindex` (`<Seo noindex>` hoặc `<NoIndex />` ở khung của cả khu).
+  - Thẻ dựng từ `src/lib/seo.ts` (`storySeo`, `chapterSeo`, `genreSeo`, `seoTags`), dùng chung với hàm Vercel. File này, `src/lib/routes.ts` và `src/config/site.ts` không được dùng alias `@/` hay `import.meta`, và import tương đối ghi đuôi `.js`.
+  - Bot không chạy JS (Facebook, Zalo, Telegram, Google...) được `vercel.json` chuyển theo user-agent sang hàm `api/meta.ts`: trả `index.html` đã chèn thẻ của trang, 404 cho truyện/chương/thể loại không có. Logic ở `api/_lib/` (thư mục bắt đầu bằng `_` không thành hàm); import trong `api/` phải ghi đuôi `.js`. Thêm trang công khai mới thì khai báo ở `matchRoute` (`api/_lib/html.ts`); trang tĩnh thì thêm vào `STATIC_PAGES` của `src/lib/seo.ts` (trang lấy tiêu đề, mô tả từ đó để thẻ của app và của hàm giống hệt nhau).
+  - `/sitemap.xml` do `api/sitemap.ts` sinh; `robots.txt` và thẻ mặc định trong `index.html` (`data-seo="default"`, app gỡ khi khởi động) do plugin `seo.config.ts` sinh lúc build.
+  - Địa chỉ web: `DEFAULT_SITE_URL` (`src/config/site.ts`), ghi đè bằng `VITE_SITE_URL`; client đọc qua `SITE_URL` (`src/lib/siteUrl.ts`). Ảnh xem trước mặc định `public/og-default.png` có tên web: đổi `SITE_NAME` thì làm lại ảnh.
+  - Rewrite có `has` không chạy với `vercel dev`: thử trên bản deploy bằng `vercel deploy` rồi `vercel curl <đường dẫn> --deployment <url> -- -A "facebookexternalhit/1.1"` (bản preview có lớp đăng nhập nên hàm trả trang tối giản thay vì `index.html`).
 
 ## Quy ước
 

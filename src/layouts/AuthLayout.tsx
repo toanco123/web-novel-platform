@@ -8,6 +8,7 @@ import { StoryCover } from '@/features/stories/StoryCover'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import { AppScrollRestoration } from '@/components/common/AppScrollRestoration'
+import { NoIndex } from '@/components/common/Seo'
 
 // Vị trí 3 bìa xếp quạt: trái, phải, giữa (bìa giữa nằm trên cùng)
 const fan = [
@@ -19,6 +20,7 @@ const fan = [
 export function AuthLayout() {
   return (
     <div className="grid min-h-svh bg-background text-foreground lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <NoIndex />
       <ShowcasePanel />
       <div className="flex flex-col">
         <header className="flex h-16 items-center justify-between gap-3 px-4 md:px-8">

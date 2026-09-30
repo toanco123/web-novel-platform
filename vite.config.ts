@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 import { pwa } from './pwa.config.ts'
+import { seoFiles } from './seo.config.ts'
+import { DEFAULT_SITE_URL } from './src/config/site.ts'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -16,7 +18,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), tailwindcss(), ...pwa()],
+    plugins: [react(), tailwindcss(), ...pwa(), seoFiles(env.VITE_SITE_URL || DEFAULT_SITE_URL)],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),

@@ -7,6 +7,7 @@ import { DeleteAccountForm } from '@/features/auth/components/DeleteAccountForm'
 import { ProfileForm } from '@/features/auth/components/ProfileForm'
 import { useSession } from '@/features/auth/hooks'
 import { cn } from '@/lib/utils'
+import { Seo } from '@/components/common/Seo'
 
 export default function AccountPage() {
   return (
@@ -22,7 +23,7 @@ function Account() {
 
   return (
     <Container className="max-w-3xl py-10">
-      <title>{`Tài khoản | ${SITE_NAME}`}</title>
+      <Seo title={`Tài khoản | ${SITE_NAME}`} noindex />
       <h1 className="font-heading text-4xl font-semibold">Tài khoản</h1>
       <p className="mt-1 text-muted-foreground">
         Tên và ảnh hiển thị ở bình luận và truyện bạn đăng.

@@ -12,6 +12,7 @@ import { TrendingWeekly } from '@/features/stories/sections/TrendingWeekly'
 import { StoryRow, StoryRowSkeleton } from '@/features/stories/StoryRow'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
+import { Seo } from '@/components/common/Seo'
 
 export default function SearchPage() {
   const [params, setParams] = useSearchParams()
@@ -25,7 +26,7 @@ export default function SearchPage() {
 
   return (
     <Container className="py-10">
-      <title>{q ? `Tìm “${q}” | ${SITE_NAME}` : `Tìm kiếm | ${SITE_NAME}`}</title>
+      <Seo title={q ? `Tìm “${q}” | ${SITE_NAME}` : `Tìm kiếm | ${SITE_NAME}`} noindex />
       <h1 className="font-heading text-4xl font-semibold">Tìm truyện</h1>
       {/* key: tìm từ ô ở header thì ô này cập nhật theo */}
       <SearchForm key={q} initial={q} onSubmit={submit} />

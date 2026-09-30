@@ -30,6 +30,8 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import type { ChapterContent } from '@/types/chapter'
+import { Seo } from '@/components/common/Seo'
+import { chapterSeo } from '@/lib/seo'
 
 // Router không hỗ trợ tham số nằm giữa đoạn URL ("chapter-:number") nên tự tách ở đây
 const parseChapterSegment = (segment: string) => {
@@ -136,7 +138,7 @@ function Reader({ slug, number }: { slug: string; number: number }) {
   if (!chapter)
     return (
       <div className="flex flex-col items-center gap-4 px-4 py-32 text-center">
-        <title>{`Không tìm thấy chương | ${SITE_NAME}`}</title>
+        <Seo title={`Không tìm thấy chương | ${SITE_NAME}`} noindex />
         <p className="font-heading text-6xl font-semibold text-muted-foreground">404</p>
         <p>Không tìm thấy chương {number}. Có thể chương đã bị ẩn hoặc chưa được đăng.</p>
         <Button asChild className="rounded-full">
@@ -180,11 +182,7 @@ function Reader({ slug, number }: { slug: string; number: number }) {
 
   return (
     <>
-      <title>{`Chương ${chapter.number}: ${chapter.title} - ${chapter.story.title} | ${SITE_NAME}`}</title>
-      <meta
-        name="description"
-        content={`Đọc chương ${chapter.number} "${chapter.title}" của truyện ${chapter.story.title} (${chapter.story.author.name}).`}
-      />
+      <Seo {...chapterSeo({ ...chapter.story, authorName: chapter.story.author.name }, chapter)} />
       {chapter.prev && <link rel="prev" href={paths.chapter(slug, chapter.prev.number)} />}
       {chapter.next && <link rel="next" href={paths.chapter(slug, chapter.next.number)} />}
 

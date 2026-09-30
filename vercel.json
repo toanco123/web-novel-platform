@@ -109,6 +109,21 @@
   ],
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/((?!api/|assets/).*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|Zalo|TelegramBot|Slackbot|Discordbot|WhatsApp|LinkedInBot|SkypeUriPreview|Pinterestbot|redditbot|Googlebot|Google-InspectionTool|bingbot|coccocbot|YandexBot|DuckDuckBot|Applebot|Baiduspider).*"
+        }
+      ],
+      "destination": "/api/meta"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

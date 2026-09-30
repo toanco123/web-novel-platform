@@ -5,10 +5,7 @@ import { paths } from '@/lib/routes'
 
 export default function AboutPage() {
   return (
-    <InfoPage
-      title={`Về ${SITE_NAME}`}
-      description="Nơi đọc và đăng truyện chữ tiếng Việt, gọn nhẹ và dễ chịu cho mắt."
-    >
+    <InfoPage path={paths.about}>
       <p>
         {SITE_NAME} là nền tảng đọc truyện chữ: ngôn tình, cổ đại, xuyên không, hiện đại và nhiều
         thể loại khác. Chúng tôi muốn việc đọc truyện dài trên điện thoại hay máy tính đều thoải mái

@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router'
 import { NotFound } from '@/components/common/NotFound'
 import { RequireAuth } from '@/components/common/RequireAuth'
+import { NoIndex } from '@/components/common/Seo'
 import { AdminLayout } from '@/features/admin/components/AdminLayout'
 import { useSession } from '@/features/auth/hooks'
 
@@ -25,6 +26,7 @@ function AdminGate() {
   }
   return (
     <AdminLayout user={user}>
+      <NoIndex />
       <Outlet />
     </AdminLayout>
   )
