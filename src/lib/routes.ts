@@ -40,11 +40,15 @@ export const paths = {
   /** Trang quản trị (chỉ quản trị viên) */
   admin: '/admin',
   adminUsers: '/admin/users',
+  /** Trang người dùng đã tìm sẵn theo tên hoặc email */
+  adminUserSearch: (q: string) => `/admin/users?q=${encodeURIComponent(q)}`,
   /** ownerId: chỉ hiện truyện của một người dùng */
   adminStories: (ownerId?: string) =>
     ownerId ? `/admin/stories?owner=${encodeURIComponent(ownerId)}` : '/admin/stories',
   adminInbox: '/admin/inbox',
   adminReports: '/admin/reports',
+  /** Kiểm duyệt bình luận (mặc định: bình luận đang bị báo cáo) */
+  adminComments: '/admin/comments',
   adminGenres: '/admin/genres',
   adminImport: '/admin/import',
   /** Chọn truyện cho banner nổi bật và khối đề cử của trang chủ */

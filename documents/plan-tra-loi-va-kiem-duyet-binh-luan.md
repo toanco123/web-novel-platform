@@ -1,6 +1,6 @@
 # Plan: Trả lời bình luận và kiểm duyệt bình luận
 
-Trạng thái: đang làm (30/09/2026). Nhánh `comment-replies-moderation`.
+Trạng thái: ✅ xong (30/09/2026). Nhánh `comment-replies-moderation`.
 
 ## Context
 
@@ -35,7 +35,8 @@ Ngoài phạm vi: tác giả tự xóa bình luận trong truyện của mình, 
 - Hai chế độ (`?view=`): **Bị báo cáo** (mặc định; bình luận có báo cáo đang mở, báo cáo mới nhất trước) và **Tất cả** (`?view=all`, mới viết trước). Tìm theo nội dung hoặc tên người viết (`?q=`), phân trang (`?page=`).
 - Mỗi hàng: nội dung, người viết, truyện và chương (link sang trang công khai nếu truyện đang công khai), lúc viết, các báo cáo đang mở (lý do, ghi chú, người báo).
 - Thao tác: **Xóa** (xác nhận; xóa luôn trả lời và báo cáo của nó) và **Bỏ qua** (đánh dấu các báo cáo đang mở là đã xử lý, bình luận giữ nguyên).
-- Trang Tổng quan thêm ô "Bình luận bị báo cáo" dẫn sang trang này.
+- Ô "Bình luận" ở trang Tổng quan ghi số bình luận đang bị báo cáo và dẫn sang trang này.
+- Tên người viết dẫn sang trang Người dùng đã tìm sẵn theo tên đó (để khóa tài khoản spam).
 
 ## 4. Dữ liệu
 
@@ -107,5 +108,5 @@ type CommentReportReason = 'spam' | 'offensive' | 'spoiler' | 'other'
 3. Bản giả + test: api admin và `reportedComments`.
 4. Migration, ca kiểm tra SQL, push, sinh kiểu, bản remote của comments và admin.
 5. Giao diện người đọc + test luồng.
-6. Trang `/admin/comments`, ô ở Tổng quan + test luồng.
+6. Trang `/admin/comments`, ô "Bình luận" ở Tổng quan + test luồng.
 7. Cập nhật `thiet-ke-database.md`, `CLAUDE.md`, lộ trình; kiểm tra giao diện; chạy toàn bộ test, lint, build; gộp vào `main`.

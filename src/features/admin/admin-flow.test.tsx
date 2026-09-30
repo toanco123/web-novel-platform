@@ -238,3 +238,57 @@ test('trang chủ: chọn truyện nổi bật, đổi thứ tự, lưu thì tra
     .poll(async () => (await getFeaturedStories()).map((s) => s.title), slow)
     .toEqual(['Gió Qua Hiên Nhà'])
 }, 20_000)
+
+test('kiểm duyệt bình luận: xem báo cáo, bỏ qua, xóa bình luận vi phạm', async () => {
+  const comments = await import('@/features/comments/api')
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const spam = await comments.addComment(story.slug, 'Vào web abc chấm com đọc nhanh hơn')
+  const spoiler = await comments.addComment(story.slug, 'Cuối truyện hai người cưới nhau', 1)
+  await comments.addComment(story.slug, 'Truyện dễ thương ghê')
+  await registerUser('Mai', 'mai@gmail.com')
+  await comments.reportComment({ commentId: spam.id, reason: 'spam', note: 'Quảng cáo web khác' })
+  await comments.reportComment({ commentId: spoiler.id, reason: 'spoiler', note: '' })
+  signInAs('demo')
+  const { router, user } = renderApp('/admin')
+
+  // Ô "Bình luận" ở Tổng quan dẫn sang trang kiểm duyệt
+  await user.click(await screen.findByRole('link', { name: /2 bị báo cáo/ }, slow))
+  expect(await screen.findByRole('heading', { name: 'Bình luận' }, slow)).toBeInTheDocument()
+  const row = (text: string) => screen.getByText(text).closest('tr')!
+  await screen.findByText('Vào web abc chấm com đọc nhanh hơn', {}, slow)
+  expect(screen.queryByText('Truyện dễ thương ghê')).not.toBeInTheDocument()
+  const spamRow = within(row('Vào web abc chấm com đọc nhanh hơn'))
+  expect(spamRow.getByText('Spam, quảng cáo')).toBeInTheDocument()
+  expect(spamRow.getByText(/Quảng cáo web khác/)).toBeInTheDocument()
+  expect(spamRow.getByText(/Mai/)).toBeInTheDocument()
+  expect(spamRow.getByRole('link', { name: 'Mùa Hạ Năm Ấy' })).toHaveAttribute(
+    'href',
+    `/story/${story.slug}`,
+  )
+  expect(
+    within(row('Cuối truyện hai người cưới nhau')).getByRole('link', { name: /Chương 1/ }),
+  ).toHaveAttribute('href', `/story/${story.slug}/chapter-1`)
+
+  // Bỏ qua: bình luận còn nguyên, chỉ rời danh sách bị báo cáo
+  await user.click(
+    within(row('Cuối truyện hai người cưới nhau')).getByRole('button', { name: 'Bỏ qua' }),
+  )
+  await expect.poll(() => screen.queryByText('Cuối truyện hai người cưới nhau'), slow).toBeNull()
+
+  await user.click(spamRow.getByRole('button', { name: 'Xóa' }))
+  const popconfirm = (await screen.findByText('Xóa bình luận này?', {}, slow)).closest(
+    '.ant-popover',
+  )!
+  await user.click(within(popconfirm as HTMLElement).getByRole('button', { name: 'Xóa' }))
+  expect(
+    await screen.findByText('Không có bình luận nào đang bị báo cáo', {}, slow),
+  ).toBeInTheDocument()
+
+  // Xem tất cả: bình luận bị xóa không còn, bình luận được bỏ qua vẫn còn
+  await user.click(screen.getByText('Tất cả'))
+  await expect.poll(() => router.state.location.search, slow).toBe('?view=all')
+  expect(await screen.findByText('Truyện dễ thương ghê', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Cuối truyện hai người cưới nhau')).toBeInTheDocument()
+  expect(screen.queryByText('Vào web abc chấm com đọc nhanh hơn')).not.toBeInTheDocument()
+}, 20_000)

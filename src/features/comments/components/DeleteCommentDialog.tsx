@@ -13,15 +13,17 @@ import {
 type Props = {
   pending: boolean
   onConfirm: () => void
+  /** Số trả lời sẽ bị xóa theo bình luận này */
+  replyCount?: number
 }
 
-export function DeleteCommentDialog({ pending, onConfirm }: Props) {
+export function DeleteCommentDialog({ pending, onConfirm, replyCount = 0 }: Props) {
   return (
     <Dialog>
       <DialogTrigger asChild>
         <button
           type="button"
-          className="text-xs text-muted-foreground underline-offset-4 hover:text-destructive hover:underline"
+          className="py-1 underline-offset-4 hover:text-destructive hover:underline"
         >
           Xóa
         </button>
@@ -31,6 +33,7 @@ export function DeleteCommentDialog({ pending, onConfirm }: Props) {
           <DialogTitle>Xóa bình luận này?</DialogTitle>
           <DialogDescription>
             Bình luận sẽ bị xóa vĩnh viễn và không khôi phục được.
+            {replyCount > 0 && ` ${replyCount} trả lời bên dưới cũng sẽ bị xóa.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
