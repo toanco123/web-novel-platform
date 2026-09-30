@@ -91,6 +91,7 @@ npx vitest run api                       # test của hàm Vercel (api/_lib)
 ## Quy ước
 
 - Tên nhánh git đặt bằng tiếng Anh (kebab-case). Chữ trên giao diện, tài liệu và commit message vẫn bằng tiếng Việt.
+- **Mỗi lần commit là một lần tăng version** trong `package.json`: trước khi commit chạy `npm version patch --no-git-tag-version` (tăng số cuối, vd `0.0.3` → `0.0.4`, sửa cả `package-lock.json`, không tự tạo commit hay tag) rồi đưa hai file này vào chính commit đó. Commit gộp nhánh ("Gộp nhánh ...") không tăng thêm, vì các commit trong nhánh đã tăng rồi.
 - Import alias `@/` → `src/` (cấu hình ở cả `vite.config.ts` và `tsconfig*.json`).
 - Mọi URL lấy từ `paths` trong `src/lib/routes.ts`, không viết cứng. Tên web lấy từ `SITE_NAME` (`src/config/site.ts`).
 - Hệ thiết kế (màu, font, bố cục trang chủ) ghi ở mục 8 của file plan. Token màu riêng: `rose-gold`, `neon`, `wine`; font: `font-script` (logo), `font-heading` (serif), `font-sans`. Mặc định giao diện tối; theme lưu ở Zustand key `theme`, script inline trong `index.html` đọc key này để tránh nháy màu.
