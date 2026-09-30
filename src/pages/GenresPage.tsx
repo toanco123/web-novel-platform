@@ -11,6 +11,7 @@ import { useGenres } from '@/features/genres/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
 import { slugify } from '@/lib/slugify'
+import { Seo } from '@/components/common/Seo'
 
 export default function GenresPage() {
   const { data: genres, isPending, isError } = useGenres()
@@ -22,7 +23,11 @@ export default function GenresPage() {
 
   return (
     <Container className="py-10">
-      <title>{`Thể loại truyện | ${SITE_NAME}`}</title>
+      <Seo
+        title={`Thể loại truyện | ${SITE_NAME}`}
+        description="Tất cả thể loại truyện chữ: ngôn tình, cổ đại, xuyên không, hiện đại và nhiều thể loại khác."
+        path={paths.genres}
+      />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-4xl font-semibold">Thể loại</h1>

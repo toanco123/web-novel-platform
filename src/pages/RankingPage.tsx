@@ -10,6 +10,7 @@ import { StoryCover } from '@/features/stories/StoryCover'
 import { formatCount } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
+import { Seo } from '@/components/common/Seo'
 
 const criteria: { value: RankingCriterion; param: string; label: string; hint: string }[] = [
   {
@@ -56,10 +57,10 @@ export default function RankingPage() {
 
   return (
     <Container className="py-10">
-      <title>{`Bảng xếp hạng truyện | ${SITE_NAME}`}</title>
-      <meta
-        name="description"
-        content="Truyện đọc nhiều, đánh giá cao và được theo dõi nhiều nhất."
+      <Seo
+        title={`Bảng xếp hạng truyện | ${SITE_NAME}`}
+        description="Truyện đọc nhiều, đánh giá cao và được theo dõi nhiều nhất."
+        path={paths.ranking}
       />
       <h1 className="flex items-center gap-3 font-heading text-4xl font-semibold">
         <Trophy className="size-8 text-rose-gold" aria-hidden />

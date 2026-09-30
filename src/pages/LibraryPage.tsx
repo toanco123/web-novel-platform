@@ -11,6 +11,7 @@ import { useLibraryUpdateCount } from '@/features/library/hooks'
 import { SavedList } from '@/features/offline/components/SavedList'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
+import { Seo } from '@/components/common/Seo'
 
 type Tab = 'following' | 'history' | 'saved'
 
@@ -33,7 +34,7 @@ export default function LibraryPage() {
 
   return (
     <Container className="py-10">
-      <title>{`Tủ truyện | ${SITE_NAME}`}</title>
+      <Seo title={`Tủ truyện | ${SITE_NAME}`} noindex />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-4xl font-semibold">Tủ truyện</h1>

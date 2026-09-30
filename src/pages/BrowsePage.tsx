@@ -6,6 +6,7 @@ import { SITE_NAME } from '@/config/site'
 import { StoryBrowser } from '@/features/stories/StoryBrowser'
 import { paths } from '@/lib/routes'
 import type { StoryStatus } from '@/types/story'
+import { Seo } from '@/components/common/Seo'
 
 const lists: Record<
   string,
@@ -40,8 +41,7 @@ export default function BrowsePage() {
 
   return (
     <Container className="py-10">
-      <title>{`${list.title} | ${SITE_NAME}`}</title>
-      <meta name="description" content={list.description} />
+      <Seo title={`${list.title} | ${SITE_NAME}`} description={list.description} path={list.to} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-4xl font-semibold">{list.title}</h1>

@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   /** Nhà cung cấp đăng nhập đã bật trên Supabase, cách nhau bằng dấu phẩy, vd 'google,facebook' */
   readonly VITE_AUTH_PROVIDERS?: string
   readonly VITE_TURNSTILE_SITE_KEY?: string
+  /** Địa chỉ web (canonical, sitemap, ảnh xem trước); bỏ trống thì dùng DEFAULT_SITE_URL */
+  readonly VITE_SITE_URL?: string
 }
 
 interface ImportMeta {

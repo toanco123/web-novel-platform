@@ -2,7 +2,6 @@ import { useParams, useSearchParams } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { NotFound } from '@/components/common/NotFound'
 import { SectionError, SectionHeading } from '@/components/common/SectionHeading'
-import { SITE_NAME } from '@/config/site'
 import { ChapterList } from '@/features/chapters/components/ChapterList'
 import { CommentsSection } from '@/features/comments/components/CommentsSection'
 import { useComments } from '@/features/comments/hooks'
@@ -14,6 +13,8 @@ import { StoryHero, StoryHeroSkeleton } from '@/features/stories/detail/StoryHer
 import { useRelatedStories, useStoriesByAuthor, useStory } from '@/features/stories/hooks'
 import type { ChapterOrder } from '@/types/chapter'
 import type { Story } from '@/types/story'
+import { Seo } from '@/components/common/Seo'
+import { storySeo } from '@/lib/seo'
 
 const SECTION = {
   about: 'gioi-thieu',
@@ -63,8 +64,7 @@ function StoryDetail({ story }: { story: Story }) {
 
   return (
     <>
-      <title>{`${story.title} - ${story.author.name} | ${SITE_NAME}`}</title>
-      <meta name="description" content={story.description.slice(0, 155)} />
+      <Seo {...storySeo({ ...story, authorName: story.author.name })} />
 
       <StoryHero story={story} />
       <SectionNav

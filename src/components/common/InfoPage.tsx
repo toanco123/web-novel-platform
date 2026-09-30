@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
-import { NavLink } from 'react-router'
+import { NavLink, useLocation } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { formatDate } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import { Container } from './Container'
+import { Seo } from './Seo'
 
 const pages = [
   { to: paths.about, label: 'Giới thiệu' },
@@ -23,10 +24,10 @@ type Props = {
 
 /** Khung chung cho các trang thông tin: menu chuyển trang + nội dung dạng bài viết */
 export function InfoPage({ title, description, updatedAt, children }: Props) {
+  const { pathname } = useLocation()
   return (
     <Container className="grid gap-8 py-10 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-14">
-      <title>{`${title} | ${SITE_NAME}`}</title>
-      <meta name="description" content={description} />
+      <Seo title={`${title} | ${SITE_NAME}`} description={description} path={pathname} />
       {/* Màn hẹp: các nút xuống dòng; màn rộng: cột dính khi cuộn */}
       <nav aria-label="Trang thông tin" className="lg:sticky lg:top-36 lg:self-start">
         <ul className="flex flex-wrap gap-1 lg:flex-col">

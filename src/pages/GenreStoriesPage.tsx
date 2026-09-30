@@ -3,10 +3,11 @@ import { Link, useParams } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { NotFound } from '@/components/common/NotFound'
 import { Button } from '@/components/ui/button'
-import { SITE_NAME } from '@/config/site'
 import { useGenres } from '@/features/genres/hooks'
 import { StoryBrowser } from '@/features/stories/StoryBrowser'
 import { paths } from '@/lib/routes'
+import { Seo } from '@/components/common/Seo'
+import { genreSeo } from '@/lib/seo'
 
 export default function GenreStoriesPage() {
   const { slug = '' } = useParams()
@@ -17,7 +18,7 @@ export default function GenreStoriesPage() {
 
   return (
     <Container className="py-10">
-      {genre && <title>{`Truyện ${genre.name} | ${SITE_NAME}`}</title>}
+      {genre && <Seo {...genreSeo(genre)} />}
       <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
         <Link to={paths.genres} className="hover:text-foreground hover:underline">
           Thể loại
