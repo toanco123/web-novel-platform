@@ -2,15 +2,16 @@
 // và chương của người đó, cùng mọi hoạt động của họ và mọi hoạt động trên truyện của họ.
 import {
   loadAllFollows,
+  loadCommentReports,
   loadRatings,
   loadReports,
-  loadUserComments,
   loadViews,
+  removeComments,
+  saveCommentReports,
   saveFollows,
   saveHistory,
   saveRatings,
   saveReports,
-  saveUserComments,
   saveViews,
 } from './activity'
 import { loadUserStories, removeChapters, saveUserStories } from './userContent'
@@ -23,10 +24,9 @@ export function purgeUser(userId: string) {
   for (const story of mine) removeChapters(story.id)
   saveUserStories(stories.filter((s) => s.owner.id !== userId))
 
-  saveUserComments(
-    loadUserComments().filter((c) => c.user.id !== userId && !slugs.has(c.storySlug)),
-  )
+  removeComments((c) => c.user.id === userId || slugs.has(c.storySlug))
   saveReports(loadReports().filter((r) => r.reporter.id !== userId && !slugs.has(r.storySlug)))
+  saveCommentReports(loadCommentReports().filter((r) => r.reporter.id !== userId))
 
   for (const [id, entries] of Object.entries(loadAllFollows())) {
     if (id === userId) saveFollows(id, [])

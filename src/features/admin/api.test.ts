@@ -233,3 +233,68 @@ test('truyện chọn tay: chặn quá số lượng và truyện không tồn t
   const stories = await import('@/features/stories/api')
   expect((await stories.getEditorPicks()).map((s) => s.id)).toEqual(ids.slice(0, 2))
 })
+
+test('kiểm duyệt bình luận: xem bình luận bị báo cáo, bỏ qua báo cáo, xóa bình luận', async () => {
+  const comments = await import('@/features/comments/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const spam = await comments.addComment(story.slug, 'Vào web abc chấm com đọc nhanh hơn')
+  await comments.addComment(story.slug, 'Bình luận chương của Linh', 1)
+  await comments.addComment(story.slug, 'Trả lời quảng cáo', null, spam.id)
+  await expect(admin.getAdminComments({ view: 'all', page: 1 })).rejects.toBeInstanceOf(
+    admin.AdminError,
+  )
+  await expect(admin.deleteAdminComment(spam.id)).rejects.toBeInstanceOf(admin.AdminError)
+  await expect(admin.dismissCommentReports(spam.id)).rejects.toBeInstanceOf(admin.AdminError)
+
+  await registerUser('Mai', 'mai@gmail.com')
+  await comments.reportComment({ commentId: spam.id, reason: 'offensive', note: '' })
+  await comments.reportComment({ commentId: spam.id, reason: 'spam', note: ' Quảng cáo web khác ' })
+
+  signInAs('demo')
+  const all = await admin.getAdminComments({ view: 'all', page: 1 })
+  expect(all.items.map((c) => c.content)).toEqual([
+    'Trả lời quảng cáo',
+    'Bình luận chương của Linh',
+    'Vào web abc chấm com đọc nhanh hơn',
+  ])
+  expect(all.items[0]).toMatchObject({ isReply: true, replyCount: 0, reports: [] })
+  expect(all.items[1]).toMatchObject({ chapterNumber: 1, isReply: false })
+  // Tìm không dấu theo nội dung hoặc tên người viết
+  expect((await admin.getAdminComments({ view: 'all', q: 'QUANG CAO', page: 1 })).total).toBe(1)
+  expect((await admin.getAdminComments({ view: 'all', q: 'linh', page: 1 })).total).toBe(3)
+
+  const reported = await admin.getAdminComments({ view: 'reported', page: 1 })
+  expect(reported.items).toEqual([
+    expect.objectContaining({
+      id: spam.id,
+      author: { id: linh, displayName: 'Linh' },
+      storySlug: story.slug,
+      storyTitle: 'Mùa Hạ Năm Ấy',
+      storyPublished: true,
+      chapterNumber: null,
+      isReply: false,
+      replyCount: 1,
+      // Báo lại thì cập nhật báo cáo đang mở, không tạo thêm
+      reports: [
+        expect.objectContaining({
+          reason: 'spam',
+          note: 'Quảng cáo web khác',
+          reporterName: 'Mai',
+        }),
+      ],
+    }),
+  ])
+  expect((await admin.getAdminOverview(7)).totals.reportedComments).toBe(1)
+
+  await admin.dismissCommentReports(spam.id)
+  expect((await admin.getAdminComments({ view: 'reported', page: 1 })).items).toEqual([])
+  expect((await admin.getAdminOverview(7)).totals.reportedComments).toBe(0)
+  expect((await admin.getAdminComments({ view: 'all', page: 1 })).total).toBe(3)
+
+  // Xóa bình luận gốc: trả lời mất theo
+  await admin.deleteAdminComment(spam.id)
+  const left = await admin.getAdminComments({ view: 'all', page: 1 })
+  expect(left.items.map((c) => c.content)).toEqual(['Bình luận chương của Linh'])
+  await expect(admin.deleteAdminComment(spam.id)).rejects.toMatchObject({ code: 'not_found' })
+})

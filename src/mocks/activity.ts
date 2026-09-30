@@ -2,16 +2,17 @@
 // lưu localStorage trong giai đoạn mock. Nhiều api.ts cùng đọc các dữ liệu này (vd studio đếm
 // người theo dõi), nên gom về một chỗ thay vì để api này đọc thẳng key của api khác.
 import { readMock, writeMock } from '@/lib/mockStorage'
-import type { Comment, Score } from '@/types/comment'
+import type { Comment, CommentReportReason, Score } from '@/types/comment'
 import type { ReadingProgress } from '@/types/library'
 import type { ContactTopic } from '@/features/feedback/schemas'
-import type { ChapterReport } from '@/types/report'
+import type { ChapterReport, ReportStatus } from '@/types/report'
 
 const FOLLOWS_KEY = 'mock-library'
 const HISTORY_KEY = 'mock-history'
 const VIEWS_KEY = 'mock-views'
 const RATINGS_KEY = 'mock-ratings'
 const COMMENTS_KEY = 'mock-comments'
+const COMMENT_REPORTS_KEY = 'mock-comment-reports'
 const REPORTS_KEY = 'mock-reports'
 const CONTACT_KEY = 'mock-contact-messages'
 
@@ -107,13 +108,45 @@ export const ratingsOf = (slug: string) =>
 
 // ── Bình luận ───────────────────────────────────────────────────────────
 
-// Bình luận lưu trước khi có bình luận theo chương không có chapterNumber
+// Bình luận lưu trước khi có bình luận theo chương không có chapterNumber, trước khi có trả lời
+// không có parentId. replyCount không lưu: api đếm lại khi đọc
 export const loadUserComments = () =>
   readMock<Comment[]>(COMMENTS_KEY, []).map((c) => ({
     ...c,
     chapterNumber: c.chapterNumber ?? null,
+    parentId: c.parentId ?? null,
+    replyCount: 0,
   }))
 export const saveUserComments = (comments: Comment[]) => writeMock(COMMENTS_KEY, comments)
+
+/** Báo cáo bình luận vi phạm (chỉ quản trị viên xem) */
+export type StoredCommentReport = {
+  id: string
+  commentId: string
+  reporter: { id: string; displayName: string }
+  reason: CommentReportReason
+  note: string
+  status: ReportStatus
+  createdAt: string
+}
+
+export const loadCommentReports = () => readMock<StoredCommentReport[]>(COMMENT_REPORTS_KEY, [])
+export const saveCommentReports = (reports: StoredCommentReport[]) =>
+  writeMock(COMMENT_REPORTS_KEY, reports)
+
+/**
+ * Xóa các bình luận khớp điều kiện, kèm trả lời và báo cáo của chúng (như khóa ngoại cascade trên
+ * DB). Trả về số bình luận khớp điều kiện.
+ */
+export function removeComments(match: (comment: Comment) => boolean) {
+  const all = loadUserComments()
+  const matched = all.filter(match)
+  const removed = new Set(matched.map((c) => c.id))
+  for (const c of all) if (c.parentId && removed.has(c.parentId)) removed.add(c.id)
+  saveUserComments(all.filter((c) => !removed.has(c.id)))
+  saveCommentReports(loadCommentReports().filter((r) => !removed.has(r.commentId)))
+  return matched.length
+}
 
 // ── Báo lỗi chương ──────────────────────────────────────────────────────
 

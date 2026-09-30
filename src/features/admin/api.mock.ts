@@ -8,10 +8,13 @@ import {
   dayKey,
   followerCount,
   loadAllFollows,
+  loadCommentReports,
   loadContactMessages,
   loadReports,
   loadUserComments,
   loadViews,
+  removeComments,
+  saveCommentReports,
   saveContactMessages,
   saveReports,
 } from '@/mocks/activity'
@@ -34,6 +37,8 @@ import {
   ADMIN_PAGE_SIZE,
   AdminError,
   CURATED_LIMITS,
+  type AdminComment,
+  type AdminCommentQuery,
   type AdminContactMessage,
   type AdminMessageQuery,
   type AdminOverview,
@@ -179,6 +184,7 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
       viewsInPeriod: [...viewsByDay.values()].reduce((a, b) => a + b, 0),
       comments: loadUserComments().length,
       openReports: loadReports().filter((r) => r.status === 'open').length,
+      reportedComments: reportedCommentIds().size,
       unhandledMessages: loadContactMessages().filter((m) => !m.handledAt).length,
       bannedUsers: users.filter((u) => u.bannedAt).length,
     },
@@ -346,6 +352,94 @@ export async function setAdminReportStatus(id: string, status: AdminReport['stat
   await delay()
   await requireAdmin()
   saveReports(loadReports().map((r) => (r.id === id ? { ...r, status } : r)))
+}
+
+// ── Bình luận ───────────────────────────────────────────────────────────
+
+/** Id các bình luận (còn tồn tại) đang có báo cáo chưa xử lý */
+function reportedCommentIds() {
+  const existing = new Set(loadUserComments().map((c) => c.id))
+  return new Set(
+    loadCommentReports()
+      .filter((r) => r.status === 'open' && existing.has(r.commentId))
+      .map((r) => r.commentId),
+  )
+}
+
+/** Bình luận do người dùng viết (bình luận mẫu của bản giả không nằm ở đây) */
+export async function getAdminComments({
+  view,
+  q = '',
+  page,
+}: AdminCommentQuery): Promise<Page<AdminComment>> {
+  await delay()
+  await requireAdmin()
+  const query = slugify(q)
+  const stored = loadUserComments()
+  const names = new Map(loadUsers().map((u) => [u.id, u.displayName]))
+  const openReports = loadCommentReports()
+    .filter((r) => r.status === 'open')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const titles = new Map<string, { title: string; published: boolean }>([
+    ...seedStories.map((s) => [s.slug, { title: s.title, published: true }] as const),
+    ...loadUserStories().map(
+      (s) => [s.slug, { title: s.title, published: s.visibility === 'published' }] as const,
+    ),
+  ])
+
+  const comments = stored.flatMap((c): AdminComment[] => {
+    const story = titles.get(c.storySlug)
+    if (!story) return []
+    const displayName = names.get(c.user.id) ?? c.user.displayName
+    if (!matches(query, c.content, displayName)) return []
+    return [
+      {
+        id: c.id,
+        content: c.content,
+        createdAt: c.createdAt,
+        isReply: !!c.parentId,
+        replyCount: stored.filter((r) => r.parentId === c.id).length,
+        author: { id: c.user.id, displayName },
+        storySlug: c.storySlug,
+        storyTitle: story.title,
+        storyPublished: story.published,
+        chapterNumber: c.chapterNumber,
+        reports: openReports
+          .filter((r) => r.commentId === c.id)
+          .map((r) => ({
+            reason: r.reason,
+            note: r.note,
+            reporterName: names.get(r.reporter.id) ?? r.reporter.displayName,
+            createdAt: r.createdAt,
+          })),
+      },
+    ]
+  })
+  const shown =
+    view === 'reported'
+      ? comments
+          .filter((c) => c.reports.length > 0)
+          .sort((a, b) => b.reports[0].createdAt.localeCompare(a.reports[0].createdAt))
+      : comments.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return paginate(shown, page, ADMIN_PAGE_SIZE)
+}
+
+/** Xóa bình luận của bất kỳ ai, kèm trả lời và báo cáo của nó */
+export async function deleteAdminComment(id: string) {
+  await delay()
+  await requireAdmin()
+  if (removeComments((c) => c.id === id) === 0) throw new AdminError('not_found')
+}
+
+/** Đóng mọi báo cáo đang mở của một bình luận, bình luận giữ nguyên */
+export async function dismissCommentReports(commentId: string) {
+  await delay()
+  await requireAdmin()
+  saveCommentReports(
+    loadCommentReports().map((r) =>
+      r.commentId === commentId && r.status === 'open' ? { ...r, status: 'resolved' as const } : r,
+    ),
+  )
 }
 
 // ── Khóa tài khoản, gỡ truyện ───────────────────────────────────────────

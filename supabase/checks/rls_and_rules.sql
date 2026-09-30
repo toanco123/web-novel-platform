@@ -752,6 +752,130 @@ select pg_temp.expect(
   not exists (select 1 from public.curated_stories where list = 'featured'),
   'bỏ hết truyện chọn tay');
 
+-- ── Trả lời và báo cáo bình luận ────────────────────────────────────────
+
+create function pg_temp.spam_comment(p_content text)
+returns uuid
+language sql
+as $$
+  select id from public.comments
+  where story_id = pg_temp.story_id('truyen-chong-spam') and content = p_content
+$$;
+
+-- A trả lời bình luận "Hay quá" của C
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.comments (story_id, content, parent_id) values
+  (pg_temp.story_id('truyen-chong-spam'), 'Cảm ơn bạn', pg_temp.spam_comment('Hay quá')),
+  (pg_temp.story_id('truyen-chong-spam'), 'Chúc bạn đọc vui', pg_temp.spam_comment('Hay quá'));
+select pg_temp.expect_error(
+  $$insert into public.comments (story_id, content, parent_id)
+    values (pg_temp.story_id('truyen-chong-spam'), 'Lồng hai cấp', pg_temp.spam_comment('Cảm ơn bạn'))$$,
+  'invalid_parent');
+select pg_temp.expect_error(
+  $$insert into public.comments (story_id, chapter_number, content, parent_id)
+    values (pg_temp.story_id('truyen-chong-spam'), 1, 'Sai chỗ', pg_temp.spam_comment('Hay quá'))$$,
+  'invalid_parent');
+select pg_temp.expect_error(
+  $$insert into public.comments (story_id, content, parent_id)
+    values (pg_temp.story_id('truyen-chong-spam'), 'Không có gốc', gen_random_uuid())$$,
+  'parent_not_found');
+
+-- Báo cáo: không báo bình luận của mình, bình luận không có; báo lại thì cập nhật
+select pg_temp.expect_error(
+  $$select public.report_comment(pg_temp.spam_comment('Cảm ơn bạn'), 'spam')$$, 'own_comment');
+select pg_temp.expect_error(
+  $$select public.report_comment(gen_random_uuid(), 'spam')$$, 'not_found');
+select pg_temp.expect_error(
+  $$select public.report_comment(pg_temp.spam_comment('Chờ chương mới'), 'other', '  ')$$, '23514');
+select public.report_comment(pg_temp.spam_comment('Chờ chương mới'), 'offensive');
+select public.report_comment(pg_temp.spam_comment('Chờ chương mới'), 'spam', ' Quảng cáo ');
+select pg_temp.expect_error($$select * from private.comment_reports$$, '42501');
+select pg_temp.expect_error($$select * from public.admin_comments()$$, 'forbidden');
+select pg_temp.expect_error(
+  $$select public.admin_delete_comment(gen_random_uuid())$$, 'forbidden');
+select pg_temp.expect_error(
+  $$select public.admin_dismiss_comment_reports(gen_random_uuid())$$, 'forbidden');
+
+-- Tối đa 10 báo cáo mới / giờ: A đã có 1, thêm 9 báo cáo cũ đã xử lý
+reset role;
+insert into private.comment_reports (comment_id, reporter_id, reason, status, resolved_at)
+select pg_temp.spam_comment('Chờ chương mới'), '00000000-0000-4000-8000-00000000000a', 'spam',
+  'resolved', now()
+from generate_series(1, 9);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$select public.report_comment(pg_temp.spam_comment('Cảm ơn tác giả'), 'spam')$$,
+  'rate_limited');
+select public.report_comment(pg_temp.spam_comment('Chờ chương mới'), 'spam', 'Quảng cáo web khác');
+
+-- Khách đọc được bình luận gốc kèm số trả lời, không báo cáo được
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect(
+  (select count(*) = 3 and sum(t.reply_count) = 2 and bool_and(t.display_name is not null)
+    from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t),
+  'comment_threads: chỉ bình luận gốc, kèm người viết và số trả lời');
+select pg_temp.expect(
+  (select t.reply_count = 2
+    from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t
+    where t.content = 'Hay quá'),
+  'comment_threads đếm trả lời của từng bình luận');
+select pg_temp.expect(
+  not exists (select 1 from public.comment_threads(pg_temp.story_id('truyen-chong-spam'), 1)),
+  'comment_threads theo chương không lẫn bình luận của truyện');
+select pg_temp.expect_error(
+  $$select public.report_comment(gen_random_uuid(), 'spam')$$, '42501');
+
+-- Admin: xem, bỏ qua báo cáo, xóa bình luận
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select count(*) = 5 from public.admin_comments() where story_slug = 'truyen-chong-spam')
+    and (select count(*) = 2 from public.admin_comments('TÁC GIẢ A')
+      where story_slug = 'truyen-chong-spam' and is_reply)
+    and (select count(*) = 1 from public.admin_comments('cam on ban')
+      where story_slug = 'truyen-chong-spam'),
+  'admin_comments: mọi bình luận, tìm không dấu theo nội dung và người viết');
+select pg_temp.expect(
+  (select count(*) = 1
+      and bool_and(c.content = 'Chờ chương mới'
+        and jsonb_array_length(c.reports) = 1
+        and c.reports -> 0 ->> 'reason' = 'spam'
+        and c.reports -> 0 ->> 'note' = 'Quảng cáo web khác'
+        and c.reports -> 0 ->> 'reporterName' = 'Tác giả A')
+    from public.admin_comments(null, true) c where c.story_slug = 'truyen-chong-spam'),
+  'admin_comments(reported): báo lại chỉ cập nhật báo cáo đang mở');
+select pg_temp.expect(
+  (select (o -> 'totals' ->> 'reportedComments')::int >= 1 from public.admin_overview(7) as o),
+  'tổng quan đếm bình luận đang bị báo cáo');
+select public.admin_dismiss_comment_reports(pg_temp.spam_comment('Chờ chương mới'));
+select pg_temp.expect(
+  not exists (select 1 from public.admin_comments(null, true)
+    where story_slug = 'truyen-chong-spam'),
+  'bỏ qua báo cáo thì bình luận rời danh sách bị báo cáo');
+select pg_temp.expect(
+  (select reply_count = 2 from public.admin_comments()
+    where id = pg_temp.spam_comment('Hay quá')),
+  'admin_comments có số trả lời');
+select public.admin_delete_comment(pg_temp.spam_comment('Hay quá'));
+select pg_temp.expect(
+  (select count(*) = 2 from public.admin_comments() where story_slug = 'truyen-chong-spam'),
+  'admin xóa bình luận gốc thì trả lời mất theo');
+select pg_temp.expect_error(
+  $$select public.admin_delete_comment(gen_random_uuid())$$, 'not_found');
+select public.admin_delete_comment(pg_temp.spam_comment('Chờ chương mới'));
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from private.comment_reports
+    where reporter_id = '00000000-0000-4000-8000-00000000000a'),
+  'xóa bình luận thì báo cáo của nó mất theo');
+
 -- ── Tự xóa tài khoản ────────────────────────────────────────────────────
 
 reset role;

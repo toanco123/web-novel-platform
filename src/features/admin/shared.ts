@@ -1,5 +1,6 @@
 // Phần dùng chung của hai backend trang quản trị (api.mock.ts, api.remote.ts)
 import type { ContactTopic } from '@/features/feedback/schemas'
+import type { CommentReportReason } from '@/types/comment'
 import type { ReportReason, ReportStatus } from '@/types/report'
 import type { CuratedList, StoryStatus, StoryVisibility } from '@/types/story'
 
@@ -21,6 +22,8 @@ export type AdminOverview = {
     viewsInPeriod: number
     comments: number
     openReports: number
+    /** Số bình luận đang có báo cáo chưa xử lý */
+    reportedComments: number
     unhandledMessages: number
     bannedUsers: number
   }
@@ -147,6 +150,28 @@ export type AdminReport = {
   reporter: { id: string; displayName: string }
   createdAt: string
 }
+
+export type AdminComment = {
+  id: string
+  content: string
+  createdAt: string
+  /** Là trả lời của một bình luận khác */
+  isReply: boolean
+  /** Số trả lời sẽ bị xóa theo nếu xóa bình luận này */
+  replyCount: number
+  author: { id: string; displayName: string }
+  storySlug: string
+  storyTitle: string
+  /** Truyện đang công khai (có link sang trang truyện / trang đọc) */
+  storyPublished: boolean
+  /** null: bình luận của cả truyện */
+  chapterNumber: number | null
+  /** Các báo cáo chưa xử lý, mới nhất trước */
+  reports: { reason: CommentReportReason; note: string; reporterName: string; createdAt: string }[]
+}
+
+/** reported: chỉ bình luận có báo cáo chưa xử lý (báo cáo mới nhất trước); all: mới viết trước */
+export type AdminCommentQuery = { view: 'reported' | 'all'; q?: string; page: number }
 
 export type AdminMessageQuery = { status: AdminMessageStatus; page: number }
 export type AdminReportQuery = { status: ReportStatus | 'all'; page: number }

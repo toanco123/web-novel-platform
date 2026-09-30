@@ -9,5 +9,13 @@ export * from './shared'
 
 const api: typeof mock = supabase ? remote : mock
 
-export const { getComments, addComment, deleteComment, getRatingSummary, getMyRating, rateStory } =
-  api
+export const {
+  getComments,
+  getReplies,
+  addComment,
+  deleteComment,
+  reportComment,
+  getRatingSummary,
+  getMyRating,
+  rateStory,
+} = api
