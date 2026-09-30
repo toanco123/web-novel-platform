@@ -547,8 +547,21 @@ select pg_temp.expect(
 select public.admin_set_report_status(
   (select id from public.admin_reports('open') where story_slug = 'truyen-chong-spam'), 'resolved');
 select pg_temp.expect(
-  (select count(*) = 1 from public.admin_reports('resolved') where resolved_at is not null),
+  (select count(*) = 1 from public.admin_reports('resolved')
+    where story_slug = 'truyen-chong-spam' and resolved_at is not null),
   'admin đánh dấu báo lỗi đã sửa');
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_reports(null, 'CHỐNG spam')
+      where story_slug = 'truyen-chong-spam')
+    and (select count(*) = 1 from public.admin_reports(null, 'sai chinh ta')
+      where story_slug = 'truyen-chong-spam')
+    and (select count(*) = 1 from public.admin_reports('resolved', 'khach-c')
+      where story_slug = 'truyen-chong-spam')
+    and not exists (select 1 from public.admin_reports('open', 'khach-c')
+      where story_slug = 'truyen-chong-spam')
+    and not exists (select 1 from public.admin_reports(null, 'khong co chu nay')
+      where story_slug = 'truyen-chong-spam'),
+  'admin_reports tìm không dấu theo tên truyện, ghi chú, người báo');
 select pg_temp.expect(
   (select count(*) >= 3 from public.admin_contact_messages('open')),
   'admin đọc được tin nhắn liên hệ chưa xử lý');
@@ -561,6 +574,16 @@ select pg_temp.expect(
     and (select (o -> 'totals' ->> 'unhandledMessages')::int >= 2
       from public.admin_overview(7) as o),
   'đánh dấu tin nhắn đã xử lý; tổng quan đếm tin chưa xử lý');
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_contact_messages(null, 'THỨ nhat')
+      where lower(email) = 'spam@example.com')
+    and (select count(*) = 3 from public.admin_contact_messages(null, 'spam@example')
+      where lower(email) = 'spam@example.com')
+    and (select count(*) = 2 from public.admin_contact_messages('open', 'spam@example')
+      where lower(email) = 'spam@example.com')
+    and not exists (select 1 from public.admin_contact_messages(null, 'khong co chu nay')
+      where lower(email) = 'spam@example.com'),
+  'admin_contact_messages tìm không dấu theo tên, email, nội dung');
 
 -- ── Admin: gỡ truyện, khóa tài khoản ───────────────────────────────────
 

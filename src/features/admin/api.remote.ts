@@ -10,8 +10,8 @@ import { normalizeGenreName } from '@/features/genres/api'
 import type { Page } from '@/types/page'
 import type { CuratedList, Genre } from '@/types/story'
 import {
-  ADMIN_PAGE_SIZE,
   AdminError,
+  adminPageSize,
   isAdminErrorCode,
   type AdminComment,
   type AdminCommentQuery,
@@ -25,6 +25,7 @@ import {
   type AdminUser,
   type AdminUserQuery,
   type CuratedStory,
+  type SortOrder,
 } from './shared'
 
 /** Mã lỗi của các RPC admin (forbidden, not_found, cannot_ban_*) → AdminError; lỗi khác null */
@@ -38,19 +39,48 @@ const rethrow = (error: PostgrestError) => {
   throw adminError(error) ?? error
 }
 
+// Lọc, sắp xếp và phân trang làm bằng PostgREST ngay trên kết quả của RPC trả bảng (hàm trả về cả
+// danh sách, PostgREST bọc thêm where / order by / limit). Không kèm order thì giảm dần.
+
+/** Tùy chọn của .order(): giá trị trống luôn xếp cuối, dù tăng hay giảm */
+const direction = (order: SortOrder = 'desc') => ({
+  ascending: order === 'asc',
+  nullsFirst: false,
+})
+
 export async function getAdminOverview(days: number): Promise<AdminOverview> {
   await requireUserId()
   const data = unwrap(await db().rpc('admin_overview', { p_days: days }), adminError)
   return data as unknown as AdminOverview
 }
 
-export async function getAdminUsers({ q, page }: AdminUserQuery): Promise<Page<AdminUser>> {
+const userSortColumns = {
+  name: 'display_name',
+  created: 'created_at',
+  lastSignIn: 'last_sign_in_at',
+  stories: 'story_count',
+  comments: 'comment_count',
+  follows: 'follow_count',
+} as const
+
+export async function getAdminUsers({
+  q,
+  role,
+  status,
+  provider,
+  sort = 'created',
+  order,
+  page,
+  pageSize,
+}: AdminUserQuery): Promise<Page<AdminUser>> {
   await requireUserId()
-  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
-    db()
-      .rpc('admin_users', { p_query: q || undefined }, { count: 'exact' })
-      .range(from, to),
-  ).catch(rethrow)
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc('admin_users', { p_query: q || undefined }, { count: 'exact' })
+    if (role) query = query.eq('is_admin', role === 'admin')
+    if (status) query = query.eq('is_banned', status === 'banned')
+    if (provider) query = query.eq('provider', provider)
+    return query.order(userSortColumns[sort], direction(order)).order('id').range(from, to)
+  }).catch(rethrow)
   return {
     ...result,
     items: result.items.map((r) => ({
@@ -70,25 +100,52 @@ export async function getAdminUsers({ q, page }: AdminUserQuery): Promise<Page<A
   }
 }
 
+const storySortColumns = {
+  title: 'title',
+  chapters: 'published_count',
+  views: 'view_count',
+  followers: 'follower_count',
+  rating: 'rating_avg',
+  comments: 'comment_count',
+  reports: 'open_reports',
+  created: 'created_at',
+  updated: 'updated_at',
+} as const
+
 export async function getAdminStories({
   q,
   visibility,
+  status,
+  hasReports,
   ownerId,
-  sort,
+  sort = 'updated',
+  order,
   page,
+  pageSize,
 }: AdminStoryQuery): Promise<Page<AdminStory>> {
   await requireUserId()
   // Id tác giả sai định dạng (link sửa tay) thì coi như không có truyện nào
   if (ownerId && !isUuid(ownerId)) return { items: [], total: 0, page: 1, pageCount: 1 }
-  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
-    db()
-      .rpc(
-        'admin_stories',
-        { p_query: q || undefined, p_visibility: visibility, p_owner_id: ownerId, p_sort: sort },
-        { count: 'exact' },
-      )
-      .range(from, to),
-  ).catch(rethrow)
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc(
+      'admin_stories',
+      {
+        p_query: q || undefined,
+        // Truyện bị gỡ cũng là nháp; lọc riêng bằng taken_down_at ở dưới
+        p_visibility: visibility === 'takedown' ? 'draft' : visibility,
+        p_owner_id: ownerId,
+      },
+      { count: 'exact' },
+    )
+    if (visibility === 'takedown') query = query.not('taken_down_at', 'is', null)
+    if (status) query = query.eq('status', status)
+    if (hasReports) query = query.gt('open_reports', 0)
+    return query
+      .order(storySortColumns[sort], direction(order))
+      .order('updated_at', { ascending: false })
+      .order('id')
+      .range(from, to)
+  }).catch(rethrow)
   return {
     ...result,
     items: result.items.map((r) => ({
@@ -121,18 +178,22 @@ export async function getAdminStories({
 
 export async function getAdminMessages({
   status,
+  topic,
+  q,
+  order,
   page,
+  pageSize,
 }: AdminMessageQuery): Promise<Page<AdminContactMessage>> {
   await requireUserId()
-  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
-    db()
-      .rpc(
-        'admin_contact_messages',
-        { p_status: status === 'all' ? undefined : status },
-        { count: 'exact' },
-      )
-      .range(from, to),
-  ).catch(rethrow)
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc(
+      'admin_contact_messages',
+      { p_status: status === 'all' ? undefined : status, p_query: q || undefined },
+      { count: 'exact' },
+    )
+    if (topic) query = query.eq('topic', topic)
+    return query.order('created_at', direction(order)).order('id').range(from, to)
+  }).catch(rethrow)
   return {
     ...result,
     items: result.items.map((r) => ({
@@ -157,14 +218,22 @@ export async function setMessageHandled(id: string, handled: boolean) {
 
 export async function getAdminReports({
   status,
+  reason,
+  q,
+  order,
   page,
+  pageSize,
 }: AdminReportQuery): Promise<Page<AdminReport>> {
   await requireUserId()
-  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
-    db()
-      .rpc('admin_reports', { p_status: status === 'all' ? undefined : status }, { count: 'exact' })
-      .range(from, to),
-  ).catch(rethrow)
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc(
+      'admin_reports',
+      { p_status: status === 'all' ? undefined : status, p_query: q || undefined },
+      { count: 'exact' },
+    )
+    if (reason) query = query.eq('reason', reason)
+    return query.order('created_at', direction(order)).order('id').range(from, to)
+  }).catch(rethrow)
   return {
     ...result,
     items: result.items.map((r) => ({
@@ -194,18 +263,26 @@ export async function setAdminReportStatus(id: string, status: AdminReport['stat
 export async function getAdminComments({
   view,
   q,
+  kind,
+  sort = view === 'reported' ? 'reported' : 'created',
+  order,
   page,
+  pageSize,
 }: AdminCommentQuery): Promise<Page<AdminComment>> {
   await requireUserId()
-  const result = await loadPage(page, ADMIN_PAGE_SIZE, (from, to) =>
-    db()
-      .rpc(
-        'admin_comments',
-        { p_query: q || undefined, p_reported: view === 'reported' },
-        { count: 'exact' },
-      )
-      .range(from, to),
-  ).catch(rethrow)
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc(
+      'admin_comments',
+      { p_query: q || undefined, p_reported: view === 'reported' },
+      { count: 'exact' },
+    )
+    if (kind) query = query.eq('is_reply', kind === 'reply')
+    return query
+      .order(sort === 'reported' ? 'last_reported_at' : 'created_at', direction(order))
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to)
+  }).catch(rethrow)
   return {
     ...result,
     items: result.items.map((r) => ({

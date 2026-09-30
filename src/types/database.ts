@@ -821,7 +821,7 @@ export type Database = {
         }[]
       }
       admin_contact_messages: {
-        Args: { p_status?: string }
+        Args: { p_query?: string; p_status?: string }
         Returns: {
           created_at: string
           email: string
@@ -855,7 +855,10 @@ export type Database = {
       }
       admin_overview: { Args: { p_days?: number }; Returns: Json }
       admin_reports: {
-        Args: { p_status?: Database["public"]["Enums"]["report_status"] }
+        Args: {
+          p_query?: string
+          p_status?: Database["public"]["Enums"]["report_status"]
+        }
         Returns: {
           chapter_number: number
           chapter_title: string
