@@ -7,9 +7,10 @@ import { seededRandom } from '@/lib/seededRandom'
 import { slugify } from '@/lib/slugify'
 import { followerCount, loadViews, recentViews, type ViewStats } from '@/mocks/activity'
 import { allGenres, catalog, findStory } from '@/mocks/catalog'
+import { loadCurated } from '@/mocks/curated'
 import { editorPickSlugs, featuredSlugs, stories as seedStories } from '@/mocks/stories'
 import type { Page } from '@/types/page'
-import type { Story } from '@/types/story'
+import type { CuratedList, Story } from '@/types/story'
 import {
   BROWSE_PER_PAGE,
   type BrowseFilters,
@@ -32,14 +33,23 @@ const desc =
 /** Danh sách công khai: chỉ truyện đã xuất bản và có ít nhất 1 chương */
 const publicStories = () => catalog().filter((s) => s.chapterCount > 0)
 
+/** Truyện quản trị viên chọn tay, theo thứ tự đã xếp; bỏ truyện không còn công khai */
+function curated(list: CuratedList): Story[] {
+  const stories = new Map(publicStories().map((s) => [s.id, s]))
+  return loadCurated(list).flatMap((id) => stories.get(id) ?? [])
+}
+
 export async function getFeaturedStories(): Promise<Story[]> {
   await delay()
-  return bySlugs(featuredSlugs)
+  const picked = curated('featured')
+  // Chưa chọn tay: danh sách có sẵn của bản giả
+  return picked.length ? picked : bySlugs(featuredSlugs)
 }
 
 export async function getEditorPicks(): Promise<Story[]> {
   await delay()
-  return bySlugs(editorPickSlugs)
+  const picked = curated('editor_pick')
+  return picked.length ? picked : bySlugs(editorPickSlugs)
 }
 
 /** Top lượt đọc 7 ngày (dùng chung số liệu với bảng xếp hạng) */

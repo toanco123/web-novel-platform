@@ -47,6 +47,8 @@ export const paths = {
   adminReports: '/admin/reports',
   adminGenres: '/admin/genres',
   adminImport: '/admin/import',
+  /** Chọn truyện cho banner nổi bật và khối đề cử của trang chủ */
+  adminFeatured: '/admin/featured',
 }
 
 function withNext(path: string, next?: string) {

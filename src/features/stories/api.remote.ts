@@ -39,7 +39,7 @@ const isPublic = (s: Story) => s.visibility === 'published' && s.chapterCount > 
 
 // ── Trang chủ ───────────────────────────────────────────────────────────
 
-/** Truyện chọn tay (sửa qua Dashboard) theo position; bỏ truyện không còn công khai */
+/** Truyện chọn tay (sửa ở /admin/featured) theo position; bỏ truyện không còn công khai */
 async function curated(list: 'featured' | 'editor_pick'): Promise<Story[]> {
   const rows = unwrap(
     await db()

@@ -8,7 +8,7 @@ import { db } from '@/lib/supabase'
 import { isUuid } from '@/lib/uuid'
 import { normalizeGenreName } from '@/features/genres/api'
 import type { Page } from '@/types/page'
-import type { Genre } from '@/types/story'
+import type { CuratedList, Genre } from '@/types/story'
 import {
   ADMIN_PAGE_SIZE,
   AdminError,
@@ -22,6 +22,7 @@ import {
   type AdminStoryQuery,
   type AdminUser,
   type AdminUserQuery,
+  type CuratedStory,
 } from './shared'
 
 /** Mã lỗi của các RPC admin (forbidden, not_found, cannot_ban_*) → AdminError; lỗi khác null */
@@ -239,4 +240,26 @@ export async function deleteGenre(slug: string) {
 export async function mergeGenres(from: string, into: string): Promise<number> {
   await requireUserId()
   return unwrap(await db().rpc('admin_merge_genres', { p_from: from, p_into: into }), adminError)
+}
+
+// ── Truyện chọn tay trên trang chủ ──────────────────────────────────────
+
+/** Danh sách đã chọn theo thứ tự, kể cả truyện đang ẩn (để admin thấy và bỏ đi) */
+export async function getCuratedStories(list: CuratedList): Promise<CuratedStory[]> {
+  await requireUserId()
+  const rows = unwrap(await db().rpc('admin_curated', { p_list: list }), adminError)
+  return rows.map((r) => ({
+    id: r.story_id,
+    slug: r.slug,
+    title: r.title,
+    authorName: r.author_name,
+    isPublic: r.is_public,
+  }))
+}
+
+/** Thay cả danh sách theo thứ tự đưa vào (id lặp lại chỉ giữ lần đầu); rỗng: trang chủ tự chọn */
+export async function setCuratedStories(list: CuratedList, storyIds: string[]) {
+  await requireUserId()
+  if (!storyIds.every(isUuid)) throw new AdminError('not_found')
+  unwrap(await db().rpc('admin_set_curated', { p_list: list, p_story_ids: storyIds }), adminError)
 }

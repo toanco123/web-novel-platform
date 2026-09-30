@@ -17,6 +17,7 @@ import {
 } from '@/mocks/activity'
 import { allGenres, toStory } from '@/mocks/catalog'
 import { mockChapters } from '@/mocks/chapters'
+import { loadCurated, saveCurated } from '@/mocks/curated'
 import { genres as seedGenres, stories as seedStories } from '@/mocks/stories'
 import {
   loadChapters,
@@ -28,10 +29,11 @@ import {
 import { loadUsers, saveUsers } from '@/mocks/users'
 import { normalizeGenreName } from '@/features/genres/api'
 import type { Page } from '@/types/page'
-import type { Genre } from '@/types/story'
+import type { CuratedList, Genre } from '@/types/story'
 import {
   ADMIN_PAGE_SIZE,
   AdminError,
+  CURATED_LIMITS,
   type AdminContactMessage,
   type AdminMessageQuery,
   type AdminOverview,
@@ -41,6 +43,7 @@ import {
   type AdminStoryQuery,
   type AdminUser,
   type AdminUserQuery,
+  type CuratedStory,
 } from './shared'
 
 const SYSTEM_AUTHOR = 'Hệ thống'
@@ -453,4 +456,38 @@ export async function mergeGenres(from: string, into: string): Promise<number> {
   saveUserGenres(loadUserGenres().filter((g) => g.slug !== from))
   replaceStoryGenre(from, into)
   return moved
+}
+
+// ── Truyện chọn tay trên trang chủ ──────────────────────────────────────
+
+/** Danh sách đã chọn theo thứ tự, kể cả truyện đang ẩn (để admin thấy và bỏ đi) */
+export async function getCuratedStories(list: CuratedList): Promise<CuratedStory[]> {
+  await delay()
+  await requireAdmin()
+  const stories = new Map(allStories().map((s) => [s.id, s]))
+  const penNames = new Map(loadUserStories().map((s) => [s.id, s.authorName]))
+  return loadCurated(list).flatMap((id): CuratedStory[] => {
+    const story = stories.get(id)
+    if (!story) return []
+    return [
+      {
+        id: story.id,
+        slug: story.slug,
+        title: story.title,
+        authorName: penNames.get(id) || story.ownerName,
+        isPublic: story.visibility === 'published' && story.publishedCount > 0,
+      },
+    ]
+  })
+}
+
+/** Thay cả danh sách theo thứ tự đưa vào (id lặp lại chỉ giữ lần đầu); rỗng: trang chủ tự chọn */
+export async function setCuratedStories(list: CuratedList, storyIds: string[]) {
+  await delay()
+  await requireAdmin()
+  const ids = [...new Set(storyIds)]
+  if (ids.length > CURATED_LIMITS[list]) throw new AdminError('too_many_curated')
+  const known = new Set(allStories().map((s) => s.id))
+  if (ids.some((id) => !known.has(id))) throw new AdminError('not_found')
+  saveCurated(list, ids)
 }

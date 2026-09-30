@@ -1,6 +1,6 @@
 # Plan: Công cụ admin và nhập truyện hàng loạt
 
-Trạng thái: ✅ xong (29/09/2026). Nối tiếp `plan-trang-quan-tri.md` (trang `/admin` lúc đầu chỉ xem).
+Trạng thái: ✅ xong (29/09/2026); phần 5 (chọn truyện cho trang chủ) thêm ngày 30/09/2026. Nối tiếp `plan-trang-quan-tri.md` (trang `/admin` lúc đầu chỉ xem).
 
 Khác với plan ban đầu:
 - Thanh tab admin ở màn hẹp cuộn ngang (đủ 7 mục) và tự đưa tab đang mở vào tầm nhìn.
@@ -12,8 +12,7 @@ Khác với plan ban đầu:
 2. **Khóa user, gỡ truyện:** khóa/mở khóa tài khoản vi phạm; gỡ truyện vi phạm kèm lý do.
 3. **Quản lý thể loại:** sửa tên/mô tả, xóa, gộp thể loại.
 4. **Nhập truyện hàng loạt:** kéo thả nhiều file `.txt`, mỗi file một truyện; truyện đứng tên admin, kèm tên tác giả gốc.
-
-Ngoài phạm vi đợt này: chọn truyện nổi bật (`curated_stories`), captcha.
+5. **Chọn truyện cho trang chủ:** chọn và xếp thứ tự truyện ở banner nổi bật và hàng "Truyện đề cử".
 
 ## Route mới (menu admin)
 
@@ -23,6 +22,7 @@ Ngoài phạm vi đợt này: chọn truyện nổi bật (`curated_stories`), c
 | `/admin/reports` | Báo lỗi chương toàn web (`?status=open\|resolved\|all`, `?page=`) |
 | `/admin/genres` | Quản lý thể loại |
 | `/admin/import` | Nhập truyện hàng loạt |
+| `/admin/featured` | Chọn truyện cho trang chủ (menu "Trang chủ") |
 
 Trang Người dùng và Truyện có thêm nút thao tác (khóa, gỡ). Tổng quan có thêm ô "Tin nhắn chưa xử lý".
 
@@ -76,6 +76,17 @@ Trang Người dùng và Truyện có thêm nút thao tác (khóa, gỡ). Tổng
   - Nút "Nhập N truyện": chạy lần lượt từng truyện, gồm `createStory` → `importChapters` (xuất bản) → `publishStory`, dùng lại api của khu Sáng tác. Mỗi hàng hiện tiến độ; lỗi ở một truyện không dừng các truyện khác.
   - Xong có link tới từng truyện (trang công khai và khu Sáng tác).
 - Truyện nhập thuộc tài khoản admin, nên admin sửa chương hay bìa ở khu Sáng tác như truyện thường.
+
+## 5. Chọn truyện cho trang chủ
+
+- **Trang `/admin/featured`:** hai danh sách, "Banner nổi bật" (tối đa 8 truyện) và "Truyện đề cử" (tối đa 12).
+  - Ô tìm chỉ gợi ý truyện đang công khai, chưa có trong danh sách.
+  - Mỗi truyện có nút đưa lên, đưa xuống và bỏ. Thay đổi chỉ có hiệu lực khi bấm "Lưu"; "Hoàn tác" trả về bản đã lưu.
+  - Truyện đã chọn mà sau đó bị ẩn hoặc bị gỡ vẫn nằm trong danh sách, kèm nhãn "Đang ẩn", và không lên trang chủ.
+- **Danh sách trống:** trang chủ tự chọn như trước (nổi bật: nhiều lượt đọc nhất; đề cử: điểm cao nhất).
+- **RPC:** `admin_curated(list)` đọc danh sách kể cả truyện đang ẩn; `admin_set_curated(list, story_ids[])` thay cả danh sách theo thứ tự đưa vào, quá số lượng báo `too_many_curated`, id không có báo `not_found`.
+- **Bản giả:** lưu id truyện ở `src/mocks/curated.ts` (localStorage `mock-curated`); chưa chọn thì dùng danh sách có sẵn của bản giả.
+- Lưu xong thì làm mới cả key `['stories']` để trang chủ lấy danh sách mới.
 
 ## Kiểm tra
 

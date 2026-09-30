@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/auth/hooks'
+import type { CuratedList } from '@/types/story'
 import * as api from './api'
 import { importStory } from './bulkImport'
 
@@ -115,6 +116,30 @@ export const useSetAdminReportStatus = () =>
   useAdminMutation(({ id, status }: { id: string; status: api.AdminReport['status'] }) =>
     api.setAdminReportStatus(id, status),
   )
+
+export function useCuratedStories(list: CuratedList) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: [...adminKeys.all(userId), 'curated', list],
+    queryFn: () => api.getCuratedStories(list),
+  })
+}
+
+/** Lưu danh sách chọn tay: làm mới cả trang chủ (key ['stories']) */
+export function useSetCuratedStories() {
+  const queryClient = useQueryClient()
+  const userId = useUserId()
+  return useMutation({
+    mutationFn: ({ list, storyIds }: { list: CuratedList; storyIds: string[] }) =>
+      api.setCuratedStories(list, storyIds),
+    onSettled: () =>
+      Promise.all(
+        [adminKeys.all(userId), ['stories']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+  })
+}
 
 /** Nhập một truyện từ file: xong thì làm mới danh sách truyện (công khai, Sáng tác, admin) */
 export function useImportStory() {

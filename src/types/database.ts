@@ -805,6 +805,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_curated: {
+        Args: { p_list: string }
+        Returns: {
+          author_name: string
+          is_public: boolean
+          slug: string
+          story_id: string
+          title: string
+        }[]
+      }
       admin_delete_genre: { Args: { p_slug: string }; Returns: undefined }
       admin_merge_genres: {
         Args: { p_from: string; p_into: string }
@@ -832,6 +842,10 @@ export type Database = {
       }
       admin_set_contact_handled: {
         Args: { p_handled: boolean; p_id: number }
+        Returns: undefined
+      }
+      admin_set_curated: {
+        Args: { p_list: string; p_story_ids: string[] }
         Returns: undefined
       }
       admin_set_report_status: {
