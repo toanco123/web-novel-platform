@@ -30,7 +30,7 @@ Một module thuần, dùng ở cả client và hàm Vercel, để hai nơi ra c
 - `PageSeo = { title, description?, path?, image?, type?, noindex?, jsonLd? }`.
 - `seoTags(seo, siteUrl)` → danh sách thẻ `meta`/`link` (description, canonical, `og:*`, `twitter:card`, robots).
 - `storySeo`, `chapterSeo`, `genreSeo`, `homeSeo`: dựng `PageSeo` từ dữ liệu.
-- `STATIC_PAGES` + `staticPageSeo(path)`: tiêu đề và mô tả của các trang tĩnh (thể loại, ba danh sách, bảng xếp hạng, bốn trang thông tin). Trang trong app cũng lấy chữ hiển thị từ bảng này. React chỉ nhận lại thẻ có sẵn trong head khi nội dung giống hệt, nên thẻ của hàm và thẻ của app phải trùng nhau, nếu không bot chạy JS sẽ thấy hai thẻ description.
+- `STATIC_PAGES` + `staticPageSeo(path)`: tiêu đề và mô tả của các trang tĩnh (thể loại, ba danh sách, bảng xếp hạng, bốn trang thông tin). Trang trong app cũng lấy chữ hiển thị từ bảng này. Bot không chạy JS đọc thẻ của hàm, bot chạy JS đọc thẻ của app, nên hai nơi phải ra cùng nội dung.
 - `metaDescription(text)`: gom khoảng trắng, cắt ở 160 ký tự theo ranh giới từ.
 
 Quy tắc:
@@ -80,7 +80,7 @@ Trang chủ `/` là file tĩnh nên Vercel trả thẳng `index.html`, không qu
 
 - Plugin `seo.config.ts` gắn sẵn vào `index.html` lúc build các thẻ chung của web (description, `og:*`, `twitter:card`, ảnh mặc định), đánh dấu `data-seo="default"`. Không có canonical và `og:url`, vì mọi trang dùng chung file này.
 - App gỡ các thẻ này khi khởi động (`src/app/defaultSeo.ts`, gọi trong `main.tsx`), để không trùng với thẻ do `<Seo>` đặt.
-- Hàm `api/meta` cũng gỡ chúng trước khi chèn thẻ của trang.
+- Hàm `api/meta` cũng gỡ chúng trước khi chèn thẻ của trang. Thẻ hàm chèn mang `data-seo="page"`, nên app cũng gỡ khi khởi động: React không nhận lại thẻ có sẵn trong head khi không hydrate, để nguyên thì bot có chạy JS (Google) thấy mỗi thẻ hai lần (đã gặp trên production ngày 30/09/2026). JSON-LD không đánh dấu nên được giữ.
 
 ## 4. Sitemap và robots
 
