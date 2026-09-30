@@ -51,7 +51,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `chapter_reports` | `id`, `story_id`, `chapter_number`, `reporter_id`, `reason`, `note` (≤500, bắt buộc khi `reason='other'`), `status`, `created_at`, `resolved_at` | Unique một phần trên `(reporter_id, story_id, chapter_number, reason)` khi `status='open'`, để gộp báo lỗi trùng |
 | `chapter_views` | `story_id`, `chapter_number`, `day`, `views` | Chỉ ghi qua `record_chapter_view` |
 | `contact_messages` | `name`, `email`, `topic`, `message` (10–2000), `user_id` | Chỉ insert, không ai đọc được qua API (xem trên Dashboard) |
-| `curated_stories` | `list` (`featured` \| `editor_pick`), `story_id`, `position` | Thay `featuredSlugs`/`editorPickSlugs`, sửa qua Dashboard |
+| `curated_stories` | `list` (`featured` \| `editor_pick`), `story_id`, `position` | Thay `featuredSlugs`/`editorPickSlugs`; quản trị viên sửa ở `/admin/featured` (RPC `admin_set_curated`) |
 
 **Enum:**
 - `story_status`: `ongoing` \| `completed`
@@ -75,6 +75,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `forbidden` | Gọi RPC quản trị (`admin_*`) mà không phải quản trị viên | `AdminError` |
 | `cannot_ban_self`, `cannot_ban_admin` | Admin tự khóa mình / khóa admin khác | `AdminError` |
 | `genre_exists`, `same_genre` | Đổi tên thể loại trùng thể loại khác / gộp thể loại vào chính nó | `AdminError` |
+| `too_many_curated` | Chọn quá 8 truyện nổi bật / 12 truyện đề cử cho trang chủ | `AdminError` |
 | `story_taken_down` | Tác giả công khai lại truyện đang bị admin gỡ | `StudioError('story_taken_down')` |
 | `story_limit`, `chapter_limit` | Vượt hạn mức tác giả mỗi ngày (bảng dưới) | `StudioError('story_limit' / 'chapter_limit')` |
 | `invalid_avatar_url` | Đặt `profiles.avatar_url` không phải ảnh trong thư mục `avatars/{uid}/` của mình (chỉ xảy ra khi gọi thẳng API) | Lỗi chung |
@@ -173,6 +174,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `admin_set_user_banned(user_id, banned)` | quản trị viên | `auth.users.banned_until = 'infinity'` / `null`; khóa thì xóa `auth.sessions` |
 | `admin_set_story_takedown(story_id, reason)` | quản trị viên | Gỡ truyện: về nháp + `taken_down_at`, `takedown_reason`; `reason` rỗng là khôi phục |
 | `admin_update_genre(slug, name, description)`, `admin_delete_genre(slug)`, `admin_merge_genres(from, into)` | quản trị viên | Sửa (slug đổi theo tên), xóa, gộp thể loại |
+| `admin_curated(list)`, `admin_set_curated(list, story_ids[])` | quản trị viên | Đọc danh sách truyện chọn tay (kể cả truyện đang ẩn) và thay cả danh sách theo thứ tự đưa vào. Tối đa 8 truyện nổi bật, 12 truyện đề cử |
 
 ## 7. Storage
 
@@ -243,6 +245,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |
 | admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports', {...}, { count: 'exact' }).range()` qua `loadPage` |
 | admin | `setMessageHandled`, `setAdminReportStatus`, `setUserBanned`, `setStoryTakedown`, `updateGenre`, `deleteGenre`, `mergeGenres` | RPC `admin_*` cùng tên (mục 6) |
+| admin | `getCuratedStories`, `setCuratedStories` | `rpc('admin_curated', { p_list })` / `rpc('admin_set_curated', { p_list, p_story_ids })` |
 | admin | nhập truyện hàng loạt | Không có RPC riêng: `features/admin/bulkImport.ts` gọi `createStory` (kèm `p_author_name`) → `importChapters` → `publishStory` của studio |
 
 ## 9. Quy trình
@@ -252,6 +255,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 - **Kiểm tra RLS và luật:** `supabase db query --linked -f supabase/checks/rls_and_rules.sql`.
   - Script chạy trong transaction rồi rollback, nên không để lại dữ liệu.
   - Không lỗi nghĩa là mọi kiểm tra đều qua. Khi đổi schema thì thêm ca kiểm tra vào đây.
+  - DB thật đã có dữ liệu, nên ca kiểm tra không được đếm trên cả bảng: lọc theo slug của truyện mẫu, hoặc bỏ truyện có sẵn bằng bảng tạm `existing_stories`.
+  - Thử migration chưa push: ghép `begin;` + file migration + file kiểm tra thành một file rồi chạy bằng `supabase db query --linked -f`; lệnh `rollback` cuối file kiểm tra hủy luôn migration.
 - **Sinh kiểu TypeScript:** `supabase gen types typescript --linked --schema public > src/types/database.ts`. File này là file sinh ra, đã được bỏ qua trong `.prettierignore`. Client đã dùng `createClient<Database>`.
 
 ## 10. Việc còn lại
@@ -263,7 +268,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
   - Bật Google/Facebook.
   - Mẫu email tiếng Việt.
 - ~~**Chống spam**~~ (xong 28/09/2026: giới hạn ở mục 4). Còn có thể thêm captcha (Cloudflare Turnstile) cho form liên hệ và đăng ký nếu vẫn bị spam.
-- **Vai trò quản trị:** trang `/admin` có tổng quan, người dùng (khóa/mở khóa), truyện (gỡ/khôi phục), hộp thư, báo lỗi, thể loại, nhập truyện hàng loạt (plan: `plan-trang-quan-tri.md`, `plan-cong-cu-admin.md`). Còn `curated_stories` (truyện nổi bật) vẫn sửa qua Dashboard.
+- **Vai trò quản trị:** trang `/admin` có tổng quan, người dùng (khóa/mở khóa), truyện (gỡ/khôi phục), hộp thư, báo lỗi, thể loại, nhập truyện hàng loạt, chọn truyện cho trang chủ (plan: `plan-trang-quan-tri.md`, `plan-cong-cu-admin.md`).
   - Cấp quyền (chạy trong SQL editor hoặc `supabase db query --linked`), rồi người đó đăng xuất và đăng nhập lại để JWT có vai trò mới:
     `update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role": "admin"}' where email = '...';`
   - Thu hồi: `raw_app_meta_data - 'role'`. JWT cũ vẫn còn quyền tới khi hết hạn (mặc định 1 giờ).

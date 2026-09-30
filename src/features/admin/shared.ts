@@ -1,7 +1,7 @@
 // Phần dùng chung của hai backend trang quản trị (api.mock.ts, api.remote.ts)
 import type { ContactTopic } from '@/features/feedback/schemas'
 import type { ReportReason, ReportStatus } from '@/types/report'
-import type { StoryStatus, StoryVisibility } from '@/types/story'
+import type { CuratedList, StoryStatus, StoryVisibility } from '@/types/story'
 
 export const ADMIN_PAGE_SIZE = 20
 
@@ -151,6 +151,20 @@ export type AdminReport = {
 export type AdminMessageQuery = { status: AdminMessageStatus; page: number }
 export type AdminReportQuery = { status: ReportStatus | 'all'; page: number }
 
+// ── Truyện chọn tay trên trang chủ ──────────────────────────────────────
+
+/** Số truyện tối đa của mỗi danh sách chọn tay */
+export const CURATED_LIMITS: Record<CuratedList, number> = { featured: 8, editor_pick: 12 }
+
+export type CuratedStory = {
+  id: string
+  slug: string
+  title: string
+  authorName: string
+  /** false: truyện đang ẩn hoặc bị gỡ, không lên trang chủ cho tới khi công khai lại */
+  isPublic: boolean
+}
+
 export type AdminErrorCode =
   | 'forbidden'
   | 'not_found'
@@ -159,6 +173,7 @@ export type AdminErrorCode =
   | 'genre_exists'
   | 'same_genre'
   | 'builtin_genre'
+  | 'too_many_curated'
 
 const adminMessages: Record<AdminErrorCode, string> = {
   forbidden: 'Chỉ quản trị viên mới xem được trang này.',
@@ -169,6 +184,7 @@ const adminMessages: Record<AdminErrorCode, string> = {
   same_genre: 'Chọn một thể loại khác để gộp vào.',
   builtin_genre:
     'Bản thử nghiệm không sửa được thể loại có sẵn, chỉ sửa được thể loại do người dùng tạo.',
+  too_many_curated: 'Danh sách này đã đủ số truyện. Bỏ bớt một truyện rồi thêm lại.',
 }
 
 export const isAdminErrorCode = (code: string): code is AdminErrorCode =>

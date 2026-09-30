@@ -15,6 +15,9 @@ export type StoryStatus = 'ongoing' | 'completed'
 
 export type StoryVisibility = 'draft' | 'published'
 
+/** Danh sách truyện chọn tay trên trang chủ: banner nổi bật | truyện đề cử */
+export type CuratedList = 'featured' | 'editor_pick'
+
 export type Story = {
   id: string
   slug: string

@@ -53,6 +53,10 @@ returns uuid
 language sql
 as $$ select id from public.stories where slug = p_slug $$;
 
+-- DB thật đã có dữ liệu: các phép đếm trên toàn bảng bỏ qua truyện có từ trước khi kiểm tra
+create temp table existing_stories as select id from public.stories;
+grant select on existing_stories to anon, authenticated;
+
 
 -- ── Tài khoản: trigger tạo hồ sơ ────────────────────────────────────────
 
@@ -385,12 +389,17 @@ select set_config('request.jwt.claims', '{"role": "anon"}', true);
 set local role anon;
 
 select pg_temp.expect(
-  (select count(*) = 1 from public.story_cards), 'khách thấy truyện công khai');
+  (select count(*) = 1 from public.story_cards
+    where id not in (select id from existing_stories)),
+  'khách thấy truyện công khai');
 select pg_temp.expect(
-  (select count(*) = 1 from public.chapters), 'khách thấy chương đã xuất bản');
+  (select count(*) = 1 from public.chapters
+    where story_id not in (select id from existing_stories)),
+  'khách thấy chương đã xuất bản');
 select public.record_chapter_view('hoa-no-nam-ay', 50);
 select pg_temp.expect(
-  (select view_count = 1 from public.story_cards), 'khách cũng ghi được lượt đọc');
+  (select view_count = 1 from public.story_cards where slug = 'hoa-no-nam-ay'),
+  'khách cũng ghi được lượt đọc');
 insert into public.contact_messages (name, email, topic, message)
 values ('Khách', 'khach@example.com', 'general', 'Góp ý cho trang web.');
 select pg_temp.expect_error($$select * from public.contact_messages$$, '42501');
@@ -687,6 +696,61 @@ select pg_temp.expect(
     from public.story_cards where slug = 'chi-pheo'),
   'xóa bút danh thì hiển thị lại tên tài khoản');
 reset role;
+
+-- ── Admin: truyện chọn tay cho trang chủ ────────────────────────────────
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000b", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error($$select * from public.admin_curated('featured')$$, 'forbidden');
+select pg_temp.expect_error($$select public.admin_set_curated('featured', '{}')$$, 'forbidden');
+select pg_temp.expect_error(
+  $$insert into public.curated_stories (list, story_id)
+    values ('featured', pg_temp.story_id('chi-pheo'))$$,
+  '42501');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_set_curated('featured', array[
+  pg_temp.story_id('chi-pheo'), pg_temp.story_id('truyen-chong-spam'), pg_temp.story_id('chi-pheo')]);
+select pg_temp.expect(
+  (select array_agg(t.slug order by t.ord) = array['chi-pheo', 'truyen-chong-spam']
+      and bool_and(t.is_public)
+    from public.admin_curated('featured')
+      with ordinality as t(story_id, slug, title, author_name, is_public, ord)),
+  'chọn truyện nổi bật: giữ thứ tự, bỏ id lặp lại');
+select pg_temp.expect(
+  not exists (select 1 from public.admin_curated('editor_pick')),
+  'danh sách đề cử không đổi khi sửa danh sách nổi bật');
+select pg_temp.expect_error(
+  $$select public.admin_set_curated('featured',
+    (select array_agg(gen_random_uuid()) from generate_series(1, 9)))$$,
+  'too_many_curated');
+select pg_temp.expect_error(
+  $$select public.admin_set_curated('editor_pick', array[gen_random_uuid()])$$, 'not_found');
+select pg_temp.expect_error($$select public.admin_set_curated('khac', '{}')$$, 'not_found');
+select public.admin_set_curated('featured', array[pg_temp.story_id('truyen-chong-spam')]);
+
+reset role;
+set local role anon;
+select pg_temp.expect(
+  (select array_agg(story_id) = array[pg_temp.story_id('truyen-chong-spam')]
+    from public.curated_stories where list = 'featured'),
+  'khách đọc được danh sách chọn tay, lưu lại thì thay cả danh sách');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_set_curated('featured', '{}');
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from public.curated_stories where list = 'featured'),
+  'bỏ hết truyện chọn tay');
 
 -- ── Tự xóa tài khoản ────────────────────────────────────────────────────
 

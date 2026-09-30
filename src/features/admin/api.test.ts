@@ -189,3 +189,47 @@ test('thể loại: sửa tên (slug đổi theo), gộp, xóa; truyện đi the
   await admin.deleteGenre('hoc-duong')
   expect(await genresOf()).toEqual([])
 })
+
+test('truyện chọn tay: lưu theo thứ tự, trang chủ dùng danh sách đã chọn', async () => {
+  const stories = await import('@/features/stories/api')
+  const auto = (await stories.getFeaturedStories()).map((s) => s.slug)
+  await registerUser('Linh', 'linh@gmail.com')
+  const a = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const b = await publishStory('Gió Qua Hiên Nhà', 1)
+  await expect(admin.setCuratedStories('featured', [a.id])).rejects.toBeInstanceOf(admin.AdminError)
+
+  signInAs('demo')
+  expect(await admin.getCuratedStories('featured')).toEqual([])
+  await admin.setCuratedStories('featured', [b.id, a.id, b.id])
+  expect(await admin.getCuratedStories('featured')).toEqual([
+    { id: b.id, slug: b.slug, title: 'Gió Qua Hiên Nhà', authorName: 'Linh', isPublic: true },
+    { id: a.id, slug: a.slug, title: 'Mùa Hạ Năm Ấy', authorName: 'Linh', isPublic: true },
+  ])
+  expect((await stories.getFeaturedStories()).map((s) => s.slug)).toEqual([b.slug, a.slug])
+  // Danh sách kia không đổi
+  expect(await admin.getCuratedStories('editor_pick')).toEqual([])
+
+  // Truyện bị gỡ vẫn nằm trong danh sách của admin nhưng không lên trang chủ
+  await admin.setStoryTakedown(b.id, 'Đạo văn')
+  expect((await admin.getCuratedStories('featured')).map((s) => s.isPublic)).toEqual([false, true])
+  expect((await stories.getFeaturedStories()).map((s) => s.slug)).toEqual([a.slug])
+
+  // Bỏ hết thì trang chủ tự chọn lại như cũ
+  await admin.setCuratedStories('featured', [])
+  expect((await stories.getFeaturedStories()).map((s) => s.slug)).toEqual(auto)
+})
+
+test('truyện chọn tay: chặn quá số lượng và truyện không tồn tại', async () => {
+  signInAs('demo')
+  const { items } = await admin.getAdminStories({ page: 1 })
+  const ids = items.map((s) => s.id)
+  await expect(
+    admin.setCuratedStories('featured', ids.slice(0, admin.CURATED_LIMITS.featured + 1)),
+  ).rejects.toMatchObject({ code: 'too_many_curated' })
+  await expect(admin.setCuratedStories('editor_pick', ['khong-co'])).rejects.toMatchObject({
+    code: 'not_found',
+  })
+  await admin.setCuratedStories('editor_pick', ids.slice(0, 2))
+  const stories = await import('@/features/stories/api')
+  expect((await stories.getEditorPicks()).map((s) => s.id)).toEqual(ids.slice(0, 2))
+})

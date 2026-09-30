@@ -194,3 +194,47 @@ test('nhập truyện hàng loạt: chọn 2 file, áp thể loại cho tất c�
     description: 'Giới thiệu truyện Lão Hạc, đủ dài để qua kiểm tra.',
   })
 }, 20_000)
+
+test('trang chủ: chọn truyện nổi bật, đổi thứ tự, lưu thì trang chủ dùng danh sách đó', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  await publishStory('Mùa Hạ Năm Ấy', 1)
+  await publishStory('Gió Qua Hiên Nhà', 1)
+  signInAs('demo')
+  const { user } = renderApp('/admin')
+
+  const nav = (await screen.findAllByRole('navigation', { name: 'Quản trị' }, slow))[0]
+  await user.click(within(nav).getByRole('link', { name: 'Trang chủ' }))
+  const card = await screen.findByRole('region', { name: 'Banner nổi bật' }, slow)
+  expect(await within(card).findByText(/Chưa chọn truyện nào/, {}, slow)).toBeInTheDocument()
+  expect(within(card).getByRole('button', { name: 'Lưu' })).toBeDisabled()
+
+  const add = within(card).getByRole('combobox', { name: 'Thêm truyện vào Banner nổi bật' })
+  await user.type(add, 'mua ha')
+  await user.click(await screen.findByTitle('Mùa Hạ Năm Ấy', {}, slow))
+  await user.type(add, 'gio qua')
+  await user.click(await screen.findByTitle('Gió Qua Hiên Nhà', {}, slow))
+  const titles = () =>
+    within(card)
+      .getAllByRole('listitem')
+      .map((li) => within(li).getByRole('link').textContent)
+  expect(titles()).toEqual(['Mùa Hạ Năm Ấy', 'Gió Qua Hiên Nhà'])
+
+  await user.click(within(card).getByRole('button', { name: 'Đưa "Gió Qua Hiên Nhà" lên' }))
+  expect(titles()).toEqual(['Gió Qua Hiên Nhà', 'Mùa Hạ Năm Ấy'])
+  await user.click(within(card).getByRole('button', { name: 'Lưu' }))
+  expect(await screen.findByText('Đã lưu Banner nổi bật.', {}, slow)).toBeInTheDocument()
+
+  const { getFeaturedStories } = await import('@/features/stories/api')
+  expect((await getFeaturedStories()).map((s) => s.title)).toEqual([
+    'Gió Qua Hiên Nhà',
+    'Mùa Hạ Năm Ấy',
+  ])
+
+  // Bỏ một truyện rồi lưu lại
+  await user.click(within(card).getByRole('button', { name: 'Bỏ "Mùa Hạ Năm Ấy"' }))
+  // jsdom không chạy hết hiệu ứng nên icon "loading" của lần lưu trước còn trong tên nút
+  await user.click(within(card).getByRole('button', { name: /Lưu$/ }))
+  await expect
+    .poll(async () => (await getFeaturedStories()).map((s) => s.title), slow)
+    .toEqual(['Gió Qua Hiên Nhà'])
+}, 20_000)

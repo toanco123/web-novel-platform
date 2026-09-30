@@ -22,4 +22,6 @@ export const {
   updateGenre,
   deleteGenre,
   mergeGenres,
+  getCuratedStories,
+  setCuratedStories,
 } = api
