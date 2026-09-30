@@ -48,11 +48,15 @@ export const missingSeo = (): PageSeo => ({
 export const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-/** Các thẻ của một trang dưới dạng HTML (không gồm <title>) */
+/**
+ * Các thẻ của một trang dưới dạng HTML (không gồm <title>). Đánh dấu data-seo="page": app gỡ chúng
+ * khi khởi động (src/app/defaultSeo.ts) rồi tự đặt thẻ bằng <Seo>, để bot có chạy JS không thấy mỗi
+ * thẻ hai lần (React không nhận lại thẻ có sẵn khi không hydrate).
+ */
 function renderTags(seo: PageSeo, siteUrl: string, jsonLd?: object) {
   const tags = seoTags(seo, siteUrl).map(({ tag, attrs }) => {
     const pairs = Object.entries(attrs).map(([key, value]) => `${key}="${escapeHtml(value)}"`)
-    return `<${tag} ${pairs.join(' ')}>`
+    return `<${tag} ${pairs.join(' ')} data-seo="page">`
   })
   // "<" viết thành < để nội dung không đóng thẻ script sớm
   if (jsonLd && !seo.noindex) {

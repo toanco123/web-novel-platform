@@ -79,15 +79,19 @@ test('injectSeo thay <title> và chèn thẻ vào head của index.html', () => 
   expect(html).toContain(
     `<title>Mùa &quot;Hạ&quot; &lt;b&gt; &amp; Em - Linh | ${SITE_NAME}</title>`,
   )
-  expect(html).toContain('<link rel="canonical" href="https://web.example/story/mua-ha">')
+  // data-seo="page": app gỡ các thẻ này khi khởi động rồi tự đặt thẻ bằng <Seo>, để bot chạy JS
+  // không thấy mỗi thẻ hai lần
   expect(html).toContain(
-    '<meta property="og:title" content="Mùa &quot;Hạ&quot; &lt;b&gt; &amp; Em - Linh">',
+    '<link rel="canonical" href="https://web.example/story/mua-ha" data-seo="page">',
   )
   expect(html).toContain(
-    '<meta name="description" content="Giới thiệu có &quot;nháy&quot; &amp; &lt;thẻ&gt;.">',
+    '<meta property="og:title" content="Mùa &quot;Hạ&quot; &lt;b&gt; &amp; Em - Linh" data-seo="page">',
   )
   expect(html).toContain(
-    '<meta property="og:image" content="https://cdn.example/a.webp?x=1&amp;y=2">',
+    '<meta name="description" content="Giới thiệu có &quot;nháy&quot; &amp; &lt;thẻ&gt;." data-seo="page">',
+  )
+  expect(html).toContain(
+    '<meta property="og:image" content="https://cdn.example/a.webp?x=1&amp;y=2" data-seo="page">',
   )
   // Thẻ nằm trong head, phần còn lại của app giữ nguyên
   expect(html.indexOf('og:title')).toBeLessThan(html.indexOf('</head>'))
@@ -109,7 +113,7 @@ test('không có index.html hợp lệ thì trả trang tối giản vẫn đủ
     const html = shell ? injectSeo(shell, seo, SITE) : fallbackHtml(seo, SITE)
     expect(html).toContain('<!doctype html>')
     expect(html).toContain('<title>Tiêu đề</title>')
-    expect(html).toContain('<meta property="og:title" content="Tiêu đề">')
+    expect(html).toContain('<meta property="og:title" content="Tiêu đề" data-seo="page">')
     expect(html).toContain('<html lang="vi">')
   }
 })
