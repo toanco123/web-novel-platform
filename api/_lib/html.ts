@@ -81,12 +81,17 @@ function renderTags(seo: PageSeo, siteUrl: string, jsonLd?: object) {
   return tags.join('\n    ')
 }
 
-/** Trang tối giản chỉ có thẻ: dùng khi không tải được index.html của app */
+/**
+ * Trang tối giản chỉ có thẻ: dùng khi không tải được index.html của app. Bot chỉ cần thẻ; người đọc
+ * thật lọt vào đây (user-agent của trình duyệt trong app Zalo cũng có chữ "Zalo") thì trang tự tải
+ * lại sau 3 giây để vào app khi lỗi tạm thời qua đi.
+ */
 export function fallbackHtml(seo: PageSeo, siteUrl: string, jsonLd?: object) {
   return `<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="3">
     <title>${escapeHtml(seo.title)}</title>
     ${renderTags(seo, siteUrl, jsonLd)}
   </head>
@@ -101,15 +106,16 @@ export function fallbackHtml(seo: PageSeo, siteUrl: string, jsonLd?: object) {
 /** Thẻ SEO mặc định mà bản build gắn sẵn vào index.html (seo.config.ts đánh dấu data-seo) */
 const DEFAULT_TAG = /[ \t]*<(?:meta|link)\b[^>]*\bdata-seo="default"[^>]*>\n?/g
 
+/** Đúng là index.html của app, không phải trang báo lỗi hay trang đăng nhập của bản preview trên Vercel */
+export const isAppShell = (html: string) =>
+  /<title>[^<]*<\/title>/.test(html) && html.includes('</head>') && html.includes('id="root"')
+
 /**
  * index.html của app với <title> và thẻ SEO của trang (thay cho thẻ mặc định có sẵn). shell không
- * phải index.html của app (trang báo lỗi, trang đăng nhập của bản preview trên Vercel) thì trả trang
- * tối giản.
+ * phải index.html của app thì trả trang tối giản.
  */
 export function injectSeo(shell: string, seo: PageSeo, siteUrl: string, jsonLd?: object) {
-  const isApp =
-    /<title>[^<]*<\/title>/.test(shell) && shell.includes('</head>') && shell.includes('id="root"')
-  if (!isApp) return fallbackHtml(seo, siteUrl, jsonLd)
+  if (!isAppShell(shell)) return fallbackHtml(seo, siteUrl, jsonLd)
   // Hàm thay thế: tên truyện có "$&"... không bị hiểu là mẫu thay thế
   return shell
     .replace(DEFAULT_TAG, '')

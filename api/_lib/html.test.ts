@@ -3,7 +3,7 @@ import indexHtml from '../../index.html?raw'
 import { SITE_NAME } from '../../src/config/site.js'
 import { paths } from '../../src/lib/routes.js'
 import { storySeo } from '../../src/lib/seo.js'
-import { fallbackHtml, injectSeo, matchRoute, staticPageSeo } from './html.js'
+import { fallbackHtml, injectSeo, isAppShell, matchRoute, staticPageSeo } from './html.js'
 
 const SITE = 'https://web.example'
 
@@ -135,4 +135,14 @@ test('thẻ mặc định của index.html (data-seo) được thay bằng thẻ
   expect(html).toContain('content="giữ lại"')
   expect(html.match(/og:title/g)).toHaveLength(1)
   expect(html.match(/name="description"/g)).toHaveLength(1)
+})
+
+test('isAppShell chỉ nhận index.html của app', () => {
+  expect(isAppShell(indexHtml)).toBe(true)
+  expect(isAppShell('<html><head><title>Protected Deployment</title></head></html>')).toBe(false)
+  expect(isAppShell('')).toBe(false)
+})
+
+test('trang tối giản tự tải lại để người đọc thật vào được app khi lỗi tạm thời qua đi', () => {
+  expect(fallbackHtml({ title: 'T' }, SITE)).toContain('<meta http-equiv="refresh" content="3">')
 })

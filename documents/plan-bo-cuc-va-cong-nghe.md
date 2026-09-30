@@ -180,6 +180,7 @@ Thiết kế chi tiết (bảng, luật nghiệp vụ, RLS, RPC, storage, bảng
 5c. **PWA và đọc offline** ✅ (29/09/2026, chi tiết ở `plan-pwa-doc-offline.md`): cài ứng dụng, tự lưu chương đã mở + tải trước 5 chương, nút tải về, tab "Đã lưu", đồng bộ lịch sử đọc khi có mạng lại.
 5d. **Chọn truyện cho trang chủ** ✅ (30/09/2026, mục 5 `plan-cong-cu-admin.md`): trang `/admin/featured` chọn và xếp thứ tự truyện ở banner nổi bật và hàng đề cử.
 5e. **Trả lời và kiểm duyệt bình luận** ✅ (30/09/2026, chi tiết ở `plan-tra-loi-va-kiem-duyet-binh-luan.md`): trả lời bình luận một cấp, báo cáo bình luận, trang `/admin/comments`.
+5f. **SEO và xem trước link** ✅ (30/09/2026, chi tiết ở `plan-seo-va-xem-truoc-link.md`): thẻ canonical + Open Graph, hàm `api/meta` chèn thẻ cho bot, `sitemap.xml`, `robots.txt`.
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---
