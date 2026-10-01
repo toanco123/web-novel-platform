@@ -1,6 +1,6 @@
 # Plan: Lọc, sắp xếp, phân trang cho bảng quản trị và sửa giao diện bảng
 
-Trạng thái: đang làm (30/09/2026). Nhánh `admin-table-filters-sort`.
+Trạng thái: ✅ xong (01/10/2026). Nhánh `admin-table-filters-sort`.
 
 ## Context
 
@@ -53,3 +53,10 @@ Cách sửa: mọi cột có độ rộng; tên dài cắt bằng "…" (`ellips
 - `supabase/checks/rls_and_rules.sql`: `p_query` của hai RPC, người thường vẫn bị chặn.
 - Gọi thử API thật bằng tài khoản không phải admin để chắc cú pháp lọc, sắp xếp trên RPC được PostgREST nhận.
 - Chụp lại 9 trang admin ở 1440 / 768 / 375px, hai theme, với dữ liệu thử.
+
+## 6. Ghi chú khi làm
+
+- Bảng nhiều cột (Người dùng, Truyện) vẫn cuộn ngang ở 1440px; cột đầu và cột thao tác được ghim nên luôn thấy. Hộp thư, Báo lỗi, Bình luận, Thể loại vừa khít 1440px.
+- Bấm tiêu đề cột đang là thứ tự mặc định thì đổi sang tăng dần (vd Hộp thư: bấm "Gửi lúc" một lần là cũ trước).
+- Ô lọc và ô số dòng có `id` riêng: trong test, antd sinh cùng một id `test-id` cho mọi phần tử, làm nhãn của hộp thoại (aria-labelledby) trỏ nhầm sang ô lọc.
+- Thể loại có sẵn không có ngày tạo (`createdAt: null`) và luôn xếp cuối khi sắp theo ngày tạo.

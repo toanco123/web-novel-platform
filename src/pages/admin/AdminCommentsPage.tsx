@@ -119,7 +119,7 @@ export default function AdminCommentsPage() {
             rowKey="id"
             loading={isPending || isFetching}
             dataSource={data?.items}
-            scroll={{ x: 1150 }}
+            scroll={{ x: 1100 }}
             locale={{
               emptyText:
                 q || kind
@@ -135,7 +135,7 @@ export default function AdminCommentsPage() {
                 title: 'Bình luận',
                 key: 'content',
                 fixed: pinFirst ? 'left' : undefined,
-                width: pinFirst ? 300 : 240,
+                width: pinFirst ? 270 : 220,
                 render: (_, c) => (
                   <div className="min-w-0">
                     <p className="break-words whitespace-pre-line">{c.content}</p>
@@ -150,7 +150,7 @@ export default function AdminCommentsPage() {
               {
                 title: 'Người viết',
                 key: 'author',
-                width: 160,
+                width: 150,
                 render: (_, c) => (
                   <Link
                     to={paths.adminUserSearch(c.author.displayName)}
@@ -164,7 +164,7 @@ export default function AdminCommentsPage() {
               {
                 title: 'Truyện · chương',
                 key: 'target',
-                width: 180,
+                width: 170,
                 render: (_, c) =>
                   c.storyPublished ? (
                     <div>
@@ -198,7 +198,7 @@ export default function AdminCommentsPage() {
               {
                 title: 'Báo cáo',
                 ...sortable('reported', active),
-                width: 240,
+                width: 230,
                 render: (_, c) =>
                   c.reports.length === 0 ? (
                     '–'

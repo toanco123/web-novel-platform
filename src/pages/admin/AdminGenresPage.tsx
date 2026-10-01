@@ -110,7 +110,7 @@ export default function AdminGenresPage() {
             rowKey="slug"
             loading={isPending}
             dataSource={shown}
-            scroll={{ x: 960 }}
+            scroll={{ x: 1100 }}
             pagination={{
               pageSize,
               pageSizeOptions: ADMIN_PAGE_SIZES,
@@ -130,7 +130,7 @@ export default function AdminGenresPage() {
               {
                 title: 'Thể loại',
                 dataIndex: 'name',
-                width: 280,
+                width: 260,
                 sorter: (a, b) => a.name.localeCompare(b.name, 'vi'),
                 render: (name: string, g) => (
                   <div className="min-w-0">

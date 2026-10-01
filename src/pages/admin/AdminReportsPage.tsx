@@ -104,7 +104,7 @@ export default function AdminReportsPage() {
             rowKey="id"
             loading={isPending || isFetching}
             dataSource={data?.items}
-            scroll={{ x: 1180 }}
+            scroll={{ x: 1100 }}
             locale={{
               emptyText:
                 q || reason
@@ -120,7 +120,7 @@ export default function AdminReportsPage() {
                 title: 'Truyện · chương',
                 key: 'target',
                 fixed: pinFirst ? 'left' : undefined,
-                width: pinFirst ? 260 : 180,
+                width: pinFirst ? 220 : 180,
                 render: (_, r) => {
                   const chapter = `Chương ${r.chapterNumber}${r.chapterTitle ? `: ${r.chapterTitle}` : ''}`
                   return (
@@ -140,7 +140,7 @@ export default function AdminReportsPage() {
               {
                 title: 'Lý do',
                 dataIndex: 'reason',
-                width: 230,
+                width: 210,
                 render: (reason: string) => (
                   <Tag color={reason === 'violation' ? 'red' : undefined}>
                     {reasonLabel(reason)}
@@ -150,14 +150,14 @@ export default function AdminReportsPage() {
               {
                 title: 'Ghi chú',
                 dataIndex: 'note',
-                width: 290,
+                width: 230,
                 render: (note: string) =>
                   note ? <span className="whitespace-pre-line">{note}</span> : '–',
               },
               {
                 title: 'Người báo',
                 key: 'reporter',
-                width: 170,
+                width: 140,
                 ellipsis: true,
                 render: (_, r) => r.reporter.displayName,
               },
@@ -171,7 +171,7 @@ export default function AdminReportsPage() {
               {
                 title: 'Trạng thái',
                 key: 'status',
-                width: 190,
+                width: 170,
                 fixed: pinActions ? 'right' : undefined,
                 className: 'whitespace-nowrap',
                 render: (_, r) => (

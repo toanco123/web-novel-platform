@@ -419,7 +419,12 @@ test('báo lỗi và bình luận: lọc theo lý do, tìm; lọc trả lời', 
   const root = await comments.addComment(story.slug, 'Bình luận gốc của Linh')
   await comments.addComment(story.slug, 'Trả lời của Linh', null, root.id)
   await registerUser('Mai', 'mai@gmail.com')
-  await reportChapter({ slug: story.slug, chapter: 1, reason: 'typo', note: 'Sai chính tả dòng ba' })
+  await reportChapter({
+    slug: story.slug,
+    chapter: 1,
+    reason: 'typo',
+    note: 'Sai chính tả dòng ba',
+  })
   await reportChapter({ slug: story.slug, chapter: 2, reason: 'violation', note: 'Nội dung lạ' })
   signInAs('demo')
   const { router, user } = renderApp('/admin/reports')

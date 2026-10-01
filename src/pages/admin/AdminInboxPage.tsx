@@ -96,7 +96,7 @@ export default function AdminInboxPage() {
             rowKey="id"
             loading={isPending || isFetching}
             dataSource={data?.items}
-            scroll={{ x: 1110 }}
+            scroll={{ x: 1100 }}
             locale={{
               emptyText:
                 q || topic
@@ -131,7 +131,7 @@ export default function AdminInboxPage() {
               {
                 title: 'Nội dung',
                 dataIndex: 'message',
-                width: 370,
+                width: 360,
                 render: (text: string) => (
                   <Typography.Paragraph
                     className="mb-0! whitespace-pre-line"
