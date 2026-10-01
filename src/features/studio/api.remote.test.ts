@@ -257,6 +257,7 @@ test('tạo truyện: một lần RPC, tên gọn khoảng trắng, chương đ�
     followers: 0,
     openReports: 0,
     takedown: null,
+    review: null,
     authorName: null,
   })
 

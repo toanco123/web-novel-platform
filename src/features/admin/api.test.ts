@@ -146,7 +146,9 @@ test('gỡ truyện: truyện ẩn khỏi người đọc, tác giả thấy lý
   signInAs('demo')
   await admin.setStoryTakedown(story.id, null)
   signInAs(linh)
-  expect((await studio.publishStory(story.id)).visibility).toBe('published')
+  // Gỡ làm mất dấu đã duyệt: khôi phục xong phải gửi duyệt lại
+  await expect(studio.publishStory(story.id)).rejects.toMatchObject({ code: 'story_not_approved' })
+  expect((await studio.submitStoryForReview(story.id)).review?.status).toBe('pending')
 })
 
 test('thể loại: sửa tên (slug đổi theo), gộp, xóa; truyện đi theo', async () => {

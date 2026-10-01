@@ -17,11 +17,14 @@ import {
 } from '@/mocks/activity'
 import { takenStorySlugs } from '@/mocks/catalog'
 import {
+  approvedReview,
   loadChapters,
   loadUserStories,
+  pendingReview,
   removeChapters,
   saveChapters,
   saveUserStories,
+  storyReview,
   type StoredStory,
 } from '@/mocks/userContent'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
@@ -56,6 +59,7 @@ function withCounts(story: StoredStory): MyStory {
     openReports: loadReports().filter((r) => r.storySlug === story.slug && r.status === 'open')
       .length,
     takedown: story.takedown ?? null,
+    review: storyReview(story),
     authorName: story.authorName ?? null,
   }
 }
@@ -142,15 +146,19 @@ export async function createStory(
     bytes: firstChapter ? contentBytes(firstChapter.chapter.content) : 0,
   })
   const publish = firstChapter?.publish ?? false
+  // Tác giả: chương đầu xuất bản và truyện vào hàng chờ duyệt; quản trị viên: công khai luôn
+  const live = publish && user.isAdmin
+  const time = now()
   const story: StoredStory = {
     ...normalize(input),
     id: crypto.randomUUID(),
     slug: uniqueSlug(input.title),
     owner: { id: user.id, displayName: user.displayName },
-    visibility: publish ? 'published' : 'draft',
-    createdAt: now(),
-    updatedAt: now(),
-    publishedAt: publish ? now() : null,
+    visibility: live ? 'published' : 'draft',
+    createdAt: time,
+    updatedAt: time,
+    publishedAt: live ? time : null,
+    review: live ? approvedReview(time) : publish ? pendingReview(time) : null,
   }
   // Ghi chương trước: localStorage đầy thì báo lỗi mà không để lại truyện rỗng
   if (firstChapter) {
@@ -174,15 +182,31 @@ export async function updateStory(id: string, input: StoryInput): Promise<MyStor
 
 export async function publishStory(id: string): Promise<MyStory> {
   await delay(300)
-  const { story, stories } = await ownStory(id)
+  const { user, story, stories } = await ownStory(id)
   if (story.takedown) throw new StudioError('story_taken_down')
   if (withCounts(story).publishedCount === 0) throw new StudioError('no_published_chapters')
+  const review = storyReview(story)
+  // Quản trị viên miễn duyệt (trigger stories_require_review của DB)
+  if (!user.isAdmin && review?.status !== 'approved') throw new StudioError('story_not_approved')
   return saveStory(stories, {
     ...story,
     visibility: 'published',
     publishedAt: story.publishedAt ?? now(),
     updatedAt: now(),
+    review: review?.status === 'approved' ? review : approvedReview(now()),
   })
+}
+
+/** Gửi truyện cho ban quản trị duyệt (lần đầu, hoặc lại sau khi bị từ chối) */
+export async function submitStoryForReview(id: string): Promise<MyStory> {
+  await delay(300)
+  const { story, stories } = await ownStory(id)
+  const review = storyReview(story)
+  if (story.takedown) throw new StudioError('story_taken_down')
+  if (review?.status === 'pending') throw new StudioError('already_pending')
+  if (review?.status === 'approved') throw new StudioError('already_approved')
+  if (withCounts(story).publishedCount === 0) throw new StudioError('no_published_chapters')
+  return saveStory(stories, { ...story, review: pendingReview(now()), updatedAt: now() })
 }
 
 export async function unpublishStory(id: string): Promise<MyStory> {
@@ -291,10 +315,11 @@ export async function saveChapter(
   return saved
 }
 
-/** Chặn làm truyện đang công khai mất hết chương công khai */
+/** Chặn làm truyện đang công khai hoặc đang chờ duyệt mất hết chương đã xuất bản */
 function guardLastPublished(story: StoredStory, chapters: Chapter[], chapter: Chapter) {
   const publishedCount = chapters.filter((c) => c.status === 'published').length
-  if (story.visibility === 'published' && chapter.status === 'published' && publishedCount === 1) {
+  const live = story.visibility === 'published' || storyReview(story)?.status === 'pending'
+  if (live && chapter.status === 'published' && publishedCount === 1) {
     throw new StudioError('last_published_chapter')
   }
 }

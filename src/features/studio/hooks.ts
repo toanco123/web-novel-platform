@@ -87,6 +87,11 @@ export function useSetStoryVisibility(id: string) {
   })
 }
 
+export function useSubmitStoryForReview(id: string) {
+  const invalidate = useInvalidateAll()
+  return useMutation({ mutationFn: () => api.submitStoryForReview(id), onSuccess: invalidate })
+}
+
 export function useDeleteStory(id: string) {
   const invalidate = useInvalidateAll()
   return useMutation({ mutationFn: () => api.deleteStory(id), onSuccess: invalidate })

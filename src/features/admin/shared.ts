@@ -99,6 +99,16 @@ export type AdminStory = {
 
 export type StoryTakedown = { at: string; reason: string }
 
+/** Độ dài tối đa của lý do từ chối (cột stories.review_reason) */
+export const REVIEW_REASON_MAX = 500
+
+export type ReviewInput = {
+  storyId: string
+  /** true: duyệt và công khai luôn; false: từ chối (bắt buộc lý do) */
+  approve: boolean
+  reason?: string | null
+}
+
 // Cột sắp xếp được của từng bảng (giá trị ?sort= trên URL). Không kèm order thì giảm dần.
 
 export const ADMIN_USER_SORTS = [
@@ -282,6 +292,8 @@ export type AdminErrorCode =
   | 'same_genre'
   | 'builtin_genre'
   | 'too_many_curated'
+  | 'not_pending'
+  | 'reason_required'
 
 const adminMessages: Record<AdminErrorCode, string> = {
   forbidden: 'Chỉ quản trị viên mới xem được trang này.',
@@ -293,6 +305,9 @@ const adminMessages: Record<AdminErrorCode, string> = {
   builtin_genre:
     'Bản thử nghiệm không sửa được thể loại có sẵn, chỉ sửa được thể loại do người dùng tạo.',
   too_many_curated: 'Danh sách này đã đủ số truyện. Bỏ bớt một truyện rồi thêm lại.',
+  not_pending:
+    'Truyện này không còn chờ duyệt. Có thể quản trị viên khác vừa xử lý hoặc truyện vừa bị gỡ.',
+  reason_required: 'Nhập lý do từ chối để tác giả biết cần sửa gì.',
 }
 
 export const isAdminErrorCode = (code: string): code is AdminErrorCode =>

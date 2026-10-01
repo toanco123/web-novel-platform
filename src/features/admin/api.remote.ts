@@ -25,6 +25,7 @@ import {
   type AdminUser,
   type AdminUserQuery,
   type CuratedStory,
+  type ReviewInput,
   type SortOrder,
 } from './shared'
 
@@ -339,6 +340,10 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
     }),
     adminError,
   )
+}
+
+export async function reviewStory(_input: ReviewInput): Promise<void> {
+  throw new Error('reviewStory: chưa nối Supabase')
 }
 
 // ── Thể loại ────────────────────────────────────────────────────────────

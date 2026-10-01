@@ -15,6 +15,19 @@ export type StoryStatus = 'ongoing' | 'completed'
 
 export type StoryVisibility = 'draft' | 'published'
 
+/** Trạng thái duyệt: truyện của tác giả chỉ công khai được sau khi quản trị viên duyệt */
+export type ReviewStatus = 'pending' | 'approved' | 'rejected'
+
+export type StoryReview = {
+  status: ReviewStatus
+  /** Lần gửi duyệt gần nhất */
+  submittedAt: string | null
+  /** Lúc quản trị viên duyệt / từ chối */
+  reviewedAt: string | null
+  /** Lý do từ chối (chỉ khi rejected) */
+  reason: string | null
+}
+
 /** Danh sách truyện chọn tay trên trang chủ: banner nổi bật | truyện đề cử */
 export type CuratedList = 'featured' | 'editor_pick'
 

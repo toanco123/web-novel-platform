@@ -3,6 +3,7 @@ import { getChapterList } from '@/features/chapters/api'
 import { addComment, getComments } from '@/features/comments/api'
 import { reportChapter } from '@/features/feedback/api'
 import { getGenres } from '@/features/genres/api'
+import * as admin from '@/features/admin/api'
 import * as studio from './api'
 
 beforeEach(() => localStorage.clear())
@@ -262,5 +263,106 @@ describe('hạn mức mỗi ngày của tác giả (như trigger charge_author c
     signInAs('demo')
     setUsage('demo', { stories: 10, chapters: 500, bytes: studio.CONTENT_BYTES_PER_DAY })
     await expect(studio.createStory(input, { chapter, publish: false })).resolves.toBeTruthy()
+  })
+})
+
+describe('duyệt truyện', () => {
+  const pending = (time: unknown = expect.any(String)) => ({
+    status: 'pending',
+    submittedAt: time,
+    reviewedAt: null,
+    reason: null,
+  })
+
+  test('tác giả "Đăng" truyện mới thì truyện chờ duyệt, người đọc chưa thấy', async () => {
+    await secondUser()
+    const story = await studio.createStory(input, { chapter, publish: true })
+    expect(story).toMatchObject({ visibility: 'draft', publishedCount: 1, review: pending() })
+    localStorage.removeItem('mock-auth-session')
+    expect(await getStory(story.slug)).toBeNull()
+    expect((await getLatestUpdated()).map((s) => s.slug)).not.toContain(story.slug)
+  })
+
+  test('tác giả không tự công khai truyện chưa duyệt; gửi duyệt cần chương đã xuất bản', async () => {
+    await secondUser()
+    const story = await studio.createStory(input)
+    await expect(studio.submitStoryForReview(story.id)).rejects.toMatchObject({
+      code: 'no_published_chapters',
+    })
+    await studio.saveChapter(story.id, chapter, { publish: true })
+    await expect(studio.publishStory(story.id)).rejects.toMatchObject({
+      code: 'story_not_approved',
+    })
+    expect((await studio.submitStoryForReview(story.id)).review).toMatchObject(pending())
+    await expect(studio.submitStoryForReview(story.id)).rejects.toMatchObject({
+      code: 'already_pending',
+    })
+  })
+
+  test('bị từ chối thì thấy lý do, gửi lại; duyệt rồi thì tự ẩn/hiện', async () => {
+    const linh = await secondUser()
+    const story = await studio.createStory(input, { chapter, publish: true })
+
+    signInAs('demo')
+    await expect(
+      admin.reviewStory({ storyId: story.id, approve: false, reason: '  ' }),
+    ).rejects.toMatchObject({ code: 'reason_required' })
+    await admin.reviewStory({ storyId: story.id, approve: false, reason: 'Thiếu giới thiệu' })
+    await expect(admin.reviewStory({ storyId: story.id, approve: true })).rejects.toMatchObject({
+      code: 'not_pending',
+    })
+
+    signInAs(linh)
+    expect((await studio.getMyStory(story.id))?.review).toMatchObject({
+      status: 'rejected',
+      reason: 'Thiếu giới thiệu',
+    })
+    const again = await studio.submitStoryForReview(story.id)
+    expect(again.review).toMatchObject({ status: 'pending', reason: null })
+
+    signInAs('demo')
+    await admin.reviewStory({ storyId: story.id, approve: true })
+    signInAs(linh)
+    const approved = await studio.getMyStory(story.id)
+    expect(approved).toMatchObject({ visibility: 'published', review: { status: 'approved' } })
+    expect(approved?.publishedAt).not.toBeNull()
+    await expect(studio.submitStoryForReview(story.id)).rejects.toMatchObject({
+      code: 'already_approved',
+    })
+    await studio.unpublishStory(story.id)
+    expect((await studio.publishStory(story.id)).visibility).toBe('published')
+  })
+
+  test('truyện chờ duyệt không ẩn/xóa được chương đã xuất bản cuối cùng', async () => {
+    await secondUser()
+    const story = await studio.createStory(input, { chapter, publish: true })
+    expect(story).toMatchObject({ visibility: 'draft', review: { status: 'pending' } })
+    await expect(studio.setChapterStatus(story.id, 1, 'draft')).rejects.toMatchObject({
+      code: 'last_published_chapter',
+    })
+    await expect(studio.deleteChapter(story.id, 1)).rejects.toMatchObject({
+      code: 'last_published_chapter',
+    })
+  })
+
+  test('quản trị viên đăng là công khai ngay, không qua hàng chờ', async () => {
+    signInAs('demo')
+    const story = await studio.createStory(input, { chapter, publish: true })
+    expect(story).toMatchObject({ visibility: 'published', review: { status: 'approved' } })
+  })
+
+  test('dữ liệu cũ (chưa có trường review): truyện đã từng công khai coi như đã duyệt', async () => {
+    const linh = await secondUser()
+    const old = await studio.createStory(input, { chapter, publish: true })
+    // Giả dữ liệu trước khi có duyệt truyện: đã công khai, không có trường review
+    const stored = JSON.parse(localStorage.getItem('mock-user-stories')!)
+    stored[0] = { ...stored[0], visibility: 'published', publishedAt: stored[0].createdAt }
+    delete stored[0].review
+    localStorage.setItem('mock-user-stories', JSON.stringify(stored))
+
+    signInAs(linh)
+    expect((await studio.getMyStory(old.id))?.review).toMatchObject({ status: 'approved' })
+    await studio.unpublishStory(old.id)
+    expect((await studio.publishStory(old.id)).visibility).toBe('published')
   })
 })

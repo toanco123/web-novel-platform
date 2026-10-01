@@ -16,6 +16,7 @@ export const {
   updateStory,
   publishStory,
   unpublishStory,
+  submitStoryForReview,
   deleteStory,
   getMyChapters,
   getMyChapter,

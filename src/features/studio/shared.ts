@@ -1,5 +1,5 @@
 // Phần dùng chung của hai backend khu Sáng tác (api.mock.ts, api.remote.ts)
-import type { StoryStatus, StoryVisibility } from '@/types/story'
+import type { StoryReview, StoryStatus, StoryVisibility } from '@/types/story'
 
 export type StudioErrorCode =
   | 'not_found'
@@ -10,6 +10,9 @@ export type StudioErrorCode =
   | 'too_many_genres'
   | 'report_already_open'
   | 'story_taken_down'
+  | 'story_not_approved'
+  | 'already_pending'
+  | 'already_approved'
   | 'story_limit'
   | 'chapter_limit'
 
@@ -22,13 +25,17 @@ const messages: Record<StudioErrorCode, string> = {
   not_found: 'Không tìm thấy truyện này trong khu Sáng tác của bạn.',
   no_published_chapters: 'Cần xuất bản ít nhất 1 chương trước khi xuất bản truyện.',
   last_published_chapter:
-    'Đây là chương công khai cuối cùng. Ẩn truyện trước rồi mới ẩn hoặc xóa chương này.',
+    'Truyện đang công khai hoặc đang chờ duyệt cần ít nhất 1 chương đã xuất bản. Ẩn truyện trước (truyện chờ duyệt thì đợi duyệt xong) rồi mới ẩn hoặc xóa chương này.',
   chapter_exists: 'Truyện đã có chương mang số này. Chọn số khác.',
   chapter_number_locked:
     'Chương đã xuất bản giữ nguyên số để link và lịch sử đọc của người đọc không bị hỏng.',
   too_many_genres: 'Chọn tối đa 5 thể loại.',
   story_taken_down:
     'Truyện đã bị ban quản trị gỡ nên chưa xuất bản lại được. Liên hệ ban quản trị nếu bạn cho rằng đây là nhầm lẫn.',
+  story_not_approved:
+    'Truyện cần được ban quản trị duyệt trước khi công khai. Bấm "Gửi duyệt" để gửi truyện cho ban quản trị.',
+  already_pending: 'Truyện đang chờ ban quản trị duyệt.',
+  already_approved: 'Truyện đã được duyệt, bạn tự xuất bản được.',
   story_limit: `Mỗi ngày chỉ tạo được tối đa ${STORIES_PER_DAY} truyện mới. Thử lại vào ngày mai nhé.`,
   chapter_limit: `Hôm nay bạn đã đăng hoặc sửa quá nhiều chương (tối đa ${CHAPTERS_PER_DAY} chương mới và khoảng ${CONTENT_BYTES_PER_DAY / 1_000_000} MB nội dung mỗi ngày). Thử lại vào ngày mai nhé.`,
   report_already_open:
@@ -62,7 +69,7 @@ export type ChapterInput = { title: string; content: string }
 export type FirstChapterInput = {
   /** number: số của chương đầu tiên (mặc định 1, vd truyện đăng tiếp từ nơi khác bắt đầu từ 50) */
   chapter: ChapterInput & { number?: number }
-  /** true: xuất bản chương đó và công khai truyện luôn; false: cả hai là nháp */
+  /** true: xuất bản chương đó; tác giả thì gửi duyệt truyện luôn, quản trị viên thì công khai luôn */
   publish: boolean
 }
 
@@ -91,6 +98,8 @@ export type MyStory = {
   openReports: number
   /** Bị ban quản trị gỡ: truyện về nháp, không tự xuất bản lại được; null: bình thường */
   takedown: { at: string; reason: string } | null
+  /** Trạng thái duyệt; null: chưa gửi duyệt lần nào (hoặc bị gỡ) */
+  review: StoryReview | null
   /** Bút danh / tác giả gốc; null: dùng tên tài khoản */
   authorName: string | null
 }

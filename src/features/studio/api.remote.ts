@@ -64,6 +64,8 @@ function toMyStory(row: StudioStoryRow): MyStory {
       row.taken_down_at && row.takedown_reason
         ? { at: row.taken_down_at, reason: row.takedown_reason }
         : null,
+    // Cột duyệt map ở bước nối migration story_review
+    review: null,
     authorName: row.author_name ?? null,
   }
 }
@@ -248,6 +250,10 @@ export async function publishStory(id: string): Promise<MyStory> {
 
 export async function unpublishStory(id: string): Promise<MyStory> {
   return setVisibility(id, 'draft')
+}
+
+export async function submitStoryForReview(_id: string): Promise<MyStory> {
+  throw new Error('submitStoryForReview: chưa nối Supabase')
 }
 
 /** Chương, bình luận, báo lỗi, lượt đọc, theo dõi... xóa theo truyện (on delete cascade) */

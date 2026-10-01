@@ -28,6 +28,7 @@ import {
   loadUserStories,
   saveUserGenres,
   saveUserStories,
+  storyReview,
 } from '@/mocks/userContent'
 import { loadUsers, saveUsers } from '@/mocks/users'
 import { normalizeGenreName } from '@/features/genres/api'
@@ -49,6 +50,7 @@ import {
   type AdminUser,
   type AdminUserQuery,
   type CuratedStory,
+  type ReviewInput,
   type SortOrder,
 } from './shared'
 
@@ -556,8 +558,44 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
               ...s,
               visibility: 'draft' as const,
               takedown: { at: s.takedown?.at ?? new Date().toISOString(), reason: text },
+              // Gỡ thì mất dấu đã duyệt (truyện chờ duyệt cũng rời hàng chờ)
+              review: null,
             }
-          : { ...s, takedown: null },
+          : // Đọc khi truyện còn bị gỡ nên là null: dữ liệu cũ không tự thành đã duyệt
+            { ...s, takedown: null, review: storyReview(s) },
+    ),
+  )
+}
+
+/** Duyệt (công khai luôn) hoặc từ chối (kèm lý do) truyện đang chờ duyệt */
+export async function reviewStory({ storyId, approve, reason }: ReviewInput) {
+  await delay()
+  await requireAdmin()
+  const stories = loadUserStories()
+  const story = stories.find((s) => s.id === storyId)
+  if (!story) throw new AdminError('not_found')
+  const review = storyReview(story)
+  if (review?.status !== 'pending') throw new AdminError('not_pending')
+  const text = reason?.trim() ?? ''
+  if (!approve && !text) throw new AdminError('reason_required')
+  const time = new Date().toISOString()
+  saveUserStories(
+    stories.map((s) =>
+      s.id !== storyId
+        ? s
+        : approve
+          ? {
+              ...s,
+              visibility: 'published' as const,
+              publishedAt: s.publishedAt ?? time,
+              updatedAt: time,
+              review: { ...review, status: 'approved' as const, reviewedAt: time, reason: null },
+            }
+          : {
+              ...s,
+              updatedAt: time,
+              review: { ...review, status: 'rejected' as const, reviewedAt: time, reason: text },
+            },
     ),
   )
 }
