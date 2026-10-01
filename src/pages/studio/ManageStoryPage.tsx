@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SITE_NAME } from '@/config/site'
 import { FormAlert } from '@/features/auth/components/FormAlert'
+import { useSession } from '@/features/auth/hooks'
 import { StoryCover } from '@/features/stories/StoryCover'
 import type { MyStory } from '@/features/studio/api'
 import { ChapterTable } from '@/features/studio/components/ChapterTable'
@@ -16,7 +17,12 @@ import { StoryReportsPanel } from '@/features/studio/components/StoryReportsPane
 import { StoryStatsPanel } from '@/features/studio/components/StoryStatsPanel'
 import { StudioBreadcrumb } from '@/features/studio/components/StudioBreadcrumb'
 import { studioErrorMessage } from '@/features/studio/errors'
-import { useMyStory, useSetStoryVisibility, useUpdateStory } from '@/features/studio/hooks'
+import {
+  useMyStory,
+  useSetStoryVisibility,
+  useSubmitStoryForReview,
+  useUpdateStory,
+} from '@/features/studio/hooks'
 import { formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
 
@@ -59,7 +65,11 @@ function ManageStory({ story }: { story: MyStory }) {
             <h1 className="font-heading text-3xl leading-tight font-semibold sm:text-4xl">
               {story.title}
             </h1>
-            <StatusBadge published={published} takenDown={!!story.takedown} />
+            <StatusBadge
+              published={published}
+              takenDown={!!story.takedown}
+              review={story.review?.status}
+            />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {story.chapterCount} chương ({story.publishedCount} đã xuất bản, {story.draftCount}{' '}
@@ -144,11 +154,18 @@ function ManageStory({ story }: { story: MyStory }) {
 }
 
 function PublishControls({ story }: { story: MyStory }) {
+  const { data: viewer } = useSession()
   const visibility = useSetStoryVisibility(story.id)
+  const submit = useSubmitStoryForReview(story.id)
   const published = story.visibility === 'published'
-  const canPublish = story.publishedCount > 0 && !story.takedown
+  const review = story.review?.status ?? null
+  // Quản trị viên miễn duyệt; truyện đã duyệt thì tác giả tự xuất bản / ẩn
+  const approved = !!viewer?.isAdmin || review === 'approved'
+  const hasChapter = story.publishedCount > 0
+  const canPublish = hasChapter && !story.takedown
   // Gợi ý "cần xuất bản chương" (truyện bị gỡ thì đã có thông báo riêng ở trên)
-  const needsChapter = !story.takedown && story.publishedCount === 0
+  const needsChapter = !story.takedown && !hasChapter
+  const error = visibility.error ?? submit.error
 
   return (
     <div className="space-y-3">
@@ -160,6 +177,20 @@ function PublishControls({ story }: { story: MyStory }) {
           lẫn, hãy gửi tin nhắn ở trang <Link to={paths.contact}>Liên hệ</Link>.
         </FormAlert>
       )}
+      {!published && review === 'rejected' && (
+        <FormAlert>
+          <strong>Truyện chưa được duyệt:</strong> {story.review?.reason}
+          <br />
+          Sửa theo góp ý rồi bấm "Gửi duyệt lại".
+        </FormAlert>
+      )}
+      {!published && review === 'pending' && (
+        <p role="status" className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm">
+          Truyện đang chờ ban quản trị duyệt
+          {story.review?.submittedAt && ` (gửi ${formatRelativeTime(story.review.submittedAt)})`}.
+          Bạn vẫn sửa truyện và viết thêm chương được; duyệt xong truyện tự công khai.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {published ? (
           <Button
@@ -170,7 +201,7 @@ function PublishControls({ story }: { story: MyStory }) {
           >
             Ẩn truyện
           </Button>
-        ) : (
+        ) : approved ? (
           <Button
             className="h-10 rounded-full px-5"
             disabled={!canPublish || visibility.isPending}
@@ -179,6 +210,17 @@ function PublishControls({ story }: { story: MyStory }) {
           >
             Xuất bản truyện
           </Button>
+        ) : (
+          review !== 'pending' && (
+            <Button
+              className="h-10 rounded-full px-5"
+              disabled={!canPublish || submit.isPending}
+              aria-describedby={needsChapter ? 'publish-hint' : 'review-hint'}
+              onClick={() => submit.mutate()}
+            >
+              {review === 'rejected' ? 'Gửi duyệt lại' : 'Gửi duyệt'}
+            </Button>
+          )
         )}
         <Button asChild variant="ghost" className="h-10 rounded-full px-4">
           <Link to={paths.story(story.slug)}>
@@ -187,12 +229,18 @@ function PublishControls({ story }: { story: MyStory }) {
           </Link>
         </Button>
       </div>
-      {!published && needsChapter && (
+      {!published && needsChapter && review !== 'pending' && (
         <p id="publish-hint" className="text-sm text-muted-foreground">
-          Xuất bản ít nhất 1 chương để có thể xuất bản truyện.
+          Xuất bản ít nhất 1 chương để có thể {approved ? 'xuất bản truyện' : 'gửi duyệt'}.
         </p>
       )}
-      {visibility.isError && <FormAlert>{studioErrorMessage(visibility.error)}</FormAlert>}
+      {!published && !approved && review === null && !story.takedown && (
+        <p id="review-hint" className="text-sm text-muted-foreground">
+          Truyện mới cần ban quản trị duyệt trước khi công khai. Trong lúc chờ, bạn vẫn sửa truyện
+          và viết thêm chương được.
+        </p>
+      )}
+      {error && <FormAlert>{studioErrorMessage(error)}</FormAlert>}
       {visibility.isSuccess && (
         <FormAlert variant="success">
           {published

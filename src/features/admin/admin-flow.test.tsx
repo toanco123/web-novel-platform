@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { publishStory, registerUser, signInAs } from '@/test/helpers'
 import { renderApp } from '@/test/renderApp'
 
@@ -119,14 +119,16 @@ test('khóa người dùng và gỡ truyện trên giao diện; tác giả thấ
   await user.click(confirm)
   expect(await screen.findByText('Bị gỡ', { selector: '.ant-tag' }, slow)).toBeInTheDocument()
 
-  // Mở khóa để Linh vào khu Sáng tác xem lý do
+  // Mở khóa để Linh vào khu Sáng tác xem lý do. Phiên đăng nhập nằm trong cache của app đang
+  // chạy, nên vẽ lại app với phiên của Linh
   const { setUserBanned } = await import('./api')
   await setUserBanned(linh, false)
   signInAs(linh)
-  await router.navigate(`/studio/story/${story.id}`)
+  cleanup()
+  renderApp(`/studio/story/${story.id}`)
   expect(await screen.findByText(/Truyện đã bị ban quản trị gỡ/, {}, slow)).toBeInTheDocument()
   expect(screen.getByText(/Đạo văn/)).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Xuất bản truyện' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Gửi duyệt' })).toBeDisabled()
 })
 
 test('thể loại: sửa tên và gộp trên giao diện', async () => {

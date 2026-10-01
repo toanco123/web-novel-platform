@@ -101,6 +101,7 @@ export default function StudioPage() {
                     <StatusBadge
                       published={s.visibility === 'published'}
                       takenDown={!!s.takedown}
+                      review={s.review?.status}
                       className="mt-2 sm:hidden"
                     />
                   </div>
@@ -108,6 +109,7 @@ export default function StudioPage() {
                     <StatusBadge
                       published={s.visibility === 'published'}
                       takenDown={!!s.takedown}
+                      review={s.review?.status}
                     />
                     <span className="text-xs text-muted-foreground">
                       Sửa {formatRelativeTime(s.updatedAt)}
