@@ -85,6 +85,12 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
       value: totals.publishedStories,
       hint: `${number.format(totals.draftStories)} bản nháp`,
     },
+    {
+      title: 'Truyện chờ duyệt',
+      value: totals.pendingReviews,
+      hint: 'Mở hàng chờ',
+      to: paths.adminReviews,
+    },
     { title: 'Chương đã xuất bản', value: totals.publishedChapters },
     {
       title: 'Lượt đọc',
@@ -123,7 +129,7 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
     <>
       <Row gutter={[16, 16]}>
         {tiles.map((t) => (
-          <Col key={t.title} xs={12} md={8} lg={6}>
+          <Col key={t.title} xs={12} md={8}>
             <Card size="small" className="h-full">
               <Statistic
                 title={t.title}

@@ -1,5 +1,5 @@
 import { cleanup, screen, within } from '@testing-library/react'
-import { publishStory, registerUser, signInAs } from '@/test/helpers'
+import { pendingStory, publishStory, registerUser, signInAs } from '@/test/helpers'
 import { renderApp } from '@/test/renderApp'
 
 // G2 vẽ bằng canvas, jsdom không có: thay biểu đồ bằng thẻ rỗng
@@ -449,3 +449,71 @@ test('báo lỗi và bình luận: lọc theo lý do, tìm; lọc trả lời', 
   await expect.poll(() => screen.queryByText('Trả lời của Linh'), slow).toBeNull()
   expect(screen.getByText('Bình luận gốc của Linh')).toBeInTheDocument()
 }, 20_000)
+
+test('duyệt truyện: từ Tổng quan vào hàng chờ, duyệt một truyện, từ chối một truyện', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  await pendingStory('Mùa Hạ Năm Ấy')
+  await pendingStory('Gió Qua Hiên Nhà')
+  signInAs('demo')
+  const { router, user } = renderApp('/admin')
+
+  expect(
+    await screen.findByText('Truyện chờ duyệt', { selector: '.ant-statistic-title' }, slow),
+  ).toBeInTheDocument()
+  await user.click(screen.getByRole('link', { name: /Mở hàng chờ/ }))
+  expect(await screen.findByRole('heading', { name: 'Duyệt truyện' }, slow)).toBeInTheDocument()
+  const row = (title: string) => screen.getByText(title, { selector: 'strong' }).closest('tr')!
+  await screen.findByText('Mùa Hạ Năm Ấy', { selector: 'strong' }, slow)
+  expect(within(row('Mùa Hạ Năm Ấy')).getByRole('link', { name: /Xem trước/ })).toHaveAttribute(
+    'href',
+    '/story/mua-ha-nam-ay',
+  )
+
+  // Duyệt
+  await user.click(within(row('Mùa Hạ Năm Ấy')).getByRole('button', { name: 'Duyệt' }))
+  const popconfirm = (await screen.findByText(/Duyệt "Mùa Hạ Năm Ấy"/, {}, slow)).closest(
+    '.ant-popover',
+  )!
+  await user.click(within(popconfirm as HTMLElement).getByRole('button', { name: 'Duyệt' }))
+  await expect
+    .poll(() => screen.queryByText('Mùa Hạ Năm Ấy', { selector: 'strong' }), slow)
+    .toBeNull()
+
+  // Từ chối: bắt buộc lý do
+  await user.click(within(row('Gió Qua Hiên Nhà')).getByRole('button', { name: 'Từ chối' }))
+  const dialog = await screen.findByRole('dialog', {}, slow)
+  const confirm = within(dialog).getByRole('button', { name: 'Từ chối' })
+  expect(confirm).toBeDisabled()
+  await user.type(within(dialog).getByLabelText('Lý do từ chối'), 'Bìa vi phạm')
+  await user.click(confirm)
+  await expect
+    .poll(() => screen.queryByText('Gió Qua Hiên Nhà', { selector: 'strong' }), slow)
+    .toBeNull()
+
+  // Tab "Bị từ chối" có lý do
+  await user.click(screen.getByText('Bị từ chối', { selector: '.ant-segmented-item-label' }))
+  await expect.poll(() => router.state.location.search, slow).toBe('?status=rejected')
+  expect(await screen.findByText('Bìa vi phạm', {}, slow)).toBeInTheDocument()
+
+  // Bảng Truyện: lọc theo trạng thái duyệt
+  await router.navigate('/admin/stories?review=rejected')
+  expect(await screen.findByText('Bị từ chối', { selector: '.ant-tag' }, slow)).toBeInTheDocument()
+})
+
+test('xem trước truyện chưa công khai: dải báo đúng người đang xem', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await pendingStory('Mùa Hạ Năm Ấy')
+  renderApp(`/story/${story.slug}`)
+  expect(
+    await screen.findByText(/Truyện chưa công khai, chỉ bạn thấy trang này/, {}, slow),
+  ).toBeInTheDocument()
+
+  // Quản trị viên xem truyện chờ duyệt của người khác
+  signInAs('demo')
+  cleanup()
+  renderApp(`/story/${story.slug}`)
+  expect(
+    await screen.findByText(/Truyện đang chờ duyệt, chỉ tác giả và ban quản trị/, {}, slow),
+  ).toBeInTheDocument()
+  expect(screen.queryByText(/chỉ bạn thấy/)).not.toBeInTheDocument()
+})
