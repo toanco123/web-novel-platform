@@ -1,6 +1,7 @@
-// Khu Sáng tác trên Supabase. Luật của bản giả (truyện chỉ công khai khi có chương đã xuất bản, chương
-// công khai cuối cùng, số chương đã xuất bản không đổi...) do trigger/RPC của DB giữ (migration
-// catalog, views_rpc); ở đây map lỗi sang StudioError. Truyện của người khác luôn báo not_found.
+// Khu Sáng tác trên Supabase. Luật của bản giả (truyện chỉ công khai khi có chương đã xuất bản và đã
+// được duyệt, chương công khai cuối cùng, số chương đã xuất bản không đổi...) do trigger/RPC của DB giữ
+// (migration catalog, views_rpc, story_review); ở đây map lỗi sang StudioError. Truyện của người khác
+// luôn báo not_found.
 import type { PostgrestError } from '@supabase/supabase-js'
 import { requireUserId, unauthenticated } from '@/features/auth/api'
 import { businessCode, isUniqueViolation, unwrap } from '@/lib/dbError'
@@ -64,8 +65,14 @@ function toMyStory(row: StudioStoryRow): MyStory {
       row.taken_down_at && row.takedown_reason
         ? { at: row.taken_down_at, reason: row.takedown_reason }
         : null,
-    // Cột duyệt map ở bước nối migration story_review
-    review: null,
+    review: row.review_status
+      ? {
+          status: row.review_status,
+          submittedAt: row.review_submitted_at,
+          reviewedAt: row.reviewed_at,
+          reason: row.review_reason,
+        }
+      : null,
     authorName: row.author_name ?? null,
   }
 }
@@ -252,8 +259,11 @@ export async function unpublishStory(id: string): Promise<MyStory> {
   return setVisibility(id, 'draft')
 }
 
-export async function submitStoryForReview(_id: string): Promise<MyStory> {
-  throw new Error('submitStoryForReview: chưa nối Supabase')
+/** Gửi duyệt: RPC kiểm tra chủ truyện, chương đã xuất bản, đang chờ / đã duyệt, bị gỡ */
+export async function submitStoryForReview(id: string): Promise<MyStory> {
+  await requireUserFor(id)
+  unwrap(await db().rpc('submit_story_for_review', { p_story_id: id }), studioError)
+  return orNotFound(await findMyStory(id))
 }
 
 /** Chương, bình luận, báo lỗi, lượt đọc, theo dõi... xóa theo truyện (on delete cascade) */

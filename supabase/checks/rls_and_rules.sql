@@ -53,6 +53,18 @@ returns uuid
 language sql
 as $$ select id from public.stories where slug = p_slug $$;
 
+-- Quản trị viên duyệt truyện của tác giả thường (cho các đoạn cần truyện công khai). Gọi sau
+-- `reset role` (quyền chủ phiên) rồi `set local role authenticated` lại; JWT giữ nguyên.
+create function pg_temp.approve(p_slug text)
+returns void
+language sql
+as $$
+  update public.stories
+  set review_status = 'approved', reviewed_at = now(), review_reason = null,
+    visibility = 'published'
+  where slug = p_slug
+$$;
+
 -- DB thật đã có dữ liệu: các phép đếm trên toàn bảng bỏ qua truyện có từ trước khi kiểm tra
 create temp table existing_stories as select id from public.stories;
 grant select on existing_stories to anon, authenticated;
@@ -102,9 +114,29 @@ select * from public.create_story(
   '{"title": "Mở đầu", "content": "Nội dung chương một."}', true);
 
 select pg_temp.expect(
+  (select visibility = 'draft' and review_status = 'pending' and review_submitted_at is not null
+    from public.stories where slug = 'truong-an-khong-tuyet'),
+  'create_story đăng luôn (tác giả thường): chương đầu xuất bản, truyện chờ duyệt');
+select pg_temp.expect_error(
+  $$update public.stories set visibility = 'published' where slug = 'truong-an-khong-tuyet'$$,
+  'story_not_approved');
+select pg_temp.expect_error(
+  $$update public.stories set review_status = 'approved' where slug = 'truong-an-khong-tuyet'$$,
+  '42501');
+select pg_temp.expect_error(
+  $$select public.submit_story_for_review(pg_temp.story_id('truong-an-khong-tuyet'))$$,
+  'already_pending');
+select pg_temp.expect_error(
+  $$update public.chapters set status = 'draft'
+    where story_id = pg_temp.story_id('truong-an-khong-tuyet') and number = 1$$,
+  'last_published_chapter');
+reset role;
+select pg_temp.approve('truong-an-khong-tuyet');
+set local role authenticated;
+select pg_temp.expect(
   (select visibility = 'published' and published_at is not null from public.stories
     where slug = 'truong-an-khong-tuyet'),
-  'create_story đăng luôn thì truyện công khai');
+  'duyệt xong thì truyện công khai');
 select pg_temp.expect(
   (select chapter_count = 1 and first_chapter_number = 1 and latest_chapter_title = 'Mở đầu'
     from public.story_cards where slug = 'truong-an-khong-tuyet'),
@@ -282,6 +314,9 @@ select pg_temp.expect_error(
 select * from public.create_story(
   'Hoa Nở Năm Ấy', 'Truyện của B.', 'completed', array['ngon-tinh'], null,
   '{"number": 50, "title": "Chương 50", "content": "Đăng tiếp từ nơi khác."}', true);
+reset role;
+select pg_temp.approve('hoa-no-nam-ay');
+set local role authenticated;
 select pg_temp.expect(
   (select first_chapter_number = 50 from public.story_cards where slug = 'hoa-no-nam-ay'),
   'chương đầu tiên được chọn số');
@@ -378,6 +413,9 @@ select pg_temp.expect(
 select * from public.create_story(
   'Truyện Xóa Thử', 'Để thử xóa.', 'ongoing', array['co-dai'], null,
   '{"title": "Một", "content": "Chương duy nhất."}', true);
+reset role;
+select pg_temp.approve('truyen-xoa-thu');
+set local role authenticated;
 select pg_temp.expect(
   pg_temp.affected($$delete from public.stories where slug = 'truyen-xoa-thu'$$) = 1,
   'xóa truyện đang công khai không bị trigger chương chặn');
@@ -473,6 +511,9 @@ set local role authenticated;
 select * from public.create_story(
   'Truyện Chống Spam', 'Truyện để kiểm tra giới hạn tần suất.', 'ongoing', array['co-dai'], null,
   '{"title": "Một", "content": "Nội dung chương một."}', true);
+reset role;
+select pg_temp.approve('truyen-chong-spam');
+set local role authenticated;
 
 -- C đọc cùng một chương nhiều lần trong ngày chỉ tính 1 lượt
 reset role;
@@ -648,10 +689,110 @@ reset role;
 select set_config('request.jwt.claims',
   '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
 set local role authenticated;
+-- Gỡ làm mất dấu đã duyệt: khôi phục xong phải gửi duyệt lại
+select pg_temp.expect_error(
+  $$update public.stories set visibility = 'published' where slug = 'truyen-chong-spam'$$,
+  'story_not_approved');
+select public.submit_story_for_review(pg_temp.story_id('truyen-chong-spam'));
+reset role;
+select pg_temp.approve('truyen-chong-spam');
+set local role authenticated;
 select pg_temp.expect(
-  pg_temp.affected(
-    $$update public.stories set visibility = 'published' where slug = 'truyen-chong-spam'$$) = 1,
-  'khôi phục xong thì tác giả công khai lại được');
+  (select visibility = 'published' from public.stories where slug = 'truyen-chong-spam'),
+  'khôi phục, gửi duyệt lại và được duyệt thì công khai');
+
+-- ── Duyệt truyện ────────────────────────────────────────────────────────
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story('Truyện Chờ Duyệt', 'Giới thiệu.', 'ongoing', array['co-dai'],
+  null, '{"title": "Một", "content": "Nội dung."}', true);
+select pg_temp.expect_error(
+  $$select public.admin_review_story(pg_temp.story_id('truyen-cho-duyet'), true, null)$$,
+  'forbidden');
+
+-- Người khác và khách không thấy truyện chờ duyệt
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  not exists (select 1 from public.stories where slug = 'truyen-cho-duyet'),
+  'người khác không thấy truyện chờ duyệt');
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect(
+  not exists (select 1 from public.stories where slug = 'truyen-cho-duyet'),
+  'khách không thấy truyện chờ duyệt');
+
+-- Quản trị viên xem trước (truyện + chương đã xuất bản), từ chối cần lý do, rồi từ chối
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  exists (select 1 from public.story_cards where slug = 'truyen-cho-duyet'),
+  'quản trị viên thấy truyện chờ duyệt');
+select pg_temp.expect(
+  exists (select 1 from public.chapters where story_id = pg_temp.story_id('truyen-cho-duyet')
+    and number = 1),
+  'quản trị viên đọc được chương của truyện chờ duyệt');
+select pg_temp.expect(
+  (select count(*) = 1 from public.admin_stories() where review_status = 'pending'
+    and id not in (select id from existing_stories)),
+  'admin_stories có truyện chờ duyệt');
+select pg_temp.expect(
+  (public.admin_overview(7) -> 'totals' ->> 'pendingReviews')::integer >= 1,
+  'admin_overview đếm truyện chờ duyệt');
+select pg_temp.expect_error(
+  $$select public.admin_review_story(pg_temp.story_id('truyen-cho-duyet'), false, '  ')$$,
+  'reason_required');
+select public.admin_review_story(pg_temp.story_id('truyen-cho-duyet'), false, 'Thiếu giới thiệu');
+-- Bị từ chối thì quản trị viên không còn đọc thẳng được truyện: lấy id qua admin_stories
+select pg_temp.expect(
+  not exists (select 1 from public.stories where slug = 'truyen-cho-duyet'),
+  'truyện bị từ chối không còn hiện cho quản trị viên ngoài admin_stories');
+select pg_temp.expect_error(
+  $$select public.admin_review_story(
+    (select id from public.admin_stories() where slug = 'truyen-cho-duyet'), true, null)$$,
+  'not_pending');
+
+-- A gửi lại, quản trị viên duyệt: công khai; gỡ thì mất dấu đã duyệt
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select review_status = 'rejected' and review_reason = 'Thiếu giới thiệu'
+    from public.studio_stories where slug = 'truyen-cho-duyet'),
+  'tác giả thấy lý do từ chối');
+select public.submit_story_for_review(pg_temp.story_id('truyen-cho-duyet'));
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_review_story(pg_temp.story_id('truyen-cho-duyet'), true, null);
+select pg_temp.expect(
+  (select visibility = 'published' and review_status = 'approved' and published_at is not null
+    from public.stories where slug = 'truyen-cho-duyet'),
+  'duyệt thì công khai luôn');
+select public.admin_set_story_takedown(pg_temp.story_id('truyen-cho-duyet'), 'Đạo văn');
+select public.admin_set_story_takedown(
+  (select id from public.admin_stories() where slug = 'truyen-cho-duyet'), '');
+select pg_temp.expect(
+  (select review_status is null from public.admin_stories() where slug = 'truyen-cho-duyet'),
+  'gỡ rồi khôi phục: phải gửi duyệt lại');
+
+-- Trả lại tác giả A cho đoạn sau
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+set local role authenticated;
 
 -- ── Admin: quản lý thể loại ─────────────────────────────────────────────
 
@@ -700,6 +841,9 @@ select * from public.create_story(
   'Chí Phèo', 'Truyện ngắn nổi tiếng về người nông dân bị tha hóa.', 'completed',
   array['the-loai-3'], null, '{"title": "Một", "content": "Hắn vừa đi vừa chửi."}', true,
   '  Nam   Cao ');
+reset role;
+select pg_temp.approve('chi-pheo');
+set local role authenticated;
 select pg_temp.expect(
   (select author_name = 'Nam Cao' and author_key = 'nam-cao'
     from public.story_cards where slug = 'chi-pheo'),
