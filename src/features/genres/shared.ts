@@ -2,7 +2,11 @@
 import { slugify } from '@/lib/slugify'
 import type { Genre } from '@/types/story'
 
-export type GenreWithCount = Genre & { storyCount: number }
+export type GenreWithCount = Genre & {
+  storyCount: number
+  /** null: thể loại có sẵn */
+  createdAt: string | null
+}
 
 export class GenreExistsError extends Error {
   genre: Genre

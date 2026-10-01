@@ -11,9 +11,11 @@ import { GenreExistsError, type GenreWithCount, normalizeGenreName } from './sha
 export async function getGenres(): Promise<GenreWithCount[]> {
   await delay(100)
   const stories = catalog().filter((s) => s.chapterCount > 0)
+  const created = new Map(loadUserGenres().map((g) => [g.slug, g.createdAt]))
   return allGenres().map((g) => ({
     ...g,
     storyCount: stories.filter((s) => s.genres.some((sg) => sg.slug === g.slug)).length,
+    createdAt: created.get(g.slug) ?? null,
   }))
 }
 

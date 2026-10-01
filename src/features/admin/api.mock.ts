@@ -34,8 +34,8 @@ import { normalizeGenreName } from '@/features/genres/api'
 import type { Page } from '@/types/page'
 import type { CuratedList, Genre } from '@/types/story'
 import {
-  ADMIN_PAGE_SIZE,
   AdminError,
+  adminPageSize,
   CURATED_LIMITS,
   type AdminComment,
   type AdminCommentQuery,
@@ -49,6 +49,7 @@ import {
   type AdminUser,
   type AdminUserQuery,
   type CuratedStory,
+  type SortOrder,
 } from './shared'
 
 const SYSTEM_AUTHOR = 'Hệ thống'
@@ -60,6 +61,22 @@ async function requireAdmin() {
 }
 
 const matches = (q: string, ...fields: string[]) => !q || fields.some((f) => slugify(f).includes(q))
+
+/**
+ * Hàm so sánh theo một khóa: chuỗi so theo tiếng Việt, số và ngày ISO so trực tiếp; giá trị trống
+ * luôn xếp cuối (như `nulls last` của bản thật). Bằng nhau thì giữ thứ tự cũ.
+ */
+function by<T>(key: (item: T) => string | number | null | undefined, order: SortOrder = 'desc') {
+  const sign = order === 'asc' ? 1 : -1
+  return (a: T, b: T) => {
+    const ka = key(a) ?? null
+    const kb = key(b) ?? null
+    if (ka === null || kb === null) return ka === kb ? 0 : ka === null ? 1 : -1
+    return sign * (typeof ka === 'number' && typeof kb === 'number' ? ka - kb : compareText(ka, kb))
+  }
+}
+const compareText = (a: string | number, b: string | number) =>
+  String(a).localeCompare(String(b), 'vi')
 
 /** Mọi truyện (có sẵn + của người dùng, kể cả nháp) */
 function allStories(): AdminStory[] {
@@ -217,7 +234,28 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
   }
 }
 
-export async function getAdminUsers({ q = '', page }: AdminUserQuery): Promise<Page<AdminUser>> {
+const userSortKeys: Record<
+  NonNullable<AdminUserQuery['sort']>,
+  (u: AdminUser) => string | number | null
+> = {
+  name: (u) => u.displayName,
+  created: (u) => u.createdAt,
+  lastSignIn: (u) => u.lastSignInAt,
+  stories: (u) => u.storyCount,
+  comments: (u) => u.commentCount,
+  follows: (u) => u.followCount,
+}
+
+export async function getAdminUsers({
+  q = '',
+  role,
+  status,
+  provider,
+  sort = 'created',
+  order,
+  page,
+  pageSize,
+}: AdminUserQuery): Promise<Page<AdminUser>> {
   await delay()
   await requireAdmin()
   const query = slugify(q)
@@ -240,53 +278,83 @@ export async function getAdminUsers({ q = '', page }: AdminUserQuery): Promise<P
       followCount: follows[u.id]?.length ?? 0,
       isBanned: !!u.bannedAt,
     }))
-    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
-  return paginate(users, page, ADMIN_PAGE_SIZE)
+    .filter(
+      (u) =>
+        (!role || u.isAdmin === (role === 'admin')) &&
+        (!status || u.isBanned === (status === 'banned')) &&
+        (!provider || u.provider === provider),
+    )
+    .sort(by(userSortKeys[sort], order))
+  return paginate(users, page, adminPageSize(pageSize))
+}
+
+const storySortKeys: Record<
+  NonNullable<AdminStoryQuery['sort']>,
+  (s: AdminStory) => string | number
+> = {
+  title: (s) => s.title,
+  chapters: (s) => s.publishedCount,
+  views: (s) => s.views,
+  followers: (s) => s.followers,
+  rating: (s) => s.ratingAvg,
+  comments: (s) => s.comments,
+  reports: (s) => s.openReports,
+  created: (s) => s.createdAt,
+  updated: (s) => s.updatedAt,
 }
 
 export async function getAdminStories({
   q = '',
   visibility,
+  status,
+  hasReports,
   ownerId,
   sort = 'updated',
+  order,
   page,
+  pageSize,
 }: AdminStoryQuery): Promise<Page<AdminStory>> {
   await delay()
   await requireAdmin()
   const query = slugify(q)
-  const key = (s: AdminStory) =>
-    sort === 'views' ? s.views : sort === 'created' ? s.createdAt : s.updatedAt
   const stories = allStories()
     .filter(
       (s) =>
         matches(query, s.title, s.ownerName) &&
-        (!visibility || s.visibility === visibility) &&
+        (!visibility || (visibility === 'takedown' ? !!s.takedown : s.visibility === visibility)) &&
+        (!status || s.status === status) &&
+        (!hasReports || s.openReports > 0) &&
         (!ownerId || s.ownerId === ownerId),
     )
-    .sort((a, b) => {
-      const ka = key(a)
-      const kb = key(b)
-      if (typeof ka === 'number' && typeof kb === 'number') {
-        return kb - ka || b.updatedAt.localeCompare(a.updatedAt)
-      }
-      return String(kb).localeCompare(String(ka))
-    })
-  return paginate(stories, page, ADMIN_PAGE_SIZE)
+    // Khóa phụ: mới cập nhật trước
+    .sort(by((s) => s.updatedAt))
+    .sort(by(storySortKeys[sort], order))
+  return paginate(stories, page, adminPageSize(pageSize))
 }
 
 // ── Hộp thư & báo lỗi ───────────────────────────────────────────────────
 
 export async function getAdminMessages({
   status,
+  topic,
+  q = '',
+  order,
   page,
+  pageSize,
 }: AdminMessageQuery): Promise<Page<AdminContactMessage>> {
   await delay()
   await requireAdmin()
+  const query = slugify(q)
   const messages = loadContactMessages()
-    .filter((m) => status === 'all' || (status === 'open') === !m.handledAt)
-    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
+    .filter(
+      (m) =>
+        (status === 'all' || (status === 'open') === !m.handledAt) &&
+        (!topic || m.topic === topic) &&
+        matches(query, m.name, m.email, m.message),
+    )
     .map(({ sentAt, ...m }) => ({ ...m, createdAt: sentAt }))
-  return paginate(messages, page, ADMIN_PAGE_SIZE)
+    .sort(by((m) => m.createdAt, order))
+  return paginate(messages, page, adminPageSize(pageSize))
 }
 
 export async function setMessageHandled(id: string, handled: boolean) {
@@ -319,16 +387,26 @@ function reportTarget(slug: string, number: number) {
 
 export async function getAdminReports({
   status,
+  reason,
+  q = '',
+  order,
   page,
+  pageSize,
 }: AdminReportQuery): Promise<Page<AdminReport>> {
   await delay()
   await requireAdmin()
+  const query = slugify(q)
+  const names = new Map(loadUsers().map((u) => [u.id, u.displayName]))
   const reports = loadReports()
-    .filter((r) => status === 'all' || r.status === status)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .filter((r) => (status === 'all' || r.status === status) && (!reason || r.reason === reason))
     .flatMap((r): AdminReport[] => {
       const target = reportTarget(r.storySlug, r.chapterNumber)
       if (!target) return []
+      const reporter = {
+        ...r.reporter,
+        displayName: names.get(r.reporter.id) ?? r.reporter.displayName,
+      }
+      if (!matches(query, target.title, r.note, reporter.displayName)) return []
       return [
         {
           id: r.id,
@@ -340,12 +418,13 @@ export async function getAdminReports({
           reason: r.reason,
           note: r.note,
           status: r.status,
-          reporter: r.reporter,
+          reporter,
           createdAt: r.createdAt,
         },
       ]
     })
-  return paginate(reports, page, ADMIN_PAGE_SIZE)
+    .sort(by((r) => r.createdAt, order))
+  return paginate(reports, page, adminPageSize(pageSize))
 }
 
 export async function setAdminReportStatus(id: string, status: AdminReport['status']) {
@@ -370,7 +449,11 @@ function reportedCommentIds() {
 export async function getAdminComments({
   view,
   q = '',
+  kind,
+  sort = view === 'reported' ? 'reported' : 'created',
+  order,
   page,
+  pageSize,
 }: AdminCommentQuery): Promise<Page<AdminComment>> {
   await delay()
   await requireAdmin()
@@ -392,6 +475,7 @@ export async function getAdminComments({
     if (!story) return []
     const displayName = names.get(c.user.id) ?? c.user.displayName
     if (!matches(query, c.content, displayName)) return []
+    if (kind && (kind === 'reply') !== !!c.parentId) return []
     return [
       {
         id: c.id,
@@ -415,13 +499,11 @@ export async function getAdminComments({
       },
     ]
   })
-  const shown =
-    view === 'reported'
-      ? comments
-          .filter((c) => c.reports.length > 0)
-          .sort((a, b) => b.reports[0].createdAt.localeCompare(a.reports[0].createdAt))
-      : comments.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  return paginate(shown, page, ADMIN_PAGE_SIZE)
+  const shown = (view === 'reported' ? comments.filter((c) => c.reports.length > 0) : comments)
+    // Khóa phụ: mới viết trước
+    .sort(by((c) => c.createdAt))
+    .sort(by((c) => (sort === 'reported' ? c.reports[0]?.createdAt : c.createdAt), order))
+  return paginate(shown, page, adminPageSize(pageSize))
 }
 
 /** Xóa bình luận của bất kỳ ai, kèm trả lời và báo cáo của nó */

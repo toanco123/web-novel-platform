@@ -2,11 +2,13 @@ import { Alert, App, Button, Card, Form, Input, Modal, Popconfirm, Select, Table
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
-import { adminErrorMessage } from '@/features/admin/api'
+import { ADMIN_PAGE_SIZES, adminErrorMessage } from '@/features/admin/api'
+import { FilterSelect } from '@/features/admin/components/TableFilters'
 import { useDeleteGenre, useMergeGenres, useUpdateGenre } from '@/features/admin/hooks'
 import type { GenreWithCount } from '@/features/genres/api'
 import { useGenres } from '@/features/genres/hooks'
 import { genreSchema } from '@/features/genres/schemas'
+import { formatDate } from '@/lib/format'
 import { slugify } from '@/lib/slugify'
 import { paths } from '@/lib/routes'
 
@@ -22,6 +24,9 @@ const zodRule =
 export default function AdminGenresPage() {
   const { data: genres = [], isPending, isError } = useGenres()
   const [q, setQ] = useState('')
+  // Thể loại ít và tải cả danh sách một lần nên lọc, sắp xếp, phân trang ngay ở trình duyệt
+  const [source, setSource] = useState<'builtin' | 'user' | null>(null)
+  const [pageSize, setPageSize] = useState(50)
   const [editing, setEditing] = useState<GenreWithCount | null>(null)
   const [merging, setMerging] = useState<GenreWithCount | null>(null)
   const [mergeInto, setMergeInto] = useState<string | null>(null)
@@ -32,7 +37,9 @@ export default function AdminGenresPage() {
   const { message } = App.useApp()
 
   const query = slugify(q)
-  const shown = query ? genres.filter((g) => g.slug.includes(query)) : genres
+  const shown = genres.filter(
+    (g) => (!query || g.slug.includes(query)) && (!source || (source === 'user') === !!g.createdBy),
+  )
 
   const openEdit = (genre: GenreWithCount) => {
     form.setFieldsValue({ name: genre.name, description: genre.description ?? '' })
@@ -78,13 +85,24 @@ export default function AdminGenresPage() {
       </div>
 
       <Card>
-        <Input.Search
-          className="mb-4 max-w-sm"
-          placeholder="Tìm thể loại"
-          aria-label="Tìm thể loại"
-          allowClear
-          onChange={(e) => setQ(e.target.value)}
-        />
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Input.Search
+            className="max-w-xs"
+            placeholder="Tìm thể loại"
+            aria-label="Tìm thể loại"
+            allowClear
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <FilterSelect
+            label="Nguồn"
+            value={source ?? undefined}
+            onChange={setSource}
+            options={[
+              { value: 'builtin', label: 'Có sẵn' },
+              { value: 'user', label: 'Người dùng tạo' },
+            ]}
+          />
+        </div>
         {isError ? (
           <Alert type="error" showIcon title="Không tải được thể loại." />
         ) : (
@@ -92,13 +110,27 @@ export default function AdminGenresPage() {
             rowKey="slug"
             loading={isPending}
             dataSource={shown}
-            scroll={{ x: 820 }}
-            pagination={{ pageSize: 50, hideOnSinglePage: true, showSizeChanger: false }}
-            locale={{ emptyText: q ? 'Không có thể loại nào khớp' : 'Chưa có thể loại nào' }}
+            scroll={{ x: 1100 }}
+            pagination={{
+              pageSize,
+              pageSizeOptions: ADMIN_PAGE_SIZES,
+              showSizeChanger: {
+                virtual: false,
+                id: 'page-size',
+                'aria-label': 'Số dòng mỗi trang',
+              },
+              hideOnSinglePage: shown.length <= ADMIN_PAGE_SIZES[0],
+              showTotal: (total, [from, to]) => `${from}–${to} trong ${number.format(total)}`,
+              onShowSizeChange: (_, size) => setPageSize(size),
+            }}
+            locale={{
+              emptyText: q || source ? 'Không có thể loại nào khớp' : 'Chưa có thể loại nào',
+            }}
             columns={[
               {
                 title: 'Thể loại',
                 dataIndex: 'name',
+                width: 260,
                 sorter: (a, b) => a.name.localeCompare(b.name, 'vi'),
                 render: (name: string, g) => (
                   <div className="min-w-0">
@@ -114,26 +146,42 @@ export default function AdminGenresPage() {
               {
                 title: 'Slug',
                 dataIndex: 'slug',
-                className: 'whitespace-nowrap',
+                width: 160,
+                ellipsis: true,
                 render: (slug: string) => <code className="text-xs">{slug}</code>,
               },
               {
                 title: 'Truyện công khai',
                 dataIndex: 'storyCount',
                 align: 'right',
-                className: 'whitespace-nowrap',
+                width: 160,
                 sorter: (a, b) => a.storyCount - b.storyCount,
                 render: (n: number) => number.format(n),
               },
               {
                 title: 'Người tạo',
                 key: 'createdBy',
-                className: 'whitespace-nowrap',
+                width: 170,
+                ellipsis: true,
                 render: (_, g) => (g.createdBy ? g.createdBy.displayName : <Tag>Có sẵn</Tag>),
+              },
+              {
+                title: 'Ngày tạo',
+                dataIndex: 'createdAt',
+                width: 130,
+                // Thể loại có sẵn (không có ngày tạo) luôn ở cuối, dù xếp tăng hay giảm (antd tự đảo
+                // kết quả khi xếp giảm nên phải đảo lại phần này)
+                sorter: (a, b, order) =>
+                  a.createdAt && b.createdAt
+                    ? a.createdAt.localeCompare(b.createdAt)
+                    : (Number(!a.createdAt) - Number(!b.createdAt)) *
+                      (order === 'descend' ? -1 : 1),
+                render: (v: string | null) => (v ? formatDate(v) : '–'),
               },
               {
                 title: 'Thao tác',
                 key: 'actions',
+                width: 220,
                 className: 'whitespace-nowrap',
                 render: (_, g) => (
                   <div className="flex gap-2">

@@ -298,3 +298,161 @@ test('kiểm duyệt bình luận: xem bình luận bị báo cáo, bỏ qua bá
   expect(left.items.map((c) => c.content)).toEqual(['Bình luận chương của Linh'])
   await expect(admin.deleteAdminComment(spam.id)).rejects.toMatchObject({ code: 'not_found' })
 })
+
+// ── Lọc, sắp xếp, phân trang ────────────────────────────────────────────
+
+test('người dùng: lọc theo vai trò, trạng thái; sắp theo tên và số truyện; đổi số dòng', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  await publishStory('Mùa Hạ Năm Ấy', 1)
+  const mai = await registerUser('Mai', 'mai@gmail.com')
+  signInAs('demo')
+  await admin.setUserBanned(mai, true)
+  const ids = async (query: Partial<admin.AdminUserQuery>) =>
+    (await admin.getAdminUsers({ page: 1, ...query })).items.map((u) => u.id)
+
+  expect(await ids({ role: 'admin' })).toEqual(['demo'])
+  expect((await ids({ role: 'member' })).sort()).toEqual([linh, mai].sort())
+  expect(await ids({ status: 'banned' })).toEqual([mai])
+  expect(await ids({ status: 'active', role: 'member' })).toEqual([linh])
+  expect(await ids({ provider: 'google' })).toEqual([])
+  expect(await ids({ provider: 'email' })).toHaveLength(3)
+
+  expect(await ids({ sort: 'name', order: 'asc' })).toEqual(['demo', linh, mai])
+  expect(await ids({ sort: 'name', order: 'desc' })).toEqual([mai, linh, 'demo'])
+  expect((await ids({ sort: 'stories', order: 'desc' }))[0]).toBe(linh)
+  // Mặc định: mới tham gia trước
+  expect(await ids({})).toEqual([mai, linh, 'demo'])
+
+  const small = await admin.getAdminUsers({ page: 2, pageSize: 10, sort: 'name', order: 'asc' })
+  expect(small).toMatchObject({ total: 3, page: 1, pageCount: 1 })
+  // Số dòng ngoài 10/20/50/100 thì dùng mặc định
+  expect(admin.adminPageSize(7)).toBe(admin.ADMIN_PAGE_SIZE)
+  expect(admin.adminPageSize(50)).toBe(50)
+  expect(admin.adminPageSize(undefined)).toBe(admin.ADMIN_PAGE_SIZE)
+})
+
+test('truyện: lọc theo tiến độ, bị gỡ, có báo lỗi; sắp theo tên và số chương', async () => {
+  const feedback = await import('@/features/feedback/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const a = await publishStory('Mùa Hạ Năm Ấy', 3)
+  const b = await publishStory('Gió Qua Hiên Nhà', 1)
+  const c = await studio.createStory({
+    title: 'Chuyện Đã Xong',
+    description: 'Một câu chuyện đã viết xong, kết thúc có hậu.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'completed',
+    coverUrl: null,
+  })
+  await registerUser('Mai', 'mai@gmail.com')
+  await feedback.reportChapter({ slug: a.slug, chapter: 1, reason: 'typo', note: '' })
+  signInAs('demo')
+  await admin.setStoryTakedown(b.id, 'Đạo văn')
+  const titles = async (query: Partial<admin.AdminStoryQuery>) =>
+    (await admin.getAdminStories({ page: 1, ownerId: linh, ...query })).items.map((s) => s.title)
+
+  expect(await titles({ status: 'completed' })).toEqual(['Chuyện Đã Xong'])
+  expect(await titles({ visibility: 'takedown' })).toEqual(['Gió Qua Hiên Nhà'])
+  expect(await titles({ visibility: 'published' })).toEqual(['Mùa Hạ Năm Ấy'])
+  expect((await titles({ visibility: 'draft' })).sort()).toEqual([
+    'Chuyện Đã Xong',
+    'Gió Qua Hiên Nhà',
+  ])
+  expect(await titles({ hasReports: true })).toEqual(['Mùa Hạ Năm Ấy'])
+  expect(await titles({ sort: 'title', order: 'asc' })).toEqual([
+    'Chuyện Đã Xong',
+    'Gió Qua Hiên Nhà',
+    'Mùa Hạ Năm Ấy',
+  ])
+  expect((await titles({ sort: 'chapters', order: 'desc' }))[0]).toBe('Mùa Hạ Năm Ấy')
+  expect((await titles({ sort: 'reports', order: 'desc' }))[0]).toBe('Mùa Hạ Năm Ấy')
+  expect((await titles({ sort: 'created', order: 'asc' }))[0]).toBe('Mùa Hạ Năm Ấy')
+  expect(c.id).toBeTruthy()
+
+  // Cùng truyện có sẵn thì nhiều hơn một trang 10 dòng
+  const first = await admin.getAdminStories({ page: 1, pageSize: 10, sort: 'views', order: 'desc' })
+  const second = await admin.getAdminStories({
+    page: 2,
+    pageSize: 10,
+    sort: 'views',
+    order: 'desc',
+  })
+  expect(first.items).toHaveLength(10)
+  expect(first.total).toBeGreaterThan(10)
+  expect(second).toMatchObject({ page: 2, pageCount: Math.ceil(first.total / 10) })
+  expect(second.items).toHaveLength(Math.min(10, first.total - 10))
+  // Giảm dần theo lượt đọc, liền mạch giữa hai trang
+  const views = [...first.items, ...second.items].map((s) => s.views)
+  expect(views).toEqual([...views].sort((a, b) => b - a))
+})
+
+test('hộp thư: lọc theo chủ đề, tìm không dấu, đổi chiều sắp xếp', async () => {
+  const { sendContactMessage } = await import('@/features/feedback/api')
+  await sendContactMessage({
+    name: 'Lan',
+    email: 'lan@gmail.com',
+    topic: 'copyright',
+    message: 'Truyện này đăng lại khi chưa xin phép tác giả.',
+  })
+  await sendContactMessage({
+    name: 'Hùng',
+    email: 'hung@gmail.com',
+    topic: 'bug',
+    message: 'Trang đọc bị lỗi trên điện thoại.',
+  })
+  signInAs('demo')
+  const names = async (query: Partial<admin.AdminMessageQuery>) =>
+    (await admin.getAdminMessages({ status: 'all', page: 1, ...query })).items.map((m) => m.name)
+
+  expect(await names({})).toEqual(['Hùng', 'Lan'])
+  expect(await names({ order: 'asc' })).toEqual(['Lan', 'Hùng'])
+  expect(await names({ topic: 'bug' })).toEqual(['Hùng'])
+  expect(await names({ q: 'XIN PHEP' })).toEqual(['Lan'])
+  expect(await names({ q: 'hung@gmail' })).toEqual(['Hùng'])
+  expect(await names({ q: 'dien thoai', topic: 'copyright' })).toEqual([])
+})
+
+test('báo lỗi chương: lọc theo lý do, tìm theo truyện, ghi chú, người báo', async () => {
+  const { reportChapter } = await import('@/features/feedback/api')
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 2)
+  await registerUser('Mai', 'mai@gmail.com')
+  await reportChapter({
+    slug: story.slug,
+    chapter: 1,
+    reason: 'typo',
+    note: 'Sai chính tả dòng ba',
+  })
+  await reportChapter({ slug: story.slug, chapter: 2, reason: 'violation', note: 'Nội dung lạ' })
+  signInAs('demo')
+  const notes = async (query: Partial<admin.AdminReportQuery>) =>
+    (await admin.getAdminReports({ status: 'all', page: 1, ...query })).items.map((r) => r.note)
+
+  expect(await notes({})).toEqual(['Nội dung lạ', 'Sai chính tả dòng ba'])
+  expect(await notes({ order: 'asc' })).toEqual(['Sai chính tả dòng ba', 'Nội dung lạ'])
+  expect(await notes({ reason: 'violation' })).toEqual(['Nội dung lạ'])
+  expect(await notes({ q: 'chinh ta' })).toEqual(['Sai chính tả dòng ba'])
+  expect(await notes({ q: 'mua ha' })).toHaveLength(2)
+  expect(await notes({ q: 'MAI' })).toHaveLength(2)
+  expect(await notes({ q: 'khong co' })).toEqual([])
+})
+
+test('bình luận: lọc bình luận gốc / trả lời, sắp theo lúc viết', async () => {
+  const comments = await import('@/features/comments/api')
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const root = await comments.addComment(story.slug, 'Bình luận gốc')
+  await comments.addComment(story.slug, 'Trả lời', null, root.id)
+  await comments.addComment(story.slug, 'Bình luận thứ hai')
+  signInAs('demo')
+  const contents = async (query: Partial<admin.AdminCommentQuery>) =>
+    (await admin.getAdminComments({ view: 'all', page: 1, ...query })).items.map((c) => c.content)
+
+  expect(await contents({ kind: 'reply' })).toEqual(['Trả lời'])
+  expect(await contents({ kind: 'root' })).toEqual(['Bình luận thứ hai', 'Bình luận gốc'])
+  expect(await contents({ sort: 'created', order: 'asc' })).toEqual([
+    'Bình luận gốc',
+    'Trả lời',
+    'Bình luận thứ hai',
+  ])
+  expect((await admin.getAdminComments({ view: 'all', page: 1, pageSize: 10 })).pageCount).toBe(1)
+})

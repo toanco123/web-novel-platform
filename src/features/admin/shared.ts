@@ -4,7 +4,16 @@ import type { CommentReportReason } from '@/types/comment'
 import type { ReportReason, ReportStatus } from '@/types/report'
 import type { CuratedList, StoryStatus, StoryVisibility } from '@/types/story'
 
+/** Số dòng mỗi trang mặc định của các bảng quản trị */
 export const ADMIN_PAGE_SIZE = 20
+/** Các lựa chọn số dòng mỗi trang */
+export const ADMIN_PAGE_SIZES = [10, 20, 50, 100]
+
+/** Số dòng mỗi trang hợp lệ; giá trị khác (vd ?size= sửa tay) thì dùng mặc định */
+export const adminPageSize = (size?: number | null) =>
+  size && ADMIN_PAGE_SIZES.includes(size) ? size : ADMIN_PAGE_SIZE
+
+export type SortOrder = 'asc' | 'desc'
 
 /** Kỳ thống kê của trang Tổng quan (số ngày, tính cả hôm nay) */
 export const ADMIN_PERIODS = [7, 30, 90] as const
@@ -90,16 +99,58 @@ export type AdminStory = {
 
 export type StoryTakedown = { at: string; reason: string }
 
-export type AdminStorySort = 'updated' | 'views' | 'created'
+// Cột sắp xếp được của từng bảng (giá trị ?sort= trên URL). Không kèm order thì giảm dần.
 
-export type AdminUserQuery = { q?: string; page: number }
+export const ADMIN_USER_SORTS = [
+  'name',
+  'created',
+  'lastSignIn',
+  'stories',
+  'comments',
+  'follows',
+] as const
+export type AdminUserSort = (typeof ADMIN_USER_SORTS)[number]
+
+export type AdminUserQuery = {
+  q?: string
+  /** member: tài khoản thường */
+  role?: 'admin' | 'member'
+  status?: 'active' | 'banned'
+  /** email, google, facebook... */
+  provider?: string
+  /** Mặc định: created, giảm dần (mới tham gia trước) */
+  sort?: AdminUserSort
+  order?: SortOrder
+  page: number
+  pageSize?: number
+}
+
+export const ADMIN_STORY_SORTS = [
+  'title',
+  'chapters',
+  'views',
+  'followers',
+  'rating',
+  'comments',
+  'reports',
+  'created',
+  'updated',
+] as const
+export type AdminStorySort = (typeof ADMIN_STORY_SORTS)[number]
 
 export type AdminStoryQuery = {
   q?: string
-  visibility?: StoryVisibility
+  /** takedown: truyện đang bị gỡ (cũng là nháp) */
+  visibility?: StoryVisibility | 'takedown'
+  status?: StoryStatus
+  /** Chỉ truyện đang có báo lỗi chương chưa xử lý */
+  hasReports?: boolean
   ownerId?: string
+  /** Mặc định: updated, giảm dần */
   sort?: AdminStorySort
+  order?: SortOrder
   page: number
+  pageSize?: number
 }
 
 /** "2026-09-25" → Date theo giờ máy (không lệch ngày do múi giờ) */
@@ -170,11 +221,43 @@ export type AdminComment = {
   reports: { reason: CommentReportReason; note: string; reporterName: string; createdAt: string }[]
 }
 
-/** reported: chỉ bình luận có báo cáo chưa xử lý (báo cáo mới nhất trước); all: mới viết trước */
-export type AdminCommentQuery = { view: 'reported' | 'all'; q?: string; page: number }
+export const ADMIN_COMMENT_SORTS = ['created', 'reported'] as const
+export type AdminCommentSort = (typeof ADMIN_COMMENT_SORTS)[number]
 
-export type AdminMessageQuery = { status: AdminMessageStatus; page: number }
-export type AdminReportQuery = { status: ReportStatus | 'all'; page: number }
+export type AdminCommentQuery = {
+  /** reported: chỉ bình luận có báo cáo chưa xử lý; all: mọi bình luận */
+  view: 'reported' | 'all'
+  q?: string
+  /** root: bình luận gốc; reply: trả lời */
+  kind?: 'root' | 'reply'
+  /** created: lúc viết; reported: lúc bị báo cáo gần nhất. Mặc định: reported khi view = reported */
+  sort?: AdminCommentSort
+  order?: SortOrder
+  page: number
+  pageSize?: number
+}
+
+export type AdminMessageQuery = {
+  status: AdminMessageStatus
+  topic?: ContactTopic
+  /** Tìm không dấu theo tên, email, nội dung */
+  q?: string
+  /** Theo lúc gửi; mặc định giảm dần (mới trước) */
+  order?: SortOrder
+  page: number
+  pageSize?: number
+}
+
+export type AdminReportQuery = {
+  status: ReportStatus | 'all'
+  reason?: ReportReason
+  /** Tìm không dấu theo tên truyện, ghi chú, người báo */
+  q?: string
+  /** Theo lúc báo; mặc định giảm dần (mới trước) */
+  order?: SortOrder
+  page: number
+  pageSize?: number
+}
 
 // ── Truyện chọn tay trên trang chủ ──────────────────────────────────────
 

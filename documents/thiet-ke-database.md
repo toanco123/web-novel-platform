@@ -177,8 +177,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `admin_overview(days)` | quản trị viên | jsonb giống kiểu `AdminOverview`: tổng số, chuỗi theo ngày (người dùng mới, lượt đọc, truyện mới, chương mới; giờ Việt Nam), truyện theo thể loại, top 10 lượt đọc |
 | `admin_users(query?)` | quản trị viên | Mọi tài khoản kèm email, provider, lần đăng nhập cuối, số truyện/bình luận/theo dõi; tìm tên/email không dấu |
 | `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp, kèm trạng thái gỡ. `sort`: `updated` \| `views` \| `created` |
-| `admin_contact_messages(status?)`, `admin_set_contact_handled(id, handled)` | quản trị viên | Hộp thư liên hệ (`status`: `open` \| `handled`) |
-| `admin_reports(status?)`, `admin_set_report_status(id, status)` | quản trị viên | Báo lỗi chương của mọi truyện |
+| `admin_contact_messages(status?, query?)`, `admin_set_contact_handled(id, handled)` | quản trị viên | Hộp thư liên hệ (`status`: `open` \| `handled`; `query`: tìm không dấu theo tên, email, nội dung) |
+| `admin_reports(status?, query?)`, `admin_set_report_status(id, status)` | quản trị viên | Báo lỗi chương của mọi truyện (`query`: tìm không dấu theo tên truyện, ghi chú, người báo) |
 | `admin_set_user_banned(user_id, banned)` | quản trị viên | `auth.users.banned_until = 'infinity'` / `null`; khóa thì xóa `auth.sessions` |
 | `admin_set_story_takedown(story_id, reason)` | quản trị viên | Gỡ truyện: về nháp + `taken_down_at`, `takedown_reason`; `reason` rỗng là khôi phục |
 | `admin_update_genre(slug, name, description)`, `admin_delete_genre(slug)`, `admin_merge_genres(from, into)` | quản trị viên | Sửa (slug đổi theo tên), xóa, gộp thể loại |
@@ -254,7 +254,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | feedback | `sendContactMessage` | `contact_messages.insert(...)` (không gọi `.select()`) |
 | feedback | `reportChapter` | `rpc('report_chapter')` |
 | admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |
-| admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports', {...}, { count: 'exact' }).range()` qua `loadPage` |
+| admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports`, `getAdminComments` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports' / 'admin_comments', {...}, { count: 'exact' })`, rồi lọc (`.eq()`, `.gt()`, `.not('taken_down_at', 'is', null)`) và sắp xếp (`.order(cột, { nullsFirst: false }).order('id')`) bằng PostgREST ngay trên kết quả của hàm, `.range()` qua `loadPage`. Số dòng mỗi trang: `adminPageSize()` (10 / 20 / 50 / 100) |
 | admin | `setMessageHandled`, `setAdminReportStatus`, `setUserBanned`, `setStoryTakedown`, `updateGenre`, `deleteGenre`, `mergeGenres` | RPC `admin_*` cùng tên (mục 6) |
 | admin | `getAdminComments`, `deleteAdminComment`, `dismissCommentReports` | `rpc('admin_comments', { p_query, p_reported }, { count: 'exact' }).range()` qua `loadPage` / `rpc('admin_delete_comment')` / `rpc('admin_dismiss_comment_reports')` |
 | admin | `getCuratedStories`, `setCuratedStories` | `rpc('admin_curated', { p_list })` / `rpc('admin_set_curated', { p_list, p_story_ids })` |

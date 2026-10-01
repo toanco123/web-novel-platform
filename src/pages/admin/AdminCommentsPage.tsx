@@ -2,11 +2,18 @@ import { Alert, App, Button, Card, Grid, Input, Popconfirm, Segmented, Table, Ta
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import {
-  ADMIN_PAGE_SIZE,
+  ADMIN_COMMENT_SORTS,
   type AdminComment,
   type AdminCommentQuery,
   adminErrorMessage,
 } from '@/features/admin/api'
+import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
+import {
+  onTableChange,
+  readTableParams,
+  sortable,
+  tablePagination,
+} from '@/features/admin/components/tableParams'
 import { useFilterParams } from '@/features/admin/components/useFilterParams'
 import {
   useAdminComments,
@@ -20,14 +27,30 @@ import { paths } from '@/lib/routes'
 const number = new Intl.NumberFormat('vi-VN')
 const reasonLabel = (reason: string) =>
   commentReportReasons.find((r) => r.value === reason)?.label ?? reason
+const KINDS = ['root', 'reply'] as const
 
 export default function AdminCommentsPage() {
   const { params, page, update } = useFilterParams()
-  const pinFirst = Grid.useBreakpoint().md ?? false
-  // Giá trị khác trên URL (?view=) coi như mặc định
+  const screens = Grid.useBreakpoint()
+  const pinFirst = screens.md ?? false
+  // Cột thao tác ghim bên phải để nút luôn trong tầm nhìn; màn hẹp thì không đủ chỗ cho hai cột ghim
+  const pinActions = screens.lg ?? false
+  // Giá trị khác trên URL (?view=, ?kind=) coi như mặc định
   const view: AdminCommentQuery['view'] = params.get('view') === 'all' ? 'all' : 'reported'
   const q = params.get('q') ?? ''
-  const { data, isPending, isFetching, isError } = useAdminComments({ view, q, page })
+  const kind = KINDS.find((k) => k === params.get('kind'))
+  const { sort, order, pageSize } = readTableParams(params, ADMIN_COMMENT_SORTS)
+  const { data, isPending, isFetching, isError } = useAdminComments({
+    view,
+    q,
+    kind,
+    sort,
+    order,
+    page,
+    pageSize,
+  })
+  // Mặc định: bị báo cáo gần nhất trước (chế độ "Bị báo cáo"), mới viết trước (chế độ "Tất cả")
+  const active = { sort: sort ?? (view === 'reported' ? 'reported' : 'created'), order }
   const dismiss = useDismissCommentReports()
   const remove = useDeleteAdminComment()
   const { message } = App.useApp()
@@ -74,9 +97,20 @@ export default function AdminCommentsPage() {
             placeholder="Tìm theo nội dung hoặc người viết"
             aria-label="Tìm bình luận"
             allowClear
-            className="max-w-sm"
+            className="max-w-xs"
             onSearch={(value) => update({ q: value.trim() })}
           />
+          <FilterSelect
+            label="Loại"
+            value={kind}
+            onChange={(value) => update({ kind: value })}
+            className="w-40"
+            options={[
+              { value: 'root', label: 'Bình luận gốc' },
+              { value: 'reply', label: 'Trả lời' },
+            ]}
+          />
+          <ClearFilters params={params} keys={['q', 'kind']} update={update} />
         </div>
         {isError ? (
           <Alert type="error" showIcon title="Không tải được bình luận." />
@@ -85,28 +119,23 @@ export default function AdminCommentsPage() {
             rowKey="id"
             loading={isPending || isFetching}
             dataSource={data?.items}
-            scroll={{ x: 1000 }}
+            scroll={{ x: 1100 }}
             locale={{
-              emptyText: q
-                ? 'Không có bình luận nào khớp'
-                : view === 'reported'
-                  ? 'Không có bình luận nào đang bị báo cáo'
-                  : 'Chưa có bình luận',
+              emptyText:
+                q || kind
+                  ? 'Không có bình luận nào khớp'
+                  : view === 'reported'
+                    ? 'Không có bình luận nào đang bị báo cáo'
+                    : 'Chưa có bình luận',
             }}
-            pagination={{
-              current: data?.page ?? page,
-              total: data?.total ?? 0,
-              pageSize: ADMIN_PAGE_SIZE,
-              showSizeChanger: false,
-              hideOnSinglePage: true,
-              onChange: (p) => update({ page: String(p) }),
-            }}
+            pagination={tablePagination(data, page, pageSize, update)}
+            onChange={onTableChange(update)}
             columns={[
               {
                 title: 'Bình luận',
                 key: 'content',
                 fixed: pinFirst ? 'left' : undefined,
-                width: pinFirst ? 300 : 240,
+                width: pinFirst ? 270 : 220,
                 render: (_, c) => (
                   <div className="min-w-0">
                     <p className="break-words whitespace-pre-line">{c.content}</p>
@@ -121,9 +150,13 @@ export default function AdminCommentsPage() {
               {
                 title: 'Người viết',
                 key: 'author',
-                className: 'whitespace-nowrap',
+                width: 150,
                 render: (_, c) => (
-                  <Link to={paths.adminUserSearch(c.author.displayName)}>
+                  <Link
+                    to={paths.adminUserSearch(c.author.displayName)}
+                    title={c.author.displayName}
+                    className="block truncate"
+                  >
                     {c.author.displayName}
                   </Link>
                 ),
@@ -131,7 +164,7 @@ export default function AdminCommentsPage() {
               {
                 title: 'Truyện · chương',
                 key: 'target',
-                width: 180,
+                width: 170,
                 render: (_, c) =>
                   c.storyPublished ? (
                     <div>
@@ -157,14 +190,15 @@ export default function AdminCommentsPage() {
               },
               {
                 title: 'Lúc viết',
+                ...sortable('created', active),
+                width: 130,
                 dataIndex: 'createdAt',
-                className: 'whitespace-nowrap',
                 render: (v: string) => <span title={formatDate(v)}>{formatRelativeTime(v)}</span>,
               },
               {
                 title: 'Báo cáo',
-                key: 'reports',
-                width: 240,
+                ...sortable('reported', active),
+                width: 230,
                 render: (_, c) =>
                   c.reports.length === 0 ? (
                     '–'
@@ -187,6 +221,8 @@ export default function AdminCommentsPage() {
               {
                 title: 'Thao tác',
                 key: 'actions',
+                width: 150,
+                fixed: pinActions ? 'right' : undefined,
                 className: 'whitespace-nowrap',
                 render: (_, c) => (
                   <div className="flex items-center gap-2">
