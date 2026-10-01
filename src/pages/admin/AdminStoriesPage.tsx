@@ -3,12 +3,12 @@ import {
   App,
   Button,
   Card,
+  Checkbox,
   Grid,
   Input,
   Modal,
   Popconfirm,
   Segmented,
-  Select,
   Table,
   Tag,
   Tooltip,
@@ -16,41 +16,55 @@ import {
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
+import { ADMIN_STORY_SORTS, type AdminStory, adminErrorMessage } from '@/features/admin/api'
 import {
-  ADMIN_PAGE_SIZE,
-  type AdminStory,
-  type AdminStorySort,
-  adminErrorMessage,
-} from '@/features/admin/api'
+  ClearFilters,
+  FilterSelect,
+  onTableChange,
+  readTableParams,
+  sortable,
+  tablePagination,
+} from '@/features/admin/components/adminTable'
 import { useFilterParams } from '@/features/admin/components/useFilterParams'
 import { useAdminStories, useSetStoryTakedown } from '@/features/admin/hooks'
 import { formatDate } from '@/lib/format'
 import { paths } from '@/lib/routes'
-import type { StoryVisibility } from '@/types/story'
+import type { StoryStatus, StoryVisibility } from '@/types/story'
 
 const number = new Intl.NumberFormat('vi-VN')
 
-// Giá trị hợp lệ trên URL (?visibility=, ?sort=); giá trị khác coi như mặc định
-const VISIBILITIES: StoryVisibility[] = ['published', 'draft']
-const SORTS: AdminStorySort[] = ['views', 'created']
-const pick = <T extends string>(options: T[], value: string | null) =>
+// Giá trị hợp lệ trên URL (?visibility=, ?status=); giá trị khác coi như không lọc
+const VISIBILITIES = ['published', 'draft', 'takedown'] as const
+const STATUSES: StoryStatus[] = ['ongoing', 'completed']
+const pick = <T extends string>(options: readonly T[], value: string | null) =>
   options.find((o) => o === value)
 
 export default function AdminStoriesPage() {
   const { params, page, update } = useFilterParams()
   // Màn hẹp không ghim cột đầu, nếu không nó chiếm hết chiều ngang và che các cột khác
-  const pinFirst = Grid.useBreakpoint().md ?? false
+  const screens = Grid.useBreakpoint()
+  const pinFirst = screens.md ?? false
+  // Cột thao tác ghim bên phải để nút luôn trong tầm nhìn; màn hẹp thì không đủ chỗ cho hai cột ghim
+  const pinActions = screens.lg ?? false
   const q = params.get('q') ?? ''
   const visibility = pick(VISIBILITIES, params.get('visibility'))
-  const sort = pick(SORTS, params.get('sort'))
+  const status = pick(STATUSES, params.get('status'))
+  const hasReports = params.get('reports') === 'open'
   const ownerId = params.get('owner') ?? undefined
+  const { sort, order, pageSize } = readTableParams(params, ADMIN_STORY_SORTS)
   const { data, isPending, isFetching, isError } = useAdminStories({
     q,
     visibility,
+    status,
+    hasReports,
     ownerId,
-    sort: sort ?? 'updated',
+    sort,
+    order,
     page,
+    pageSize,
   })
+  // Mặc định: mới cập nhật trước
+  const active = { sort: sort ?? ('updated' as const), order }
   const ownerName = ownerId && data?.items[0]?.ownerName
   const takedown = useSetStoryTakedown()
   const { message } = App.useApp()
@@ -100,25 +114,36 @@ export default function AdminStoriesPage() {
               { label: 'Tất cả', value: '' },
               { label: 'Công khai', value: 'published' },
               { label: 'Nháp', value: 'draft' },
+              { label: 'Bị gỡ', value: 'takedown' },
             ]}
             aria-label="Lọc theo hiển thị"
           />
-          <Select
-            value={sort ?? ''}
-            onChange={(value) => update({ sort: value })}
-            className="w-44"
-            aria-label="Sắp xếp"
+          <FilterSelect
+            label="Tiến độ"
+            value={status}
+            onChange={(value) => update({ status: value })}
+            className="w-36"
             options={[
-              { label: 'Mới cập nhật', value: '' },
-              { label: 'Nhiều lượt đọc', value: 'views' },
-              { label: 'Mới tạo', value: 'created' },
+              { value: 'ongoing', label: 'Đang ra' },
+              { value: 'completed', label: 'Hoàn thành' },
             ]}
           />
+          <Checkbox
+            checked={hasReports}
+            onChange={(e) => update({ reports: e.target.checked ? 'open' : null })}
+          >
+            Có báo lỗi đang mở
+          </Checkbox>
           {ownerId && (
             <Tag closable onClose={() => update({ owner: null })} closeIcon aria-live="polite">
               Tác giả: {ownerName || 'đã chọn'}
             </Tag>
           )}
+          <ClearFilters
+            params={params}
+            keys={['q', 'visibility', 'status', 'reports', 'owner']}
+            update={update}
+          />
         </div>
 
         {isError ? (
@@ -128,19 +153,14 @@ export default function AdminStoriesPage() {
             rowKey="id"
             loading={isPending || isFetching}
             dataSource={data?.items}
-            scroll={{ x: 1280 }}
+            scroll={{ x: 1640 }}
             locale={{ emptyText: 'Không có truyện nào khớp bộ lọc' }}
-            pagination={{
-              current: data?.page ?? page,
-              total: data?.total ?? 0,
-              pageSize: ADMIN_PAGE_SIZE,
-              showSizeChanger: false,
-              hideOnSinglePage: true,
-              onChange: (p) => update({ page: String(p) }),
-            }}
+            pagination={tablePagination(data, page, pageSize, update)}
+            onChange={onTableChange(update)}
             columns={[
               {
                 title: 'Truyện',
+                ...sortable('title', active),
                 dataIndex: 'title',
                 fixed: pinFirst ? 'left' : undefined,
                 width: pinFirst ? 260 : 180,
@@ -155,14 +175,24 @@ export default function AdminStoriesPage() {
               },
               {
                 title: 'Tác giả',
-                className: 'whitespace-nowrap',
+                width: 160,
                 dataIndex: 'ownerName',
                 render: (name: string, s) =>
-                  s.ownerId ? <Link to={paths.adminStories(s.ownerId)}>{name}</Link> : name,
+                  s.ownerId ? (
+                    <Link
+                      to={paths.adminStories(s.ownerId)}
+                      title={name}
+                      className="block truncate"
+                    >
+                      {name}
+                    </Link>
+                  ) : (
+                    name
+                  ),
               },
               {
                 title: 'Hiển thị',
-                className: 'whitespace-nowrap',
+                width: 110,
                 dataIndex: 'visibility',
                 render: (v: StoryVisibility, s) =>
                   s.takedown ? (
@@ -177,14 +207,14 @@ export default function AdminStoriesPage() {
               },
               {
                 title: 'Tiến độ',
-                className: 'whitespace-nowrap',
+                width: 115,
                 dataIndex: 'status',
                 render: (v: AdminStory['status']) => (v === 'completed' ? 'Hoàn thành' : 'Đang ra'),
               },
               {
                 title: 'Chương',
-                className: 'whitespace-nowrap',
-                key: 'chapters',
+                ...sortable('chapters', active),
+                width: 115,
                 align: 'right',
                 render: (_, s) => (
                   <span title="Đã xuất bản / tổng số chương">
@@ -194,22 +224,24 @@ export default function AdminStoriesPage() {
               },
               {
                 title: 'Lượt đọc',
-                className: 'whitespace-nowrap',
+                ...sortable('views', active),
+                width: 125,
                 dataIndex: 'views',
                 align: 'right',
                 render: (n: number) => number.format(n),
               },
               {
                 title: 'Theo dõi',
-                className: 'whitespace-nowrap',
+                ...sortable('followers', active),
+                width: 120,
                 dataIndex: 'followers',
                 align: 'right',
                 render: (n: number) => number.format(n),
               },
               {
                 title: 'Đánh giá',
-                className: 'whitespace-nowrap',
-                key: 'rating',
+                ...sortable('rating', active),
+                width: 135,
                 align: 'right',
                 render: (_, s) =>
                   s.ratingCount
@@ -218,27 +250,39 @@ export default function AdminStoriesPage() {
               },
               {
                 title: 'Bình luận',
-                className: 'whitespace-nowrap',
+                ...sortable('comments', active),
+                width: 125,
                 dataIndex: 'comments',
                 align: 'right',
                 render: (n: number) => number.format(n),
               },
               {
                 title: 'Báo lỗi mở',
-                className: 'whitespace-nowrap',
+                ...sortable('reports', active),
+                width: 135,
                 dataIndex: 'openReports',
                 align: 'right',
                 render: (n: number) => (n > 0 ? <Tag color="orange">{n}</Tag> : 0),
               },
               {
+                title: 'Ngày tạo',
+                ...sortable('created', active),
+                width: 125,
+                dataIndex: 'createdAt',
+                render: (v: string) => formatDate(v),
+              },
+              {
                 title: 'Cập nhật',
-                className: 'whitespace-nowrap',
+                ...sortable('updated', active),
+                width: 125,
                 dataIndex: 'updatedAt',
                 render: (v: string) => formatDate(v),
               },
               {
                 title: 'Thao tác',
                 key: 'actions',
+                width: 120,
+                fixed: pinActions ? 'right' : undefined,
                 className: 'whitespace-nowrap',
                 // Truyện có sẵn của bản giả (không có chủ) không gỡ được
                 render: (_, s) =>

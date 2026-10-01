@@ -292,3 +292,121 @@ test('kiểm duyệt bình luận: xem báo cáo, bỏ qua, xóa bình luận vi
   expect(screen.getByText('Cuối truyện hai người cưới nhau')).toBeInTheDocument()
   expect(screen.queryByText('Vào web abc chấm com đọc nhanh hơn')).not.toBeInTheDocument()
 }, 20_000)
+
+// ── Lọc, sắp xếp, phân trang của bảng ───────────────────────────────────
+
+const location = (router: { state: { location: { pathname: string; search: string } } }) =>
+  router.state.location.pathname + router.state.location.search
+/** Ô đầu tiên của từng dòng dữ liệu trong bảng đang hiện */
+const firstCells = () =>
+  screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getAllByRole('cell')[0].textContent)
+
+test('bảng người dùng: bấm tiêu đề cột để sắp xếp, lọc theo vai trò, xóa bộ lọc', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  await publishStory('Mùa Hạ Năm Ấy', 1)
+  await registerUser('Mai', 'mai@gmail.com')
+  signInAs('demo')
+  const { router, user } = renderApp('/admin/users')
+  await screen.findByText('linh@gmail.com', {}, slow)
+  // Mặc định: mới tham gia trước
+  expect(firstCells()[0]).toContain('Mai')
+
+  // Bấm tiêu đề cột: giảm dần → tăng dần → về mặc định
+  const header = () => screen.getByRole('columnheader', { name: /Truyện/ })
+  await user.click(header())
+  await expect.poll(() => location(router), slow).toBe('/admin/users?sort=stories')
+  await expect.poll(() => firstCells()[0], slow).toContain('Linh')
+  expect(header()).toHaveAttribute('aria-sort', 'descending')
+  await user.click(header())
+  await expect.poll(() => location(router), slow).toBe('/admin/users?sort=stories&order=asc')
+  await expect.poll(() => firstCells().at(-1), slow).toContain('Linh')
+  await user.click(header())
+  await expect.poll(() => location(router), slow).toBe('/admin/users')
+
+  await user.click(screen.getByRole('combobox', { name: 'Vai trò' }))
+  await user.click(await screen.findByTitle('Quản trị viên', {}, slow))
+  await expect.poll(() => location(router), slow).toBe('/admin/users?role=admin')
+  await expect.poll(() => screen.queryByText('linh@gmail.com'), slow).toBeNull()
+  expect(screen.getByText('demo@webtruyen.vn')).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }))
+  await expect.poll(() => location(router), slow).toBe('/admin/users')
+  expect(await screen.findByText('linh@gmail.com', {}, slow)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Xóa bộ lọc' })).not.toBeInTheDocument()
+}, 20_000)
+
+test('bảng truyện: đổi số dòng mỗi trang, lọc bị gỡ và tiến độ, URL cũ ?sort=views vẫn đúng', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  signInAs('demo')
+  const { setStoryTakedown } = await import('./api')
+  await setStoryTakedown(story.id, 'Đạo văn')
+  const { router, user } = renderApp('/admin/stories?sort=views')
+
+  await screen.findByRole('link', { name: 'Trường An Không Tuyết' }, slow)
+  // Truyện mẫu nhiều lượt đọc nhất
+  expect(firstCells()[0]).toBe('Trọng Sinh Chi Đích Nữ Phong Hoa')
+  expect(screen.getByRole('columnheader', { name: /Lượt đọc/ })).toHaveAttribute(
+    'aria-sort',
+    'descending',
+  )
+  expect(screen.getByText(/^1–15 trong 15$/)).toBeInTheDocument()
+
+  await user.click(screen.getByRole('combobox', { name: 'Số dòng mỗi trang' }))
+  await user.click(await screen.findByTitle('10 / trang', {}, slow))
+  await expect.poll(() => location(router), slow).toBe('/admin/stories?sort=views&size=10')
+  await expect.poll(() => firstCells().length, slow).toBe(10)
+  expect(screen.getByText(/^1–10 trong 15$/)).toBeInTheDocument()
+
+  await user.click(screen.getByText('Bị gỡ'))
+  await expect.poll(() => firstCells(), slow).toEqual(['Mùa Hạ Năm Ấy'])
+  expect(router.state.location.search).toContain('visibility=takedown')
+
+  await user.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }))
+  await user.click(screen.getByRole('combobox', { name: 'Tiến độ' }))
+  await user.click(await screen.findByTitle('Hoàn thành', {}, slow))
+  await expect.poll(() => router.state.location.search, slow).toContain('status=completed')
+  await expect
+    .poll(() => screen.queryByRole('link', { name: 'Trường An Không Tuyết' }), slow)
+    .toBeNull()
+  expect(linh).toBeTruthy()
+}, 20_000)
+
+test('hộp thư: lọc theo chủ đề, tìm, sắp theo lúc gửi', async () => {
+  const { sendContactMessage } = await import('@/features/feedback/api')
+  await sendContactMessage({
+    name: 'Lan',
+    email: 'lan@gmail.com',
+    topic: 'copyright',
+    message: 'Truyện này đăng lại khi chưa xin phép tác giả.',
+  })
+  await sendContactMessage({
+    name: 'Hùng',
+    email: 'hung@gmail.com',
+    topic: 'bug',
+    message: 'Trang đọc bị lỗi trên điện thoại.',
+  })
+  signInAs('demo')
+  const { router, user } = renderApp('/admin/inbox')
+  await screen.findByText('lan@gmail.com', {}, slow)
+  expect(firstCells()[0]).toContain('Hùng')
+
+  await user.click(screen.getByRole('columnheader', { name: /Gửi lúc/ }))
+  await user.click(screen.getByRole('columnheader', { name: /Gửi lúc/ }))
+  await expect.poll(() => location(router), slow).toBe('/admin/inbox?sort=created&order=asc')
+  await expect.poll(() => firstCells()[0], slow).toContain('Lan')
+
+  await user.click(screen.getByRole('combobox', { name: 'Chủ đề' }))
+  await user.click(await screen.findByTitle('Báo lỗi trang web', {}, slow))
+  await expect.poll(() => firstCells().length, slow).toBe(1)
+  expect(firstCells()[0]).toContain('Hùng')
+
+  await user.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }))
+  await user.type(screen.getByRole('searchbox', { name: 'Tìm tin nhắn' }), 'xin phep{Enter}')
+  await expect.poll(() => router.state.location.search, slow).toContain('q=xin+phep')
+  await expect.poll(() => firstCells().length, slow).toBe(1)
+  expect(firstCells()[0]).toContain('Lan')
+}, 20_000)
