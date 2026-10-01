@@ -128,15 +128,18 @@ export default function AdminReviewsPage() {
                     <strong className="block truncate font-medium" title={title}>
                       {title}
                     </strong>
-                    <Link
-                      to={paths.story(s.slug)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs"
-                      aria-label={`Xem trước ${title} (mở tab mới)`}
-                    >
-                      Xem trước ↗
-                    </Link>
+                    {/* Quản trị viên chỉ đọc được truyện đang chờ duyệt (truyện bị từ chối là nháp) */}
+                    {s.review?.status === 'pending' && (
+                      <Link
+                        to={paths.story(s.slug)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs"
+                        aria-label={`Xem trước ${title} (mở tab mới)`}
+                      >
+                        Xem trước ↗
+                      </Link>
+                    )}
                   </div>
                 ),
               },

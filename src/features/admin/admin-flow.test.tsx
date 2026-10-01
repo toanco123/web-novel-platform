@@ -490,10 +490,14 @@ test('duyệt truyện: từ Tổng quan vào hàng chờ, duyệt một truyệ
     .poll(() => screen.queryByText('Gió Qua Hiên Nhà', { selector: 'strong' }), slow)
     .toBeNull()
 
-  // Tab "Bị từ chối" có lý do
+  // Tab "Bị từ chối" có lý do; không có "Xem trước" (quản trị viên chỉ đọc được truyện chờ duyệt)
   await user.click(screen.getByText('Bị từ chối', { selector: '.ant-segmented-item-label' }))
   await expect.poll(() => router.state.location.search, slow).toBe('?status=rejected')
-  expect(await screen.findByText('Bìa vi phạm', {}, slow)).toBeInTheDocument()
+  await screen.findByText('Gió Qua Hiên Nhà', { selector: 'strong' }, slow)
+  expect(within(row('Gió Qua Hiên Nhà')).getByText('Bìa vi phạm')).toBeInTheDocument()
+  expect(
+    within(row('Gió Qua Hiên Nhà')).queryByRole('link', { name: /Xem trước/ }),
+  ).not.toBeInTheDocument()
 
   // Bảng Truyện: lọc theo trạng thái duyệt
   await router.navigate('/admin/stories?review=rejected')
