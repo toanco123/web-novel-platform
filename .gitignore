@@ -26,3 +26,6 @@ dist-ssr
 .playwright-mcp
 .vercel
 .env*
+
+# Cài đặt Claude Code riêng của từng người
+.claude/settings.local.json
