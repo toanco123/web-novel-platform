@@ -208,7 +208,13 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
             dataSource={data.topStories}
             scroll={{ x: 640 }}
             columns={[
-              { title: '#', key: 'rank', width: 48, render: (_, __, i) => i + 1 },
+              // Hạng theo lượt đọc, giữ nguyên khi bấm sắp xếp theo cột khác
+              {
+                title: '#',
+                key: 'rank',
+                width: 48,
+                render: (_, s) => data.topStories.indexOf(s) + 1,
+              },
               {
                 title: 'Truyện',
                 dataIndex: 'title',
@@ -226,18 +232,26 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
                 title: 'Lượt đọc',
                 dataIndex: 'views',
                 align: 'right',
+                // Chỉ 10 dòng, có sẵn ở trình duyệt nên sắp xếp ngay tại chỗ
+                sorter: (a, b) => a.views - b.views,
+                defaultSortOrder: 'descend',
+                sortDirections: ['descend', 'ascend'],
                 render: (v: number) => number.format(v),
               },
               {
                 title: 'Theo dõi',
                 dataIndex: 'followers',
                 align: 'right',
+                sorter: (a, b) => a.followers - b.followers,
+                sortDirections: ['descend', 'ascend'],
                 render: (v: number) => number.format(v),
               },
               {
                 title: 'Đánh giá',
                 key: 'rating',
                 align: 'right',
+                sorter: (a, b) => a.ratingAvg - b.ratingAvg || a.ratingCount - b.ratingCount,
+                sortDirections: ['descend', 'ascend'],
                 render: (_, s) =>
                   s.ratingCount
                     ? `${s.ratingAvg.toFixed(1)} (${number.format(s.ratingCount)})`

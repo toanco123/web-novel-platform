@@ -40,14 +40,19 @@ export async function getGenres(): Promise<GenreWithCount[]> {
   const rows = unwrap(
     await db()
       .from('genre_cards')
-      .select('slug, name, description, created_by, created_by_name, story_count')
+      .select('slug, name, description, created_by, created_by_name, story_count, created_at')
       .order('created_at')
       .order('name'),
   )
   // Như bản giả: thể loại có sẵn đứng trước (header, footer chỉ hiện vài thể loại đầu), rồi tới thể
   // loại người dùng tạo theo thứ tự tạo. sort giữ nguyên thứ tự trong mỗi nhóm.
   return rows
-    .map((row) => ({ ...toGenre(row), storyCount: row.story_count ?? 0 }))
+    .map((row) => ({
+      ...toGenre(row),
+      storyCount: row.story_count ?? 0,
+      // Thể loại có sẵn (không có người tạo) không hiện ngày tạo, như bản giả
+      createdAt: row.created_by ? row.created_at : null,
+    }))
     .sort((a, b) => Number(!!a.createdBy) - Number(!!b.createdBy))
 }
 

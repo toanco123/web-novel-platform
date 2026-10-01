@@ -42,7 +42,8 @@ Cách sửa: mọi cột có độ rộng; tên dài cắt bằng "…" (`ellips
 ## 4. Giao diện
 
 - `features/admin/components/useFilterParams.ts`: đọc thêm `size`, `sort`, `order`.
-- `features/admin/components/adminTable.tsx`: phần dùng chung của các bảng (cấu hình phân trang, thuộc tính sắp xếp của cột, xử lý `onChange` của bảng, ô lọc `FilterSelect`).
+- `features/admin/components/tableParams.ts`: phần dùng chung của các bảng (đọc tham số URL, cấu hình phân trang, thuộc tính sắp xếp của cột, xử lý `onChange` của bảng).
+- `features/admin/components/TableFilters.tsx`: ô lọc `FilterSelect` và nút `ClearFilters`.
 - Sáu trang bảng trong `pages/admin` dùng các phần trên.
 
 ## 5. Kiểm tra

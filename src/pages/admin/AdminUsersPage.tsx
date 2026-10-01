@@ -2,14 +2,13 @@ import { Alert, App, Button, Card, Grid, Input, Popconfirm, Table, Tag } from 'a
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { ADMIN_USER_SORTS, type AdminUser, adminErrorMessage } from '@/features/admin/api'
+import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
 import {
-  ClearFilters,
-  FilterSelect,
   onTableChange,
   readTableParams,
   sortable,
   tablePagination,
-} from '@/features/admin/components/adminTable'
+} from '@/features/admin/components/tableParams'
 import { useFilterParams } from '@/features/admin/components/useFilterParams'
 import { useAdminUsers, useSetUserBanned } from '@/features/admin/hooks'
 import { UserAvatar } from '@/features/auth/components/UserAvatar'

@@ -28,7 +28,12 @@ test('tạo mới: chuẩn hóa tên, ghi người tạo, hiện trong danh sác
     createdBy: { id: 'demo', displayName: 'Bạn đọc Demo' },
   })
   const all = await getGenres()
-  expect(all.find((g) => g.slug === 'he-thong')).toMatchObject({ storyCount: 0 })
+  expect(all.find((g) => g.slug === 'he-thong')).toMatchObject({
+    storyCount: 0,
+    createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+  })
+  // Thể loại có sẵn không có ngày tạo
+  expect(all.find((g) => g.slug === 'ngon-tinh')?.createdAt).toBeNull()
   await expect(createGenre({ name: 'He Thong' })).rejects.toBeInstanceOf(GenreExistsError)
 })
 

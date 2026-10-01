@@ -17,14 +17,13 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { ADMIN_STORY_SORTS, type AdminStory, adminErrorMessage } from '@/features/admin/api'
+import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
 import {
-  ClearFilters,
-  FilterSelect,
   onTableChange,
   readTableParams,
   sortable,
   tablePagination,
-} from '@/features/admin/components/adminTable'
+} from '@/features/admin/components/tableParams'
 import { useFilterParams } from '@/features/admin/components/useFilterParams'
 import { useAdminStories, useSetStoryTakedown } from '@/features/admin/hooks'
 import { formatDate } from '@/lib/format'
