@@ -111,6 +111,8 @@ const storySortColumns = {
   reports: 'open_reports',
   created: 'created_at',
   updated: 'updated_at',
+  // Tạm: cột review_submitted_at có sau migration story_review
+  submitted: 'updated_at',
 } as const
 
 export async function getAdminStories({
@@ -171,6 +173,10 @@ export async function getAdminStories({
         r.taken_down_at && r.takedown_reason
           ? { at: r.taken_down_at, reason: r.takedown_reason }
           : null,
+      // Cột duyệt, bút danh, thể loại map ở bước nối migration story_review
+      review: null,
+      authorName: null,
+      genreSlugs: [],
     })),
   }
 }

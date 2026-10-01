@@ -2,7 +2,7 @@
 import type { ContactTopic } from '@/features/feedback/schemas'
 import type { CommentReportReason } from '@/types/comment'
 import type { ReportReason, ReportStatus } from '@/types/report'
-import type { CuratedList, StoryStatus, StoryVisibility } from '@/types/story'
+import type { CuratedList, StoryReview, StoryStatus, StoryVisibility } from '@/types/story'
 
 /** Số dòng mỗi trang mặc định của các bảng quản trị */
 export const ADMIN_PAGE_SIZE = 20
@@ -35,6 +35,8 @@ export type AdminOverview = {
     reportedComments: number
     unhandledMessages: number
     bannedUsers: number
+    /** Số truyện đang chờ duyệt */
+    pendingReviews: number
   }
   /** Mỗi ngày trong kỳ (cũ trước), day dạng 2026-09-25 */
   days: { day: string; signups: number; views: number; stories: number; chapters: number }[]
@@ -95,6 +97,11 @@ export type AdminStory = {
   updatedAt: string
   /** Bị admin gỡ (về nháp, tác giả không tự công khai lại được); null: bình thường */
   takedown: StoryTakedown | null
+  /** Trạng thái duyệt; truyện có sẵn của bản giả luôn là đã duyệt */
+  review: StoryReview | null
+  /** Bút danh; null: hiển thị tên tài khoản */
+  authorName: string | null
+  genreSlugs: string[]
 }
 
 export type StoryTakedown = { at: string; reason: string }
@@ -145,6 +152,7 @@ export const ADMIN_STORY_SORTS = [
   'reports',
   'created',
   'updated',
+  'submitted',
 ] as const
 export type AdminStorySort = (typeof ADMIN_STORY_SORTS)[number]
 
@@ -155,6 +163,8 @@ export type AdminStoryQuery = {
   status?: StoryStatus
   /** Chỉ truyện đang có báo lỗi chương chưa xử lý */
   hasReports?: boolean
+  /** Trạng thái duyệt (hàng chờ /admin/reviews và bộ lọc "Duyệt" của bảng Truyện) */
+  review?: 'pending' | 'rejected'
   ownerId?: string
   /** Mặc định: updated, giảm dần */
   sort?: AdminStorySort

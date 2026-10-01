@@ -16,7 +16,7 @@ export async function getChapterList(
 ): Promise<Page<ChapterSummary>> {
   await delay()
   const viewer = await getSession()
-  const story = findStory(slug, viewer?.id ?? null)
+  const story = findStory(slug, viewer?.id ?? null, viewer?.isAdmin)
   const all = story ? readerChapters(story) : []
   return paginate(order === 'desc' ? [...all].reverse() : all, page, CHAPTERS_PER_PAGE)
 }
@@ -25,7 +25,7 @@ export async function getChapterList(
 async function readerStory(slug: string) {
   await delay()
   const viewer = await getSession()
-  return findStory(slug, viewer?.id ?? null)
+  return findStory(slug, viewer?.id ?? null, viewer?.isAdmin)
 }
 
 /** Chương thứ `index` trong mục lục `all`, dạng cho trang đọc */
@@ -98,7 +98,7 @@ export async function recordChapterView(slug: string, number: number) {
   const viewer = await getSession()
   const key = `${viewer?.id ?? ''}|${slug}#${number}`
   if (counted.has(key)) return
-  const story = findStory(slug, viewer?.id ?? null)
+  const story = findStory(slug, viewer?.id ?? null, viewer?.isAdmin)
   if (!story || (story.ownerId !== null && story.ownerId === viewer?.id)) return
   counted.add(key)
 
