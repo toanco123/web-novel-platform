@@ -1,6 +1,12 @@
 # Plan: Duyệt truyện trước khi công khai
 
-Trạng thái: đang làm. Nhánh `story-review`.
+Trạng thái: ✅ xong (01/10/2026). Nhánh `story-review`, kế hoạch triển khai ở `trien-khai-duyet-truyen.md`.
+
+Khác với plan:
+- Trang truyện chưa công khai: không thêm dải mới mà sửa câu của dải "bản nháp" có sẵn trong `StoryHero` (chủ truyện: "Truyện chưa công khai, chỉ bạn thấy…"; quản trị viên xem truyện chờ duyệt: "Truyện đang chờ duyệt, chỉ tác giả và ban quản trị thấy…").
+- Bảng Truyện: trạng thái duyệt là ô lọc riêng "Duyệt" (`?review=pending|rejected`) thay vì thêm vào nhóm nút "Hiển thị" (6 nút làm tràn ngang màn 375px).
+- Tổng quan: thêm ô "Truyện chờ duyệt" thành 9 ô nên lưới đổi sang 3 ô mỗi hàng từ màn `md`.
+- Quản trị viên chỉ đọc thẳng được truyện đang chờ duyệt; truyện bị từ chối chỉ thấy qua `admin_stories` (hàng chờ, tab "Bị từ chối").
 
 ## Context
 
