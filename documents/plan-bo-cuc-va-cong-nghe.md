@@ -182,6 +182,7 @@ Thiết kế chi tiết (bảng, luật nghiệp vụ, RLS, RPC, storage, bảng
 5e. **Trả lời và kiểm duyệt bình luận** ✅ (30/09/2026, chi tiết ở `plan-tra-loi-va-kiem-duyet-binh-luan.md`): trả lời bình luận một cấp, báo cáo bình luận, trang `/admin/comments`.
 5f. **SEO và xem trước link** ✅ (30/09/2026, chi tiết ở `plan-seo-va-xem-truoc-link.md`): thẻ canonical + Open Graph, hàm `api/meta` chèn thẻ cho bot, `sitemap.xml`, `robots.txt`.
 5g. **Lọc, sắp xếp, phân trang cho bảng quản trị** ✅ (01/10/2026, chi tiết ở `plan-bang-quan-tri-loc-sap-xep.md`): bấm tiêu đề cột để sắp xếp, ô lọc theo từng bảng, chọn 10/20/50/100 dòng, sửa cột bị khuất và chữ đè cột.
+5h. **Duyệt truyện** ✅ (01/10/2026, chi tiết ở `plan-duyet-truyen.md`): truyện của tác giả phải được quản trị viên duyệt mới công khai; hàng chờ `/admin/reviews`, trạng thái chờ duyệt / bị từ chối trong khu Sáng tác.
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---

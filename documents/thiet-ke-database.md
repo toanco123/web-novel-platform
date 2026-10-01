@@ -42,7 +42,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 |---|---|---|
 | `profiles` | `id` (= `auth.users.id`), `display_name` (1–30), `avatar_url` | Trigger tạo khi có tài khoản mới. Tên lấy lần lượt từ `display_name` của form đăng ký, `full_name`/`name` (Google, Facebook), rồi phần trước @ của email |
 | `genres` | `slug` (khóa chính), `name` (2–30), `description` (≤200), `created_by` | `slug` luôn = `slugify(name)` do trigger đặt, nên tạo trùng là lỗi `23505` |
-| `stories` | `id`, `owner_id`, `slug` (unique, không đổi), `title` (2–120), `description` (≤3000), `status`, `visibility`, `cover_path`, `search_title` (tự sinh), `created_at`, `updated_at`, `published_at` | `updated_at` = lần sửa gần nhất của tác giả, kể cả sửa chương (sắp xếp khu Sáng tác). `published_at` = lần đầu công khai |
+| `stories` | `id`, `owner_id`, `slug` (unique, không đổi), `title` (2–120), `description` (≤3000), `status`, `visibility`, `cover_path`, `search_title` (tự sinh), `created_at`, `updated_at`, `published_at`, `review_status`, `review_submitted_at`, `reviewed_at`, `review_reason` (1–500, chỉ có khi `rejected`) | `updated_at` = lần sửa gần nhất của tác giả, kể cả sửa chương (sắp xếp khu Sáng tác). `published_at` = lần đầu công khai. `review_status` null = chưa gửi duyệt (hoặc bị gỡ); chỉ truyện `approved` mới công khai được (quản trị viên miễn duyệt, plan `plan-duyet-truyen.md`) |
 | `story_genres` | `story_id`, `genre_slug`, `position` | Tối đa 5 thể loại (`too_many_genres`) |
 | `chapters` | `id`, `story_id`, `number` (1–99999), `title` (≤120), `content` (1–200 000), `status`, `created_at`, `updated_at`, `published_at` | `published_at` = lần đầu xuất bản, ẩn rồi xuất bản lại vẫn giữ mốc cũ. `content` là HTML rút gọn của trình soạn hoặc văn bản thuần kiểu cũ; client giới hạn 100 000 ký tự chữ nhìn thấy, DB cho tới 200 000 vì có thẻ định dạng (`documents/plan-trinh-soan-dinh-dang.md`) |
 | `story_stats` | `chapter_count`, `first_chapter_number`, `latest_chapter_number`, `latest_chapter_title`, `last_chapter_at`, `view_count`, `follower_count`, `rating_counts int[5]`, `rating_count`, `rating_sum`, `rating_avg` | Các cột về chương chỉ tính chương đã xuất bản. `rating_*` tự sinh từ `rating_counts`; `rating_avg` = 0 khi chưa có lượt chấm |
@@ -59,6 +59,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 **Enum:**
 - `story_status`: `ongoing` \| `completed`
 - `publication_status`: `draft` \| `published`, dùng chung cho `stories.visibility` và `chapters.status`
+- `review_status`: `pending` \| `approved` \| `rejected` (`stories.review_status`)
 - `report_reason`: `typo` \| `missing` \| `order` \| `violation` \| `other`
 - `report_status`: `open` \| `resolved`
 - `contact_topic`: `general` \| `bug` \| `copyright` \| `partnership`
@@ -68,7 +69,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | Mã | Khi nào | Map sang |
 |---|---|---|
 | `no_published_chapters` | Công khai truyện chưa có chương nào đã xuất bản | `StudioError('no_published_chapters')` |
-| `last_published_chapter` | Ẩn hoặc xóa chương công khai cuối cùng của truyện đang công khai | `StudioError('last_published_chapter')` |
+| `last_published_chapter` | Ẩn hoặc xóa chương công khai cuối cùng của truyện đang công khai hoặc đang chờ duyệt | `StudioError('last_published_chapter')` |
 | `chapter_number_locked` | Đổi số của chương đã từng xuất bản | `StudioError('chapter_number_locked')` |
 | `too_many_genres` | Chọn quá 5 thể loại | `StudioError('too_many_genres')` ("Chọn tối đa 5 thể loại."); form cũng chặn trước |
 | `not_found` | RPC không thấy truyện, hoặc truyện không phải của mình | `StudioError('not_found')` |
@@ -81,7 +82,10 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `cannot_ban_self`, `cannot_ban_admin` | Admin tự khóa mình / khóa admin khác | `AdminError` |
 | `genre_exists`, `same_genre` | Đổi tên thể loại trùng thể loại khác / gộp thể loại vào chính nó | `AdminError` |
 | `too_many_curated` | Chọn quá 8 truyện nổi bật / 12 truyện đề cử cho trang chủ | `AdminError` |
-| `story_taken_down` | Tác giả công khai lại truyện đang bị admin gỡ | `StudioError('story_taken_down')` |
+| `story_taken_down` | Tác giả công khai lại (hoặc gửi duyệt) truyện đang bị admin gỡ | `StudioError('story_taken_down')` |
+| `story_not_approved` | Người không phải quản trị viên công khai truyện chưa được duyệt (trigger `stories_require_review`) | `StudioError('story_not_approved')` |
+| `already_pending`, `already_approved` | Gửi duyệt truyện đang chờ duyệt / đã được duyệt | `StudioError` |
+| `not_pending`, `reason_required` | Admin duyệt/từ chối truyện không còn chờ duyệt / từ chối không ghi lý do | `AdminError` |
 | `story_limit`, `chapter_limit` | Vượt hạn mức tác giả mỗi ngày (bảng dưới) | `StudioError('story_limit' / 'chapter_limit')` |
 | `invalid_avatar_url` | Đặt `profiles.avatar_url` không phải ảnh trong thư mục `avatars/{uid}/` của mình (chỉ xảy ra khi gọi thẳng API) | Lỗi chung |
 | `23505` (unique) | Trùng số chương / trùng thể loại | `chapter_exists` / `GenreExistsError` |
@@ -129,9 +133,9 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 |---|---|---|
 | `profiles` | mọi người | chủ sửa `display_name`, `avatar_url` |
 | `genres` | mọi người | người đã đăng nhập thêm mới (`name`, `description`) |
-| `stories` | truyện công khai, cộng truyện nháp của chính mình | chủ truyện. Insert được: `slug, title, description, status, cover_path`. Update được: `title, description, status, visibility, cover_path` |
+| `stories` | truyện công khai, cộng truyện nháp của chính mình; quản trị viên thấy thêm truyện chờ duyệt | chủ truyện. Insert được: `slug, title, description, status, cover_path`. Update được: `title, description, status, visibility, cover_path` (công khai chỉ khi đã duyệt; cột duyệt chỉ ghi qua RPC) |
 | `story_genres`, `story_stats`, `chapter_views`, `curated_stories` | ai thấy truyện thì thấy | `story_genres`: chủ truyện. Ba bảng còn lại: không ai ghi từ client |
-| `chapters` | chương đã xuất bản của truyện công khai; chủ truyện thấy cả nháp | chủ truyện. Insert được: `story_id, number, title, content, status`. Update được: `number, title, content, status` |
+| `chapters` | chương đã xuất bản của truyện công khai (quản trị viên: cả của truyện chờ duyệt); chủ truyện thấy cả nháp | chủ truyện. Insert được: `story_id, number, title, content, status`. Update được: `number, title, content, status` |
 | `follows`, `reading_history`, `ratings` | chỉ chủ | chỉ chủ |
 | `comments` | ai thấy truyện thì thấy | viết: người đã đăng nhập, vào truyện công khai hoặc chương đã xuất bản (cột `parent_id` được cấp quyền insert). Xóa: chính người viết; quản trị viên xóa qua `admin_delete_comment` |
 | `chapter_reports` | người gửi và chủ truyện | gửi: người đã đăng nhập, cho chương đã xuất bản. Đổi trạng thái: chủ truyện. Sửa ghi chú (khi báo lại): người gửi |
@@ -142,7 +146,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 - Policy dùng `(select auth.uid())` và ghi rõ `to anon` / `to authenticated`.
 - Hàm `security definer` đặt ở schema `private` (không lộ ra API) và luôn có `set search_path = ''`.
   - Hàm quyền cao mà khách cũng cần gọi (hiện chỉ có `record_chapter_view`) chia làm hai: `public.record_chapter_view` là lớp vỏ `security invoker`, gọi sang `private.record_chapter_view` (definer).
-  - `anon`/`authenticated` có USAGE trên `private`, nhưng chỉ được EXECUTE đúng hàm đó.
+  - `anon`/`authenticated` có USAGE trên `private`, nhưng chỉ được EXECUTE đúng hàm đó (và `private.is_admin()`, chỉ đọc JWT của người gọi, dùng trong policy và trigger duyệt truyện).
   - Các RPC quản trị (`admin_overview`, `admin_users`, `admin_stories`) cũng làm như vậy (cần đọc `auth.users` và truyện nháp của mọi người); chỉ `authenticated` được EXECUTE, và hàm ở `private` tự kiểm tra `private.is_admin()`.
 - **Quản trị viên** = `auth.users.raw_app_meta_data.role = 'admin'` (có trong JWT, người dùng không tự sửa được). Cách cấp quyền ở mục 10.
 - Sau mỗi migration chạy `supabase db advisors --linked`. Không được còn cảnh báo mức WARN; "unused index" (INFO) khi DB còn ít dữ liệu thì bỏ qua được.
@@ -159,7 +163,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 
 | Hàm | Ai gọi được | Việc |
 |---|---|---|
-| `create_story(title, description, status, genres[], cover_path?, first_chapter?, publish?)` | đã đăng nhập | Tạo truyện, thể loại và chương đầu trong một transaction; trả về dòng `studio_stories`. `first_chapter` = `{"number"?, "title", "content"}`. Slug trùng thì thêm `-2`, `-3`… |
+| `create_story(title, description, status, genres[], cover_path?, first_chapter?, publish?)` | đã đăng nhập | Tạo truyện, thể loại và chương đầu trong một transaction; trả về dòng `studio_stories`. `first_chapter` = `{"number"?, "title", "content"}`. Slug trùng thì thêm `-2`, `-3`… `publish`: xuất bản chương đầu, rồi tác giả thì gửi duyệt, quản trị viên thì công khai |
+| `submit_story_for_review(story_id)` | chủ truyện | Gửi duyệt / gửi lại sau khi bị từ chối (`pending`). Lỗi: `not_found`, `story_taken_down`, `already_pending`, `already_approved`, `no_published_chapters` |
 | `update_story(id, title, description, status, genres[], cover_path?)` | đã đăng nhập | Sửa truyện và thay thể loại cùng lúc |
 | `studio_story_stats(story_id)` | chủ truyện | jsonb giống kiểu `StoryStats` |
 | `record_chapter_view(slug, number)` | mọi người | +1 lượt đọc (bỏ qua chủ truyện, chương chưa xuất bản và lượt lặp lại trong ngày) |
@@ -176,11 +181,12 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `slugify(text)` | mọi người | Giống `src/lib/slugify.ts` |
 | `admin_overview(days)` | quản trị viên | jsonb giống kiểu `AdminOverview`: tổng số, chuỗi theo ngày (người dùng mới, lượt đọc, truyện mới, chương mới; giờ Việt Nam), truyện theo thể loại, top 10 lượt đọc |
 | `admin_users(query?)` | quản trị viên | Mọi tài khoản kèm email, provider, lần đăng nhập cuối, số truyện/bình luận/theo dõi; tìm tên/email không dấu |
-| `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp, kèm trạng thái gỡ. `sort`: `updated` \| `views` \| `created` |
+| `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp, kèm trạng thái gỡ, bút danh, thể loại và trạng thái duyệt (hàng chờ `/admin/reviews` lọc `review_status`). `sort`: `updated` \| `views` \| `created` |
+| `admin_review_story(story_id, approve, reason)` | quản trị viên | Truyện đang `pending`: duyệt (thành `approved` và công khai luôn) hoặc từ chối (`rejected`, bắt buộc lý do) |
 | `admin_contact_messages(status?, query?)`, `admin_set_contact_handled(id, handled)` | quản trị viên | Hộp thư liên hệ (`status`: `open` \| `handled`; `query`: tìm không dấu theo tên, email, nội dung) |
 | `admin_reports(status?, query?)`, `admin_set_report_status(id, status)` | quản trị viên | Báo lỗi chương của mọi truyện (`query`: tìm không dấu theo tên truyện, ghi chú, người báo) |
 | `admin_set_user_banned(user_id, banned)` | quản trị viên | `auth.users.banned_until = 'infinity'` / `null`; khóa thì xóa `auth.sessions` |
-| `admin_set_story_takedown(story_id, reason)` | quản trị viên | Gỡ truyện: về nháp + `taken_down_at`, `takedown_reason`; `reason` rỗng là khôi phục |
+| `admin_set_story_takedown(story_id, reason)` | quản trị viên | Gỡ truyện: về nháp + `taken_down_at`, `takedown_reason`, xóa trạng thái duyệt; `reason` rỗng là khôi phục (tác giả gửi duyệt lại) |
 | `admin_update_genre(slug, name, description)`, `admin_delete_genre(slug)`, `admin_merge_genres(from, into)` | quản trị viên | Sửa (slug đổi theo tên), xóa, gộp thể loại |
 | `admin_comments(query, reported)`, `admin_delete_comment(id)`, `admin_dismiss_comment_reports(comment_id)` | quản trị viên | Danh sách bình luận kèm các báo cáo đang mở (`reported = true`: chỉ bình luận bị báo cáo, báo cáo mới nhất trước); xóa bình luận bất kỳ (trả lời và báo cáo mất theo); đóng các báo cáo đang mở |
 | `admin_curated(list)`, `admin_set_curated(list, story_ids[])` | quản trị viên | Đọc danh sách truyện chọn tay (kể cả truyện đang ẩn) và thay cả danh sách theo thứ tự đưa vào. Tối đa 8 truyện nổi bật, 12 truyện đề cử |
@@ -234,6 +240,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | studio | `getMyStories`, `getMyStory` | `studio_stories` (`order('updated_at', desc)` / `.eq('id')`) |
 | studio | `createStory`, `updateStory` | Upload bìa (nếu có), rồi `rpc('create_story' / 'update_story')` |
 | studio | `publishStory`, `unpublishStory`, `deleteStory` | `update stories set visibility` / `delete`, rồi xóa file bìa |
+| studio | `submitStoryForReview` | `rpc('submit_story_for_review')`, rồi đọc lại `studio_stories` |
 | studio | `getMyChapters`, `getMyChapter`, `saveChapter`, `setChapterStatus`, `deleteChapter` | Thao tác thẳng trên `chapters` (chủ truyện thấy cả nháp). Luật số chương và chương công khai cuối do trigger lo |
 | studio | `importChapters` | Một lần `chapters.insert([...])`, đánh số tiếp từ số lớn nhất hiện có |
 | studio | `getStoryStats` | `rpc('studio_story_stats')` |
@@ -254,8 +261,9 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | feedback | `sendContactMessage` | `contact_messages.insert(...)` (không gọi `.select()`) |
 | feedback | `reportChapter` | `rpc('report_chapter')` |
 | admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |
-| admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports`, `getAdminComments` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports' / 'admin_comments', {...}, { count: 'exact' })`, rồi lọc (`.eq()`, `.gt()`, `.not('taken_down_at', 'is', null)`) và sắp xếp (`.order(cột, { nullsFirst: false }).order('id')`) bằng PostgREST ngay trên kết quả của hàm, `.range()` qua `loadPage`. Số dòng mỗi trang: `adminPageSize()` (10 / 20 / 50 / 100) |
+| admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports`, `getAdminComments` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports' / 'admin_comments', {...}, { count: 'exact' })`, rồi lọc (`.eq()`, `.gt()`, `.not('taken_down_at', 'is', null)`) và sắp xếp (`.order(cột, { nullsFirst: false }).order('id')`) bằng PostgREST ngay trên kết quả của hàm, `.range()` qua `loadPage`. Hàng chờ duyệt: `getAdminStories({ review })` → `.eq('review_status', …)`, sắp theo `review_submitted_at`. Số dòng mỗi trang: `adminPageSize()` (10 / 20 / 50 / 100) |
 | admin | `setMessageHandled`, `setAdminReportStatus`, `setUserBanned`, `setStoryTakedown`, `updateGenre`, `deleteGenre`, `mergeGenres` | RPC `admin_*` cùng tên (mục 6) |
+| admin | `reviewStory` | `rpc('admin_review_story', { p_story_id, p_approve, p_reason })` |
 | admin | `getAdminComments`, `deleteAdminComment`, `dismissCommentReports` | `rpc('admin_comments', { p_query, p_reported }, { count: 'exact' }).range()` qua `loadPage` / `rpc('admin_delete_comment')` / `rpc('admin_dismiss_comment_reports')` |
 | admin | `getCuratedStories`, `setCuratedStories` | `rpc('admin_curated', { p_list })` / `rpc('admin_set_curated', { p_list, p_story_ids })` |
 | admin | nhập truyện hàng loạt | Không có RPC riêng: `features/admin/bulkImport.ts` gọi `createStory` (kèm `p_author_name`) → `importChapters` → `publishStory` của studio |
@@ -280,7 +288,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
   - Bật Google/Facebook.
   - Mẫu email tiếng Việt.
 - ~~**Chống spam**~~ (xong 28/09/2026: giới hạn ở mục 4). Còn có thể thêm captcha (Cloudflare Turnstile) cho form liên hệ và đăng ký nếu vẫn bị spam.
-- **Vai trò quản trị:** trang `/admin` có tổng quan, người dùng (khóa/mở khóa), truyện (gỡ/khôi phục), hộp thư, báo lỗi, thể loại, nhập truyện hàng loạt, chọn truyện cho trang chủ, kiểm duyệt bình luận (plan: `plan-trang-quan-tri.md`, `plan-cong-cu-admin.md`, `plan-tra-loi-va-kiem-duyet-binh-luan.md`).
+- **Vai trò quản trị:** trang `/admin` có tổng quan, người dùng (khóa/mở khóa), truyện (gỡ/khôi phục), duyệt truyện (`/admin/reviews`), hộp thư, báo lỗi, thể loại, nhập truyện hàng loạt, chọn truyện cho trang chủ, kiểm duyệt bình luận (plan: `plan-trang-quan-tri.md`, `plan-cong-cu-admin.md`, `plan-tra-loi-va-kiem-duyet-binh-luan.md`).
   - Cấp quyền (chạy trong SQL editor hoặc `supabase db query --linked`), rồi người đó đăng xuất và đăng nhập lại để JWT có vai trò mới:
     `update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role": "admin"}' where email = '...';`
   - Thu hồi: `raw_app_meta_data - 'role'`. JWT cũ vẫn còn quyền tới khi hết hạn (mặc định 1 giờ).

@@ -7,7 +7,13 @@ import { loadViews, ratingsOf, totalViews } from './activity'
 import { mockChapterContent } from './chapterContent'
 import { mockChapters } from './chapters'
 import { genres as seedGenres, stories as seedStories } from './stories'
-import { loadChapters, loadUserGenres, loadUserStories, type StoredStory } from './userContent'
+import {
+  loadChapters,
+  loadUserGenres,
+  loadUserStories,
+  storyReview,
+  type StoredStory,
+} from './userContent'
 
 export function allGenres(): Genre[] {
   return [...seedGenres, ...loadUserGenres().map(({ createdAt: _createdAt, ...g }) => g)]
@@ -56,20 +62,25 @@ export function toStory(stored: StoredStory, genres = allGenres(), views = loadV
 }
 
 /**
- * Truyện người xem được thấy: truyện công khai, cộng truyện nháp của chính họ (để xem trước).
- * viewerId = null: người lạ / chưa đăng nhập.
+ * Truyện người xem được thấy: truyện công khai, cộng truyện nháp của chính họ (để xem trước); quản
+ * trị viên thấy thêm truyện đang chờ duyệt (đọc trước khi duyệt). viewerId = null: người lạ.
  */
-export function catalog(viewerId: string | null = null): Story[] {
+export function catalog(viewerId: string | null = null, isAdmin = false): Story[] {
   const genres = allGenres()
   const views = loadViews()
   const mine = loadUserStories()
-    .filter((s) => s.visibility === 'published' || s.owner.id === viewerId)
+    .filter(
+      (s) =>
+        s.visibility === 'published' ||
+        s.owner.id === viewerId ||
+        (isAdmin && storyReview(s)?.status === 'pending'),
+    )
     .map((s) => toStory(s, genres, views))
   return [...seedStories, ...mine]
 }
 
-export const findStory = (slug: string, viewerId: string | null = null) =>
-  catalog(viewerId).find((s) => s.slug === slug) ?? null
+export const findStory = (slug: string, viewerId: string | null = null, isAdmin = false) =>
+  catalog(viewerId, isAdmin).find((s) => s.slug === slug) ?? null
 
 /** Mọi slug đã dùng (kể cả truyện nháp của người khác) để tránh trùng đường dẫn */
 export const takenStorySlugs = () =>

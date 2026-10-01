@@ -73,7 +73,7 @@ export async function getNewReleases(limit = 6): Promise<Story[]> {
 export async function getStory(slug: string): Promise<Story | null> {
   await delay()
   const viewer = await getSession()
-  return findStory(slug, viewer?.id ?? null)
+  return findStory(slug, viewer?.id ?? null, viewer?.isAdmin)
 }
 
 export async function getStoriesByAuthor(authorSlug: string, excludeSlug?: string) {

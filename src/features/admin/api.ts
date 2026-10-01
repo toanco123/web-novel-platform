@@ -22,6 +22,7 @@ export const {
   dismissCommentReports,
   setUserBanned,
   setStoryTakedown,
+  reviewStory,
   updateGenre,
   deleteGenre,
   mergeGenres,

@@ -114,6 +114,10 @@ const studioRow = (over: object = {}) => ({
   views: 0,
   followers: 0,
   open_reports: 0,
+  review_status: null,
+  review_submitted_at: null,
+  reviewed_at: null,
+  review_reason: null,
   ...over,
 })
 const chapterRow = (number: number, over: object = {}) => ({
@@ -257,6 +261,7 @@ test('tạo truyện: một lần RPC, tên gọn khoảng trắng, chương đ�
     followers: 0,
     openReports: 0,
     takedown: null,
+    review: null,
     authorName: null,
   })
 
@@ -494,4 +499,34 @@ test('mở lại báo lỗi khi bạn đọc đã gửi lại đúng báo lỗi 
 
   fake.responses = [own(), ok([{ id: reportId }])]
   await api.setReportStatus(STORY_ID, reportId, 'resolved')
+})
+
+test('gửi duyệt: gọi RPC rồi đọc lại truyện; trạng thái duyệt và mã lỗi mới', async () => {
+  fake.responses = [
+    ok(null),
+    ok(studioRow({ review_status: 'pending', review_submitted_at: TIME })),
+  ]
+  const story = await api.submitStoryForReview(STORY_ID)
+  expect(fake.queries.at(-2)![0]).toEqual([
+    'rpc',
+    'submit_story_for_review',
+    { p_story_id: STORY_ID },
+  ])
+  expect(story.review).toEqual({
+    status: 'pending',
+    submittedAt: TIME,
+    reviewedAt: null,
+    reason: null,
+  })
+
+  fake.responses = [business('already_pending')]
+  await expect(api.submitStoryForReview(STORY_ID)).rejects.toMatchObject({
+    name: 'StudioError',
+    code: 'already_pending',
+  })
+  fake.responses = [business('story_not_approved')]
+  await expect(api.publishStory(STORY_ID)).rejects.toMatchObject({ code: 'story_not_approved' })
+  await expect(api.submitStoryForReview('khong-phai-uuid')).rejects.toMatchObject({
+    code: 'not_found',
+  })
 })

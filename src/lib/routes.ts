@@ -45,6 +45,7 @@ export const paths = {
   /** ownerId: chỉ hiện truyện của một người dùng */
   adminStories: (ownerId?: string) =>
     ownerId ? `/admin/stories?owner=${encodeURIComponent(ownerId)}` : '/admin/stories',
+  adminReviews: '/admin/reviews',
   adminInbox: '/admin/inbox',
   adminReports: '/admin/reports',
   /** Kiểm duyệt bình luận (mặc định: bình luận đang bị báo cáo) */

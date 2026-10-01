@@ -2,7 +2,7 @@
 import type { ContactTopic } from '@/features/feedback/schemas'
 import type { CommentReportReason } from '@/types/comment'
 import type { ReportReason, ReportStatus } from '@/types/report'
-import type { CuratedList, StoryStatus, StoryVisibility } from '@/types/story'
+import type { CuratedList, StoryReview, StoryStatus, StoryVisibility } from '@/types/story'
 
 /** Số dòng mỗi trang mặc định của các bảng quản trị */
 export const ADMIN_PAGE_SIZE = 20
@@ -35,6 +35,8 @@ export type AdminOverview = {
     reportedComments: number
     unhandledMessages: number
     bannedUsers: number
+    /** Số truyện đang chờ duyệt */
+    pendingReviews: number
   }
   /** Mỗi ngày trong kỳ (cũ trước), day dạng 2026-09-25 */
   days: { day: string; signups: number; views: number; stories: number; chapters: number }[]
@@ -95,9 +97,24 @@ export type AdminStory = {
   updatedAt: string
   /** Bị admin gỡ (về nháp, tác giả không tự công khai lại được); null: bình thường */
   takedown: StoryTakedown | null
+  /** Trạng thái duyệt; truyện có sẵn của bản giả luôn là đã duyệt */
+  review: StoryReview | null
+  /** Bút danh; null: hiển thị tên tài khoản */
+  authorName: string | null
+  genreSlugs: string[]
 }
 
 export type StoryTakedown = { at: string; reason: string }
+
+/** Độ dài tối đa của lý do từ chối (cột stories.review_reason) */
+export const REVIEW_REASON_MAX = 500
+
+export type ReviewInput = {
+  storyId: string
+  /** true: duyệt và công khai luôn; false: từ chối (bắt buộc lý do) */
+  approve: boolean
+  reason?: string | null
+}
 
 // Cột sắp xếp được của từng bảng (giá trị ?sort= trên URL). Không kèm order thì giảm dần.
 
@@ -135,6 +152,7 @@ export const ADMIN_STORY_SORTS = [
   'reports',
   'created',
   'updated',
+  'submitted',
 ] as const
 export type AdminStorySort = (typeof ADMIN_STORY_SORTS)[number]
 
@@ -145,6 +163,8 @@ export type AdminStoryQuery = {
   status?: StoryStatus
   /** Chỉ truyện đang có báo lỗi chương chưa xử lý */
   hasReports?: boolean
+  /** Trạng thái duyệt (hàng chờ /admin/reviews và bộ lọc "Duyệt" của bảng Truyện) */
+  review?: 'pending' | 'rejected'
   ownerId?: string
   /** Mặc định: updated, giảm dần */
   sort?: AdminStorySort
@@ -282,6 +302,8 @@ export type AdminErrorCode =
   | 'same_genre'
   | 'builtin_genre'
   | 'too_many_curated'
+  | 'not_pending'
+  | 'reason_required'
 
 const adminMessages: Record<AdminErrorCode, string> = {
   forbidden: 'Chỉ quản trị viên mới xem được trang này.',
@@ -293,6 +315,9 @@ const adminMessages: Record<AdminErrorCode, string> = {
   builtin_genre:
     'Bản thử nghiệm không sửa được thể loại có sẵn, chỉ sửa được thể loại do người dùng tạo.',
   too_many_curated: 'Danh sách này đã đủ số truyện. Bỏ bớt một truyện rồi thêm lại.',
+  not_pending:
+    'Truyện này không còn chờ duyệt. Có thể quản trị viên khác vừa xử lý hoặc truyện vừa bị gỡ.',
+  reason_required: 'Nhập lý do từ chối để tác giả biết cần sửa gì.',
 }
 
 export const isAdminErrorCode = (code: string): code is AdminErrorCode =>

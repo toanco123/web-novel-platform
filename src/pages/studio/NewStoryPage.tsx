@@ -16,6 +16,8 @@ export default function NewStoryPage() {
   // ?genre=ngon-tinh (từ nút "Đăng truyện" ở trang thể loại): chọn sẵn nếu thể loại có thật
   const preset = params.get('genre')
   const presetGenres = genres.data?.some((g) => g.slug === preset) ? [preset!] : []
+  // Quản trị viên miễn duyệt: đăng là công khai luôn
+  const isAdmin = !!user?.isAdmin
 
   // Chờ danh sách thể loại để form khởi tạo đúng giá trị chọn sẵn
   if (preset && genres.isPending) return <div className="h-96 animate-pulse rounded-xl bg-muted" />
@@ -28,8 +30,10 @@ export default function NewStoryPage() {
       />
       <h1 className="font-heading text-4xl font-semibold">Đăng truyện mới</h1>
       <p className="mt-1 mb-8 max-w-prose text-muted-foreground">
-        Điền thông tin truyện và viết luôn chương đầu tiên nếu muốn. "Lưu nháp" để viết tiếp sau,
-        "Đăng truyện" để công khai ngay.
+        Điền thông tin truyện và viết luôn chương đầu tiên nếu muốn. "Lưu nháp" để viết tiếp sau,{' '}
+        {isAdmin
+          ? '"Đăng truyện" để công khai ngay.'
+          : '"Đăng và gửi duyệt" để xuất bản chương đầu và gửi truyện cho ban quản trị duyệt (duyệt xong truyện mới công khai).'}
       </p>
       <StoryForm
         defaultValues={{
@@ -42,6 +46,7 @@ export default function NewStoryPage() {
         }}
         authorName={user?.displayName ?? ''}
         firstChapter
+        publishLabel={isAdmin ? 'Đăng truyện' : 'Đăng và gửi duyệt'}
         submitLabel="Lưu nháp"
         pendingLabel="Đang lưu…"
         pending={create.isPending}

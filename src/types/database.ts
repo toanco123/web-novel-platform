@@ -533,6 +533,10 @@ export type Database = {
           id: string
           owner_id: string
           published_at: string | null
+          review_reason: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
+          review_submitted_at: string | null
+          reviewed_at: string | null
           search_title: string | null
           slug: string
           status: Database["public"]["Enums"]["story_status"]
@@ -550,6 +554,10 @@ export type Database = {
           id?: string
           owner_id?: string
           published_at?: string | null
+          review_reason?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
+          review_submitted_at?: string | null
+          reviewed_at?: string | null
           search_title?: string | null
           slug: string
           status?: Database["public"]["Enums"]["story_status"]
@@ -567,6 +575,10 @@ export type Database = {
           id?: string
           owner_id?: string
           published_at?: string | null
+          review_reason?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
+          review_submitted_at?: string | null
+          reviewed_at?: string | null
           search_title?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["story_status"]
@@ -781,6 +793,10 @@ export type Database = {
           owner_name: string | null
           published_at: string | null
           published_count: number | null
+          review_reason: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
+          review_submitted_at: string | null
+          reviewed_at: string | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
           takedown_reason: string | null
@@ -876,6 +892,10 @@ export type Database = {
           story_visibility: Database["public"]["Enums"]["publication_status"]
         }[]
       }
+      admin_review_story: {
+        Args: { p_approve: boolean; p_reason: string; p_story_id: string }
+        Returns: undefined
+      }
       admin_set_contact_handled: {
         Args: { p_handled: boolean; p_id: number }
         Returns: undefined
@@ -907,10 +927,12 @@ export type Database = {
           p_visibility?: Database["public"]["Enums"]["publication_status"]
         }
         Returns: {
+          author_name: string
           chapter_count: number
           comment_count: number
           created_at: string
           follower_count: number
+          genre_slugs: string[]
           id: string
           open_reports: number
           owner_id: string
@@ -918,6 +940,10 @@ export type Database = {
           published_count: number
           rating_avg: number
           rating_count: number
+          review_reason: string
+          review_status: Database["public"]["Enums"]["review_status"]
+          review_submitted_at: string
+          reviewed_at: string
           slug: string
           status: Database["public"]["Enums"]["story_status"]
           takedown_reason: string
@@ -988,6 +1014,10 @@ export type Database = {
           owner_name: string | null
           published_at: string | null
           published_count: number | null
+          review_reason: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
+          review_submitted_at: string | null
+          reviewed_at: string | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
           takedown_reason: string | null
@@ -1100,6 +1130,10 @@ export type Database = {
         }[]
       }
       studio_story_stats: { Args: { p_story_id: string }; Returns: Json }
+      submit_story_for_review: {
+        Args: { p_story_id: string }
+        Returns: undefined
+      }
       update_story: {
         Args: {
           p_author_name?: string
@@ -1125,6 +1159,10 @@ export type Database = {
           owner_name: string | null
           published_at: string | null
           published_count: number | null
+          review_reason: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
+          review_submitted_at: string | null
+          reviewed_at: string | null
           slug: string | null
           status: Database["public"]["Enums"]["story_status"] | null
           takedown_reason: string | null
@@ -1148,6 +1186,7 @@ export type Database = {
       publication_status: "draft" | "published"
       report_reason: "typo" | "missing" | "order" | "violation" | "other"
       report_status: "open" | "resolved"
+      review_status: "pending" | "approved" | "rejected"
       story_status: "ongoing" | "completed"
     }
     CompositeTypes: {
@@ -1281,6 +1320,7 @@ export const Constants = {
       publication_status: ["draft", "published"],
       report_reason: ["typo", "missing", "order", "violation", "other"],
       report_status: ["open", "resolved"],
+      review_status: ["pending", "approved", "rejected"],
       story_status: ["ongoing", "completed"],
     },
   },

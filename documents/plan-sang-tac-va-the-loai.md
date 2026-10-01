@@ -6,7 +6,7 @@ Hiện web chỉ đọc được truyện có sẵn (mảng giả trong `src/moc
 Đã chốt với người dùng:
 - **Thể loại:** user đã đăng nhập tạo được, hiện ngay, hệ thống chặn trùng tên (kể cả khác dấu/hoa thường).
 - **Nội dung chương:** vừa soạn từng chương trên web, vừa tải file `.txt` tự tách chương (xem trước rồi mới lưu).
-- **Duyệt:** không cần admin. Truyện/chương mới là **bản nháp** chỉ tác giả thấy; bấm **Xuất bản** thì công khai ngay.
+- **Duyệt:** không cần admin. Truyện/chương mới là **bản nháp** chỉ tác giả thấy; bấm **Xuất bản** thì công khai ngay. *(Đã đổi 01/10/2026: truyện của tác giả cần quản trị viên duyệt mới công khai, xem `plan-duyet-truyen.md`.)*
 - **Ảnh bìa:** tải ảnh lên (không bắt buộc), tự cắt khung 2:3; không có thì dùng bìa chữ tự sinh.
 
 Vẫn giữ quy tắc dự án: làm UI với **dữ liệu giả** (`localStorage`), mọi đọc/ghi đi qua `features/<x>/api.ts`; khi nối Supabase chỉ thay ruột api.

@@ -25,6 +25,7 @@ import {
   type AdminUser,
   type AdminUserQuery,
   type CuratedStory,
+  type ReviewInput,
   type SortOrder,
 } from './shared'
 
@@ -110,6 +111,7 @@ const storySortColumns = {
   reports: 'open_reports',
   created: 'created_at',
   updated: 'updated_at',
+  submitted: 'review_submitted_at',
 } as const
 
 export async function getAdminStories({
@@ -117,6 +119,7 @@ export async function getAdminStories({
   visibility,
   status,
   hasReports,
+  review,
   ownerId,
   sort = 'updated',
   order,
@@ -140,6 +143,7 @@ export async function getAdminStories({
     if (visibility === 'takedown') query = query.not('taken_down_at', 'is', null)
     if (status) query = query.eq('status', status)
     if (hasReports) query = query.gt('open_reports', 0)
+    if (review) query = query.eq('review_status', review)
     return query
       .order(storySortColumns[sort], direction(order))
       .order('updated_at', { ascending: false })
@@ -170,6 +174,17 @@ export async function getAdminStories({
         r.taken_down_at && r.takedown_reason
           ? { at: r.taken_down_at, reason: r.takedown_reason }
           : null,
+      // Kiểu sinh ra của hàm trả bảng không có null, nhưng cột duyệt và bút danh có thể trống
+      review: r.review_status
+        ? {
+            status: r.review_status,
+            submittedAt: r.review_submitted_at ?? null,
+            reviewedAt: r.reviewed_at ?? null,
+            reason: r.review_reason ?? null,
+          }
+        : null,
+      authorName: r.author_name ?? null,
+      genreSlugs: r.genre_slugs ?? [],
     })),
   }
 }
@@ -335,6 +350,21 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
     await db().rpc('admin_set_story_takedown', {
       p_story_id: storyId,
       // Kiểu sinh ra đòi string; RPC coi chuỗi rỗng là khôi phục
+      p_reason: reason?.trim() ?? '',
+    }),
+    adminError,
+  )
+}
+
+/** Duyệt (công khai luôn) hoặc từ chối (kèm lý do) truyện đang chờ duyệt */
+export async function reviewStory({ storyId, approve, reason }: ReviewInput) {
+  await requireUserId()
+  if (!isUuid(storyId)) throw new AdminError('not_found')
+  unwrap(
+    await db().rpc('admin_review_story', {
+      p_story_id: storyId,
+      p_approve: approve,
+      // Kiểu sinh ra đòi string; RPC coi chuỗi rỗng là không có lý do
       p_reason: reason?.trim() ?? '',
     }),
     adminError,

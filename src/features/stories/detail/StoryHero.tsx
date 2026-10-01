@@ -28,7 +28,10 @@ export function StoryHero({ story }: { story: Story }) {
       {story.visibility === 'draft' && (
         <p className="flex items-center justify-center gap-2 bg-[#d9a68f] px-4 py-2 text-center text-sm font-medium text-[#1a0f1d]">
           <EyeOff className="size-4 shrink-0" aria-hidden />
-          Bản nháp, chỉ bạn thấy trang này. Xuất bản trong khu Sáng tác để mọi người đọc được.
+          {/* Người khác thấy truyện chưa công khai chỉ có thể là quản trị viên xem truyện chờ duyệt */}
+          {isOwner
+            ? 'Truyện chưa công khai, chỉ bạn thấy trang này. Xuất bản hoặc gửi duyệt trong khu Sáng tác để mọi người đọc được.'
+            : 'Truyện đang chờ duyệt, chỉ tác giả và ban quản trị thấy trang này.'}
         </p>
       )}
       <div

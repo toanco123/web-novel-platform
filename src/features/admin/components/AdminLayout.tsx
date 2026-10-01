@@ -3,6 +3,7 @@ import viVN from 'antd/locale/vi_VN'
 import {
   ArrowLeft,
   BookOpen,
+  ClipboardCheck,
   FileUp,
   Flag,
   Home,
@@ -26,6 +27,7 @@ const menu = [
   { key: paths.admin, icon: LayoutDashboard, label: 'Tổng quan' },
   { key: paths.adminUsers, icon: Users, label: 'Người dùng' },
   { key: paths.adminStories(), icon: BookOpen, label: 'Truyện' },
+  { key: paths.adminReviews, icon: ClipboardCheck, label: 'Duyệt truyện' },
   { key: paths.adminFeatured, icon: Home, label: 'Trang chủ' },
   { key: paths.adminInbox, icon: Inbox, label: 'Hộp thư' },
   { key: paths.adminReports, icon: Flag, label: 'Báo lỗi' },

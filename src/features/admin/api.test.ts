@@ -1,6 +1,6 @@
 import { recordChapterView } from '@/features/chapters/api'
 import * as studio from '@/features/studio/api'
-import { publishStory, registerUser, signInAs, signOut } from '@/test/helpers'
+import { pendingStory, publishStory, registerUser, signInAs, signOut } from '@/test/helpers'
 import * as admin from './api'
 
 beforeEach(() => localStorage.clear())
@@ -146,7 +146,9 @@ test('gỡ truyện: truyện ẩn khỏi người đọc, tác giả thấy lý
   signInAs('demo')
   await admin.setStoryTakedown(story.id, null)
   signInAs(linh)
-  expect((await studio.publishStory(story.id)).visibility).toBe('published')
+  // Gỡ làm mất dấu đã duyệt: khôi phục xong phải gửi duyệt lại
+  await expect(studio.publishStory(story.id)).rejects.toMatchObject({ code: 'story_not_approved' })
+  expect((await studio.submitStoryForReview(story.id)).review?.status).toBe('pending')
 })
 
 test('thể loại: sửa tên (slug đổi theo), gộp, xóa; truyện đi theo', async () => {
@@ -455,4 +457,73 @@ test('bình luận: lọc bình luận gốc / trả lời, sắp theo lúc vi�
     'Bình luận thứ hai',
   ])
   expect((await admin.getAdminComments({ view: 'all', page: 1, pageSize: 10 })).pageCount).toBe(1)
+})
+
+test('duyệt truyện: hàng chờ theo lúc gửi, xem trước, số liệu, duyệt thì công khai', async () => {
+  const { getStory } = await import('@/features/stories/api')
+  const { getChapter } = await import('@/features/chapters/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const a = await pendingStory('Mùa Hạ Năm Ấy')
+  await studio.updateStory(a.id, {
+    title: 'Mùa Hạ Năm Ấy',
+    description: 'Một câu chuyện tình học trò nhẹ nhàng, kết thúc có hậu.',
+    genreSlugs: ['ngon-tinh'],
+    status: 'ongoing',
+    coverUrl: null,
+    authorName: 'Bút danh Lá',
+  })
+  const b = await pendingStory('Gió Qua Hiên Nhà')
+
+  // Người lạ không thấy truyện chờ duyệt
+  signOut()
+  expect(await getStory(a.slug)).toBeNull()
+
+  signInAs('demo')
+  // Quản trị viên xem trước được truyện và chương đã xuất bản của nó
+  expect(await getStory(a.slug)).toMatchObject({ visibility: 'draft' })
+  expect(await getChapter(a.slug, 1)).toMatchObject({ number: 1 })
+
+  const queue = await admin.getAdminStories({
+    review: 'pending',
+    sort: 'submitted',
+    order: 'asc',
+    page: 1,
+  })
+  expect(queue.items.map((s) => s.title)).toEqual(['Mùa Hạ Năm Ấy', 'Gió Qua Hiên Nhà'])
+  expect(queue.items[0]).toMatchObject({
+    ownerId: linh,
+    authorName: 'Bút danh Lá',
+    genreSlugs: ['ngon-tinh'],
+    review: { status: 'pending' },
+  })
+  expect((await admin.getAdminOverview(7)).totals.pendingReviews).toBe(2)
+
+  await admin.reviewStory({ storyId: a.id, approve: true })
+  await admin.reviewStory({ storyId: b.id, approve: false, reason: 'Bìa vi phạm' })
+  expect((await admin.getAdminOverview(7)).totals.pendingReviews).toBe(0)
+  const rejected = await admin.getAdminStories({ review: 'rejected', page: 1 })
+  expect(rejected.items).toEqual([
+    expect.objectContaining({
+      title: 'Gió Qua Hiên Nhà',
+      review: expect.objectContaining({ reason: 'Bìa vi phạm' }),
+    }),
+  ])
+
+  signOut()
+  expect(await getStory(a.slug)).toMatchObject({ visibility: 'published' })
+  expect(await getStory(b.slug)).toBeNull()
+})
+
+test('gỡ truyện đang chờ duyệt thì rời hàng chờ; người thường không duyệt được', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await pendingStory('Mùa Hạ Năm Ấy')
+  await expect(admin.reviewStory({ storyId: story.id, approve: true })).rejects.toBeInstanceOf(
+    admin.AdminError,
+  )
+  signInAs('demo')
+  await admin.setStoryTakedown(story.id, 'Đạo văn')
+  expect((await admin.getAdminStories({ review: 'pending', page: 1 })).total).toBe(0)
+  await expect(admin.reviewStory({ storyId: story.id, approve: true })).rejects.toMatchObject({
+    code: 'not_pending',
+  })
 })

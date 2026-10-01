@@ -35,6 +35,7 @@ const number = new Intl.NumberFormat('vi-VN')
 // Giá trị hợp lệ trên URL (?visibility=, ?status=); giá trị khác coi như không lọc
 const VISIBILITIES = ['published', 'draft', 'takedown'] as const
 const STATUSES: StoryStatus[] = ['ongoing', 'completed']
+const REVIEWS = ['pending', 'rejected'] as const
 const pick = <T extends string>(options: readonly T[], value: string | null) =>
   options.find((o) => o === value)
 
@@ -48,6 +49,7 @@ export default function AdminStoriesPage() {
   const q = params.get('q') ?? ''
   const visibility = pick(VISIBILITIES, params.get('visibility'))
   const status = pick(STATUSES, params.get('status'))
+  const review = pick(REVIEWS, params.get('review'))
   const hasReports = params.get('reports') === 'open'
   const ownerId = params.get('owner') ?? undefined
   const { sort, order, pageSize } = readTableParams(params, ADMIN_STORY_SORTS)
@@ -56,6 +58,7 @@ export default function AdminStoriesPage() {
     visibility,
     status,
     hasReports,
+    review,
     ownerId,
     sort,
     order,
@@ -127,6 +130,16 @@ export default function AdminStoriesPage() {
               { value: 'completed', label: 'Hoàn thành' },
             ]}
           />
+          <FilterSelect
+            label="Duyệt"
+            value={review}
+            onChange={(value) => update({ review: value })}
+            className="w-36"
+            options={[
+              { value: 'pending', label: 'Chờ duyệt' },
+              { value: 'rejected', label: 'Bị từ chối' },
+            ]}
+          />
           <Checkbox
             checked={hasReports}
             onChange={(e) => update({ reports: e.target.checked ? 'open' : null })}
@@ -140,7 +153,7 @@ export default function AdminStoriesPage() {
           )}
           <ClearFilters
             params={params}
-            keys={['q', 'visibility', 'status', 'reports', 'owner']}
+            keys={['q', 'visibility', 'status', 'review', 'reports', 'owner']}
             update={update}
           />
         </div>
@@ -200,6 +213,12 @@ export default function AdminStoriesPage() {
                     </Tooltip>
                   ) : v === 'published' ? (
                     <Tag color="green">Công khai</Tag>
+                  ) : s.review?.status === 'pending' ? (
+                    <Tag color="gold">Chờ duyệt</Tag>
+                  ) : s.review?.status === 'rejected' ? (
+                    <Tooltip title={`Lý do: ${s.review.reason}`}>
+                      <Tag color="volcano">Bị từ chối</Tag>
+                    </Tooltip>
                   ) : (
                     <Tag>Nháp</Tag>
                   ),

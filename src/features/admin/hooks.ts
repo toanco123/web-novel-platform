@@ -95,6 +95,21 @@ export const useSetStoryTakedown = () =>
     api.setStoryTakedown(storyId, reason),
   )
 
+/** Duyệt / từ chối truyện: làm mới cả danh sách công khai (truyện vừa duyệt hiện ra ngay) */
+export function useReviewStory() {
+  const queryClient = useQueryClient()
+  const userId = useUserId()
+  return useMutation({
+    mutationFn: (input: api.ReviewInput) => api.reviewStory(input),
+    onSettled: () =>
+      Promise.all(
+        [adminKeys.all(userId), ['stories'], ['chapters'], ['genres']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+  })
+}
+
 export const useDismissCommentReports = () =>
   useAdminMutation((commentId: string) => api.dismissCommentReports(commentId))
 

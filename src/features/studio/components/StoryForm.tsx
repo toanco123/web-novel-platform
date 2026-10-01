@@ -27,7 +27,7 @@ import { CoverUpload } from './CoverUpload'
 export type StorySubmitExtra = {
   /** Chương đầu tiên viết kèm (số chương chọn được); null khi để trống (hoặc form sửa truyện) */
   chapter: StoryFormValues['chapter'] | null
-  /** Bấm "Đăng truyện": xuất bản chương đầu tiên và công khai truyện luôn */
+  /** Bấm nút đăng: xuất bản chương đầu tiên; tác giả thì gửi duyệt truyện, quản trị viên thì công khai luôn */
   publish: boolean
   /** Gọi trước khi tự điều hướng sau khi lưu thành công (bỏ hỏi rời trang) */
   allowLeave: () => void
@@ -43,8 +43,10 @@ type Props = {
   pending: boolean
   error?: unknown
   success?: string | null
-  /** Truyện mới: thêm phần viết chương đầu tiên và nút "Đăng truyện" cạnh nút lưu */
+  /** Truyện mới: thêm phần viết chương đầu tiên và nút đăng cạnh nút lưu */
   firstChapter?: boolean
+  /** Nhãn nút đăng (form truyện mới) */
+  publishLabel?: string
   onSubmit: (values: StoryValues, extra: StorySubmitExtra) => void
 }
 
@@ -67,6 +69,7 @@ export function StoryForm({
   error,
   success,
   firstChapter = false,
+  publishLabel = 'Đăng truyện',
   onSubmit,
 }: Props) {
   const {
@@ -292,7 +295,7 @@ export function StoryForm({
                 onClick={submit(true)}
                 className="h-11 rounded-lg px-5"
               >
-                Đăng truyện
+                {publishLabel}
               </Button>
               <p role="status" className="text-sm text-muted-foreground">
                 {pending ? pendingLabel : ''}

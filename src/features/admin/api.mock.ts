@@ -23,11 +23,13 @@ import { mockChapters } from '@/mocks/chapters'
 import { loadCurated, saveCurated } from '@/mocks/curated'
 import { genres as seedGenres, stories as seedStories } from '@/mocks/stories'
 import {
+  approvedReview,
   loadChapters,
   loadUserGenres,
   loadUserStories,
   saveUserGenres,
   saveUserStories,
+  storyReview,
 } from '@/mocks/userContent'
 import { loadUsers, saveUsers } from '@/mocks/users'
 import { normalizeGenreName } from '@/features/genres/api'
@@ -49,10 +51,13 @@ import {
   type AdminUser,
   type AdminUserQuery,
   type CuratedStory,
+  type ReviewInput,
   type SortOrder,
 } from './shared'
 
 const SYSTEM_AUTHOR = 'Hệ thống'
+/** Truyện có sẵn của bản giả luôn coi là đã duyệt */
+const SEED_REVIEW = approvedReview('2026-01-01T00:00:00.000Z')
 
 async function requireAdmin() {
   const user = await requireUser()
@@ -107,6 +112,9 @@ function allStories(): AdminStory[] {
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
     takedown: null,
+    review: SEED_REVIEW,
+    authorName: null,
+    genreSlugs: s.genres.map((g) => g.slug),
   }))
 
   const genres = allGenres()
@@ -135,6 +143,9 @@ function allStories(): AdminStory[] {
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
       takedown: stored.takedown ?? null,
+      review: storyReview(stored),
+      authorName: stored.authorName ?? null,
+      genreSlugs: stored.genreSlugs,
     }
   })
 
@@ -204,6 +215,7 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
       reportedComments: reportedCommentIds().size,
       unhandledMessages: loadContactMessages().filter((m) => !m.handledAt).length,
       bannedUsers: users.filter((u) => u.bannedAt).length,
+      pendingReviews: stories.filter((s) => s.review?.status === 'pending').length,
     },
     days: keys.map((day) => ({
       day,
@@ -290,7 +302,7 @@ export async function getAdminUsers({
 
 const storySortKeys: Record<
   NonNullable<AdminStoryQuery['sort']>,
-  (s: AdminStory) => string | number
+  (s: AdminStory) => string | number | null
 > = {
   title: (s) => s.title,
   chapters: (s) => s.publishedCount,
@@ -301,6 +313,7 @@ const storySortKeys: Record<
   reports: (s) => s.openReports,
   created: (s) => s.createdAt,
   updated: (s) => s.updatedAt,
+  submitted: (s) => s.review?.submittedAt ?? null,
 }
 
 export async function getAdminStories({
@@ -308,6 +321,7 @@ export async function getAdminStories({
   visibility,
   status,
   hasReports,
+  review,
   ownerId,
   sort = 'updated',
   order,
@@ -324,6 +338,7 @@ export async function getAdminStories({
         (!visibility || (visibility === 'takedown' ? !!s.takedown : s.visibility === visibility)) &&
         (!status || s.status === status) &&
         (!hasReports || s.openReports > 0) &&
+        (!review || s.review?.status === review) &&
         (!ownerId || s.ownerId === ownerId),
     )
     // Khóa phụ: mới cập nhật trước
@@ -556,8 +571,44 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
               ...s,
               visibility: 'draft' as const,
               takedown: { at: s.takedown?.at ?? new Date().toISOString(), reason: text },
+              // Gỡ thì mất dấu đã duyệt (truyện chờ duyệt cũng rời hàng chờ)
+              review: null,
             }
-          : { ...s, takedown: null },
+          : // Đọc khi truyện còn bị gỡ nên là null: dữ liệu cũ không tự thành đã duyệt
+            { ...s, takedown: null, review: storyReview(s) },
+    ),
+  )
+}
+
+/** Duyệt (công khai luôn) hoặc từ chối (kèm lý do) truyện đang chờ duyệt */
+export async function reviewStory({ storyId, approve, reason }: ReviewInput) {
+  await delay()
+  await requireAdmin()
+  const stories = loadUserStories()
+  const story = stories.find((s) => s.id === storyId)
+  if (!story) throw new AdminError('not_found')
+  const review = storyReview(story)
+  if (review?.status !== 'pending') throw new AdminError('not_pending')
+  const text = reason?.trim() ?? ''
+  if (!approve && !text) throw new AdminError('reason_required')
+  const time = new Date().toISOString()
+  saveUserStories(
+    stories.map((s) =>
+      s.id !== storyId
+        ? s
+        : approve
+          ? {
+              ...s,
+              visibility: 'published' as const,
+              publishedAt: s.publishedAt ?? time,
+              updatedAt: time,
+              review: { ...review, status: 'approved' as const, reviewedAt: time, reason: null },
+            }
+          : {
+              ...s,
+              updatedAt: time,
+              review: { ...review, status: 'rejected' as const, reviewedAt: time, reason: text },
+            },
     ),
   )
 }

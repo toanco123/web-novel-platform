@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
+import { reviewStory } from '@/features/admin/api'
 import { renderApp } from '@/test/renderApp'
-import { writeInEditor } from '@/test/helpers'
+import { approveAsAdmin, draftStory, registerUser, signInAs, writeInEditor } from '@/test/helpers'
 
 const slow = { timeout: 4000 }
 beforeEach(() => localStorage.clear())
@@ -345,4 +346,55 @@ test('chương có định dạng: soạn chữ đậm → xuất bản → tran
     .poll(() => document.querySelectorAll('[data-chapter="1"] [data-paragraph]').length, slow)
     .toBe(2)
   expect(document.querySelector('[data-chapter="1"] strong')).toBeNull()
+})
+
+test('tác giả mới: "Đăng và gửi duyệt" thì chờ duyệt; bị từ chối thì thấy lý do và gửi lại', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const { router, user } = renderApp('/studio/new-story?genre=ngon-tinh')
+  expect(await screen.findByText(/Đăng và gửi duyệt/, { selector: 'p' }, slow)).toBeInTheDocument()
+  await user.type(screen.getByLabelText('Tên truyện'), 'Gió Mùa Thu')
+  await user.type(
+    screen.getByLabelText('Giới thiệu'),
+    'Một câu chuyện tình học trò nhẹ nhàng giữa hai người bạn cùng bàn.',
+  )
+  await user.type(screen.getByLabelText('Tiêu đề chương'), 'Gặp lại')
+  await writeInEditor(user, screen.getByLabelText('Nội dung chương'), content)
+  await user.click(screen.getByRole('button', { name: 'Đăng và gửi duyệt' }))
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Gió Mùa Thu' }, slow))
+  expect(screen.getByText('Chờ duyệt')).toBeInTheDocument()
+  expect(screen.getByText(/đang chờ ban quản trị duyệt/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Xuất bản truyện' })).not.toBeInTheDocument()
+  const storyId = router.state.location.pathname.split('/').at(-1)!
+  // Mở lại trang quản lý để tải trạng thái mới (quản trị viên vừa đổi ở ngoài app)
+  const reopen = async () => {
+    await router.navigate('/studio')
+    await screen.findByRole('heading', { name: 'Sáng tác của bạn' }, slow)
+    await router.navigate(`/studio/story/${storyId}`)
+  }
+
+  // Quản trị viên từ chối
+  signInAs('demo')
+  await reviewStory({ storyId, approve: false, reason: 'Giới thiệu quá ngắn' })
+  signInAs(linh)
+  await reopen()
+  expect(await screen.findByText(/Giới thiệu quá ngắn/, {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Bị từ chối')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Gửi duyệt lại' }))
+  expect(await screen.findByText('Chờ duyệt', {}, slow)).toBeInTheDocument()
+
+  // Duyệt xong: tác giả tự ẩn / hiện
+  await approveAsAdmin(storyId)
+  await reopen()
+  expect(await screen.findByRole('button', { name: 'Ẩn truyện' }, slow)).toBeInTheDocument()
+})
+
+test('truyện chưa gửi duyệt: nút "Gửi duyệt" mở khi có chương đã xuất bản', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await draftStory('Mùa Hạ Năm Ấy', 1)
+  const { user } = renderApp(`/studio/story/${story.id}`)
+  const submit = await screen.findByRole('button', { name: 'Gửi duyệt' }, slow)
+  expect(screen.getByText(/cần ban quản trị duyệt trước khi công khai/)).toBeInTheDocument()
+  await user.click(submit)
+  expect(await screen.findByText('Chờ duyệt', {}, slow)).toBeInTheDocument()
 })
