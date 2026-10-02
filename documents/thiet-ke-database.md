@@ -27,6 +27,7 @@ stories 1─n chapters                    (unique story_id + number)
 chapters(story_id, number) 1─n comments         (chapter_number null = bình luận cả truyện)
 comments 1─n comments                          (parent_id: trả lời, chỉ một cấp)
 comments 1─n private.comment_reports           (báo cáo bình luận vi phạm)
+auth.users × profiles: user_blocks             (người chặn → người bị chặn, ẩn bình luận)
                            1─n chapter_reports
                            1─n chapter_views    (mỗi ngày một dòng)
 profiles × stories: follows, reading_history, ratings   (khóa chính user_id + story_id)
@@ -54,6 +55,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `chapter_reports` | `id`, `story_id`, `chapter_number`, `reporter_id`, `reason`, `note` (≤500, bắt buộc khi `reason='other'`), `status`, `created_at`, `resolved_at` | Unique một phần trên `(reporter_id, story_id, chapter_number, reason)` khi `status='open'`, để gộp báo lỗi trùng |
 | `chapter_views` | `story_id`, `chapter_number`, `day`, `views` | Chỉ ghi qua `record_chapter_view` |
 | `contact_messages` | `name`, `email`, `topic`, `message` (10–2000), `user_id` | Chỉ insert, không ai đọc được qua API (xem trên Dashboard) |
+| `user_blocks` | `blocker_id` (mặc định `auth.uid()`), `blocked_id` (khóa ngoại tới `profiles`, để PostgREST nhúng tên, ảnh), `created_at` | Khóa chính `(blocker_id, blocked_id)`, không tự chặn mình (`23514`). Chặn ai thì mọi bình luận, trả lời của người đó ẩn với mình (policy đọc `comments`); người bị chặn không biết. Hiện chỉ app có giao diện chặn / bỏ chặn (App Store Guideline 1.2) |
 | `curated_stories` | `list` (`featured` \| `editor_pick`), `story_id`, `position` | Thay `featuredSlugs`/`editorPickSlugs`; quản trị viên sửa ở `/admin/featured` (RPC `admin_set_curated`) |
 
 **Enum:**
@@ -137,16 +139,17 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `story_genres`, `story_stats`, `chapter_views`, `curated_stories` | ai thấy truyện thì thấy | `story_genres`: chủ truyện. Ba bảng còn lại: không ai ghi từ client |
 | `chapters` | chương đã xuất bản của truyện công khai (quản trị viên: cả của truyện chờ duyệt); chủ truyện thấy cả nháp | chủ truyện. Insert được: `story_id, number, title, content, status`. Update được: `number, title, content, status` |
 | `follows`, `reading_history`, `ratings` | chỉ chủ | chỉ chủ |
-| `comments` | ai thấy truyện thì thấy | viết: người đã đăng nhập, vào truyện công khai hoặc chương đã xuất bản (cột `parent_id` được cấp quyền insert). Xóa: chính người viết; quản trị viên xóa qua `admin_delete_comment` |
+| `comments` | ai thấy truyện thì thấy, trừ bình luận của người mình đã chặn (`private.my_blocked_ids()`, definer để khách cũng gọi được) | viết: người đã đăng nhập, vào truyện công khai hoặc chương đã xuất bản (cột `parent_id` được cấp quyền insert). Xóa: chính người viết; quản trị viên xóa qua `admin_delete_comment` |
 | `chapter_reports` | người gửi và chủ truyện | gửi: người đã đăng nhập, cho chương đã xuất bản. Đổi trạng thái: chủ truyện. Sửa ghi chú (khi báo lại): người gửi |
 | `contact_messages` | không ai | `anon` và `authenticated` insert |
+| `user_blocks` | chỉ người chặn | người chặn: insert (`blocked_id`), delete |
 
 **Quy tắc khi viết migration mới:**
 - Luôn `revoke all … from anon, authenticated` rồi mới `grant` đúng quyền. Grant theo cột chỉ có tác dụng khi không có quyền mức bảng.
 - Policy dùng `(select auth.uid())` và ghi rõ `to anon` / `to authenticated`.
 - Hàm `security definer` đặt ở schema `private` (không lộ ra API) và luôn có `set search_path = ''`.
   - Hàm quyền cao mà khách cũng cần gọi (hiện chỉ có `record_chapter_view`) chia làm hai: `public.record_chapter_view` là lớp vỏ `security invoker`, gọi sang `private.record_chapter_view` (definer).
-  - `anon`/`authenticated` có USAGE trên `private`, nhưng chỉ được EXECUTE đúng hàm đó (và `private.is_admin()`, chỉ đọc JWT của người gọi, dùng trong policy và trigger duyệt truyện).
+  - `anon`/`authenticated` có USAGE trên `private`, nhưng chỉ được EXECUTE đúng hàm đó (và `private.is_admin()`, chỉ đọc JWT của người gọi, dùng trong policy và trigger duyệt truyện; `private.my_blocked_ids()`, danh sách người mình đã chặn, dùng trong policy đọc `comments`).
   - Các RPC quản trị (`admin_overview`, `admin_users`, `admin_stories`) cũng làm như vậy (cần đọc `auth.users` và truyện nháp của mọi người); chỉ `authenticated` được EXECUTE, và hàm ở `private` tự kiểm tra `private.is_admin()`.
 - **Quản trị viên** = `auth.users.raw_app_meta_data.role = 'admin'` (có trong JWT, người dùng không tự sửa được). Cách cấp quyền ở mục 10.
 - Sau mỗi migration chạy `supabase db advisors --linked`. Không được còn cảnh báo mức WARN; "unused index" (INFO) khi DB còn ít dữ liệu thì bỏ qua được.

@@ -1155,6 +1155,105 @@ select pg_temp.expect_error(
   $$update public.chapter_reports set created_at = '2000-01-01'$$, '42501');
 reset role;
 
+-- ── Chặn người dùng ─────────────────────────────────────────────────────
+
+-- G chặn H: không còn thấy bình luận, trả lời của H; người khác vẫn thấy
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000021', 'g@kiem-tra.local', '{"display_name": "G chặn"}'),
+  ('00000000-0000-4000-8000-000000000022', 'h@kiem-tra.local', '{"display_name": "H bị chặn"}');
+
+create function pg_temp.block_comment(p_content text)
+returns uuid
+language sql
+as $$
+  select id from public.comments
+  where story_id = pg_temp.story_id('truyen-chong-spam') and content = p_content
+$$;
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000022", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.comments (story_id, content)
+  values (pg_temp.story_id('truyen-chong-spam'), 'Bình luận của H');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000021", "role": "authenticated"}', true);
+insert into public.comments (story_id, content)
+  values (pg_temp.story_id('truyen-chong-spam'), 'Bình luận của G');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000022", "role": "authenticated"}', true);
+insert into public.comments (story_id, content, parent_id)
+  values (pg_temp.story_id('truyen-chong-spam'), 'H trả lời G', pg_temp.block_comment('Bình luận của G'));
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000021", "role": "authenticated"}', true);
+select pg_temp.expect(
+  exists (select 1 from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t
+    where t.user_id = '00000000-0000-4000-8000-000000000022'),
+  'chưa chặn: thấy bình luận của H');
+insert into public.user_blocks (blocked_id) values ('00000000-0000-4000-8000-000000000022');
+select pg_temp.expect(
+  not exists (select 1 from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t
+    where t.user_id = '00000000-0000-4000-8000-000000000022'),
+  'chặn rồi: comment_threads bỏ bình luận gốc của H');
+select pg_temp.expect(
+  (select t.reply_count = 0 from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t
+    where t.content = 'Bình luận của G'),
+  'chặn rồi: số trả lời không đếm trả lời của H');
+select pg_temp.expect(
+  not exists (select 1 from public.comments
+    where user_id = '00000000-0000-4000-8000-000000000022'),
+  'chặn rồi: đọc thẳng bảng comments cũng không thấy H');
+select pg_temp.expect(
+  (select count(*) = 1 from public.user_blocks),
+  'G thấy dòng chặn của mình');
+select pg_temp.expect_error(
+  $$insert into public.user_blocks (blocked_id) values ('00000000-0000-4000-8000-000000000022')$$,
+  '23505');
+select pg_temp.expect_error(
+  $$insert into public.user_blocks (blocked_id) values ('00000000-0000-4000-8000-000000000021')$$,
+  '23514');
+-- Không ghi được blocker_id (chặn thay người khác)
+select pg_temp.expect_error(
+  $$insert into public.user_blocks (blocker_id, blocked_id)
+    values ('00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000022')$$,
+  '42501');
+
+-- H vẫn thấy bình luận của mình, không thấy và không xóa được dòng chặn của G
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000022", "role": "authenticated"}', true);
+select pg_temp.expect(
+  exists (select 1 from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t
+    where t.content = 'Bình luận của H'),
+  'người bị chặn vẫn thấy bình luận của mình');
+select pg_temp.expect(not exists (select 1 from public.user_blocks), 'H không thấy dòng chặn của G');
+select pg_temp.expect(pg_temp.affected($$delete from public.user_blocks$$) = 0,
+  'H không xóa được dòng chặn của G');
+
+-- Khách vẫn thấy bình luận của H, không đọc được bảng user_blocks
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect(
+  exists (select 1 from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t
+    where t.content = 'Bình luận của H'),
+  'khách vẫn thấy bình luận của H');
+select pg_temp.expect_error($$select * from public.user_blocks$$, '42501');
+
+-- G bỏ chặn: thấy lại bình luận của H
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000021", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(pg_temp.affected($$delete from public.user_blocks$$) = 1, 'G bỏ chặn H');
+select pg_temp.expect(
+  exists (select 1 from public.comment_threads(pg_temp.story_id('truyen-chong-spam')) t
+    where t.content = 'Bình luận của H'),
+  'bỏ chặn rồi: thấy lại bình luận của H');
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;
