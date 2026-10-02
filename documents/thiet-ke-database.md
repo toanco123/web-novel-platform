@@ -28,6 +28,7 @@ chapters(story_id, number) 1─n comments         (chapter_number null = bình l
 comments 1─n comments                          (parent_id: trả lời, chỉ một cấp)
 comments 1─n private.comment_reports           (báo cáo bình luận vi phạm)
 auth.users × profiles: user_blocks             (người chặn → người bị chặn, ẩn bình luận)
+profiles 1─n push_tokens                       (mã thông báo đẩy của máy, app di động)
                            1─n chapter_reports
                            1─n chapter_views    (mỗi ngày một dòng)
 profiles × stories: follows, reading_history, ratings   (khóa chính user_id + story_id)
@@ -56,6 +57,8 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `chapter_views` | `story_id`, `chapter_number`, `day`, `views` | Chỉ ghi qua `record_chapter_view` |
 | `contact_messages` | `name`, `email`, `topic`, `message` (10–2000), `user_id` | Chỉ insert, không ai đọc được qua API (xem trên Dashboard) |
 | `user_blocks` | `blocker_id` (mặc định `auth.uid()`), `blocked_id` (khóa ngoại tới `profiles`, để PostgREST nhúng tên, ảnh), `created_at` | Khóa chính `(blocker_id, blocked_id)`, không tự chặn mình (`23514`). Chặn ai thì mọi bình luận, trả lời của người đó ẩn với mình (policy đọc `comments`); người bị chặn không biết. Hiện chỉ app có giao diện chặn / bỏ chặn (App Store Guideline 1.2) |
+| `push_tokens` | `token` (khóa chính, mã Expo), `user_id`, `platform` (`ios` \| `android`), `updated_at` | Ghi qua `register_push_token` (máy đổi tài khoản thì mã chuyển chủ; mỗi tài khoản tối đa 10 máy, bỏ máy cũ nhất). Xóa mã của mình khi đăng xuất |
+| `private.story_push_log` | `story_id`, `sent_at` | Lần gửi thông báo chương mới gần nhất của từng truyện (chống dội: 30 phút một lần, `private.push_cooldown()`). Không ai đọc ghi qua API |
 | `curated_stories` | `list` (`featured` \| `editor_pick`), `story_id`, `position` | Thay `featuredSlugs`/`editorPickSlugs`; quản trị viên sửa ở `/admin/featured` (RPC `admin_set_curated`) |
 
 **Enum:**
@@ -143,6 +146,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `chapter_reports` | người gửi và chủ truyện | gửi: người đã đăng nhập, cho chương đã xuất bản. Đổi trạng thái: chủ truyện. Sửa ghi chú (khi báo lại): người gửi |
 | `contact_messages` | không ai | `anon` và `authenticated` insert |
 | `user_blocks` | chỉ người chặn | người chặn: insert (`blocked_id`), delete |
+| `push_tokens` | chỉ chủ | thêm / chuyển chủ qua `register_push_token`; chủ xóa |
 
 **Quy tắc khi viết migration mới:**
 - Luôn `revoke all … from anon, authenticated` rồi mới `grant` đúng quyền. Grant theo cột chỉ có tác dụng khi không có quyền mức bảng.
@@ -193,6 +197,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `admin_update_genre(slug, name, description)`, `admin_delete_genre(slug)`, `admin_merge_genres(from, into)` | quản trị viên | Sửa (slug đổi theo tên), xóa, gộp thể loại |
 | `admin_comments(query, reported)`, `admin_delete_comment(id)`, `admin_dismiss_comment_reports(comment_id)` | quản trị viên | Danh sách bình luận kèm các báo cáo đang mở (`reported = true`: chỉ bình luận bị báo cáo, báo cáo mới nhất trước); xóa bình luận bất kỳ (trả lời và báo cáo mất theo); đóng các báo cáo đang mở |
 | `admin_curated(list)`, `admin_set_curated(list, story_ids[])` | quản trị viên | Đọc danh sách truyện chọn tay (kể cả truyện đang ẩn) và thay cả danh sách theo thứ tự đưa vào. Tối đa 8 truyện nổi bật, 12 truyện đề cử |
+
+**Thông báo đẩy chương mới (app di động):** trigger `chapters_notify_insert` / `chapters_notify_update` (mỗi câu lệnh, transition table) gọi `private.send_chapter_push`: chương xuất bản lần đầu ở truyện công khai thì gửi một tin mỗi truyện (chương mới nhất trong câu lệnh) tới mọi máy của người theo dõi, trừ tác giả, bằng `pg_net` (`net.http_post` tới `https://exp.host/--/api/v2/push/send`, tối đa 100 tin mỗi lần gọi). `data.url` = `/story/<slug>/chapter-<n>` để app mở đúng chương. Chưa xử lý biên nhận của Expo (mã hết hạn `DeviceNotRegistered` chưa tự bị xóa).
 
 ## 7. Storage
 

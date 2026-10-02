@@ -1254,6 +1254,122 @@ select pg_temp.expect(
   'bỏ chặn rồi: thấy lại bình luận của H');
 reset role;
 
+-- ── Thông báo đẩy chương mới ────────────────────────────────────────────
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000031', 'p@kiem-tra.local', '{"display_name": "P tác giả"}'),
+  ('00000000-0000-4000-8000-000000000032', 'q@kiem-tra.local', '{"display_name": "Q đọc"}'),
+  ('00000000-0000-4000-8000-000000000033', 'r@kiem-tra.local', '{"display_name": "R đọc"}');
+
+-- Q đăng ký mã của máy; không tự ghi thẳng vào bảng được
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000032", "role": "authenticated"}', true);
+set local role authenticated;
+select public.register_push_token('ExponentPushToken[q-may-1]', 'ios');
+select pg_temp.expect((select count(*) = 1 from public.push_tokens), 'Q thấy mã của mình');
+select pg_temp.expect_error(
+  $$select public.register_push_token('ExponentPushToken[q-web]', 'web')$$, '23514');
+select pg_temp.expect_error(
+  $$insert into public.push_tokens (token, user_id, platform)
+    values ('ExponentPushToken[tu-ghi]', '00000000-0000-4000-8000-000000000032', 'ios')$$,
+  '42501');
+
+-- R đăng nhập trên máy của Q: mã chuyển sang R
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000033", "role": "authenticated"}', true);
+select public.register_push_token('ExponentPushToken[q-may-1]', 'ios');
+select pg_temp.expect(
+  (select count(*) = 1 from public.push_tokens where token = 'ExponentPushToken[q-may-1]'),
+  'mã chuyển sang R');
+select pg_temp.expect(pg_temp.affected($$delete from public.push_tokens$$) = 1,
+  'R xóa được mã của mình (đăng xuất)');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000032", "role": "authenticated"}', true);
+select pg_temp.expect(not exists (select 1 from public.push_tokens), 'Q không còn mã của máy cũ');
+select public.register_push_token('ExponentPushToken[q-may-2]', 'android');
+
+-- Khách không đăng ký được
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect_error(
+  $$select public.register_push_token('ExponentPushToken[khach]', 'ios')$$, '42501');
+
+-- P đăng truyện (đã duyệt), Q theo dõi; P cũng có mã và tự theo dõi truyện mình
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000031", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.genres (name) values ('Thông Báo Đẩy');
+select * from public.create_story(
+  'Truyện Thông Báo', 'Truyện để kiểm tra thông báo chương mới.', 'ongoing', array['thong-bao-day'],
+  null, '{"title": "Một", "content": "Nội dung chương một."}', true);
+select public.register_push_token('ExponentPushToken[p-tac-gia]', 'ios');
+insert into public.follows (story_id) values (pg_temp.story_id('truyen-thong-bao'));
+reset role;
+select pg_temp.approve('truyen-thong-bao');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000032", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.follows (story_id) values (pg_temp.story_id('truyen-thong-bao'));
+
+reset role;
+create temp table push_before as select coalesce(max(id), 0) as id from net.http_request_queue;
+create function pg_temp.push_bodies()
+returns setof text
+language sql
+as $$
+  select convert_from(q.body, 'UTF8') from net.http_request_queue q
+  where q.id > (select id from push_before) and q.url = 'https://exp.host/--/api/v2/push/send'
+$$;
+
+-- P xuất bản chương 2: một thông báo tới máy của Q, không tới tác giả
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000031", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.chapters (story_id, number, title, content, status)
+values (pg_temp.story_id('truyen-thong-bao'), 2, 'Hai', 'Nội dung chương hai.', 'published');
+reset role;
+select pg_temp.expect((select count(*) = 1 from pg_temp.push_bodies()), 'gửi một lần cho chương mới');
+select pg_temp.expect(
+  (select b like '%ExponentPushToken[q-may-2]%' and b not like '%p-tac-gia%'
+      and b like '%/story/truyen-thong-bao/chapter-2%' and b like '%Chương 2: Hai%'
+    from pg_temp.push_bodies() b),
+  'thông báo tới người theo dõi (không tới tác giả), mở đúng chương');
+
+-- Trong 30 phút: chương 3 không gửi thêm; chương nháp rồi xuất bản sau cũng vậy
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000031", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.chapters (story_id, number, title, content, status)
+values (pg_temp.story_id('truyen-thong-bao'), 3, 'Ba', 'Nội dung chương ba.', 'published');
+reset role;
+select pg_temp.expect((select count(*) = 1 from pg_temp.push_bodies()),
+  'trong 30 phút không gửi lại cho cùng truyện');
+
+-- Hết 30 phút: chương nháp được xuất bản thì gửi; sửa chương đã xuất bản thì không gửi
+update private.story_push_log set sent_at = now() - interval '1 hour'
+where story_id = pg_temp.story_id('truyen-thong-bao');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000031", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.chapters (story_id, number, title, content, status)
+values (pg_temp.story_id('truyen-thong-bao'), 4, 'Bốn', 'Nội dung chương bốn.', 'draft');
+update public.chapters set title = 'Hai (sửa)'
+where story_id = pg_temp.story_id('truyen-thong-bao') and number = 2;
+reset role;
+select pg_temp.expect((select count(*) = 1 from pg_temp.push_bodies()),
+  'chương nháp và sửa chương đã xuất bản không gửi');
+set local role authenticated;
+update public.chapters set status = 'published'
+where story_id = pg_temp.story_id('truyen-thong-bao') and number = 4;
+reset role;
+select pg_temp.expect((select count(*) = 2 from pg_temp.push_bodies()),
+  'chương nháp được xuất bản lần đầu thì gửi');
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;
