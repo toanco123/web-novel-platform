@@ -2,13 +2,14 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { SectionError } from '@/components/common/SectionHeading'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useSession } from '@/features/auth/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
 import type { Comment } from '@/types/comment'
 import { useComments, useMyRating, useRateStory, useRatingSummary } from '../hooks'
 import { CommentForm } from './CommentForm'
-import { CommentItem } from './CommentItem'
+import { CommentItem, CommentSkeleton } from './CommentItem'
 import { RatingSummary } from './RatingSummary'
 import { StarRatingInput } from './StarRatingInput'
 
@@ -19,7 +20,8 @@ type Props = {
 }
 
 export function CommentsSection({ slug, chapter = null }: Props) {
-  const { data: user } = useSession()
+  // Phiên chưa rõ thì giữ chỗ, không hiện lời mời đăng nhập rồi mới đổi sang ô viết bình luận
+  const { data: user, isPending: sessionPending } = useSession()
   const current = useCurrentPath()
   const comments = useComments(slug, chapter)
   const items = uniqueById(comments.data?.pages.flatMap((p) => p.items) ?? [])
@@ -36,10 +38,16 @@ export function CommentsSection({ slug, chapter = null }: Props) {
   return (
     <div className="space-y-8">
       {chapter === null && (
-        <RatingPanel slug={slug} signedIn={!!user} loginLink={loginLink('Đăng nhập')} />
+        <RatingPanel
+          slug={slug}
+          signedIn={sessionPending ? undefined : !!user}
+          loginLink={loginLink('Đăng nhập')}
+        />
       )}
 
-      {user ? (
+      {sessionPending ? (
+        <CommentFormSkeleton />
+      ) : user ? (
         <CommentForm slug={slug} user={user} chapter={chapter} />
       ) : (
         <p className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">
@@ -50,9 +58,9 @@ export function CommentsSection({ slug, chapter = null }: Props) {
       {comments.isError ? (
         <SectionError />
       ) : comments.isPending ? (
-        <div className="space-y-4">
-          {Array.from({ length: 3 }, (_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
+        <div className="divide-y" aria-busy>
+          {Array.from({ length: 4 }, (_, i) => (
+            <CommentSkeleton key={i} />
           ))}
         </div>
       ) : items.length === 0 ? (
@@ -101,13 +109,30 @@ function uniqueById(comments: Comment[]) {
   })
 }
 
+/** Cùng cỡ CommentForm: ảnh đại diện, ô nhập 3 dòng, hàng đếm chữ + nút gửi */
+function CommentFormSkeleton() {
+  return (
+    <div className="flex gap-3" aria-hidden>
+      <Skeleton className="size-9 shrink-0 rounded-full" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-24 rounded-lg" />
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-9 w-32 rounded-full" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function RatingPanel({
   slug,
   signedIn,
   loginLink,
 }: {
   slug: string
-  signedIn: boolean
+  /** undefined: phiên đăng nhập đang tải */
+  signedIn: boolean | undefined
   loginLink: ReactNode
 }) {
   const summary = useRatingSummary(slug)
@@ -115,12 +140,26 @@ function RatingPanel({
     <div className="grid gap-6 rounded-xl border bg-card/50 p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6">
       {summary.data ? (
         <RatingSummary summary={summary.data} />
+      ) : summary.isError ? (
+        <div className="text-sm text-muted-foreground">
+          <p>Không tải được điểm đánh giá.</p>
+          <button
+            type="button"
+            onClick={() => summary.refetch()}
+            disabled={summary.isFetching}
+            className="mt-1 font-medium text-rose-gold underline-offset-4 hover:underline disabled:opacity-60"
+          >
+            {summary.isFetching ? 'Đang thử lại…' : 'Thử lại'}
+          </button>
+        </div>
       ) : (
-        <div className="h-24 animate-pulse rounded-lg bg-muted" />
+        <RatingSummarySkeleton />
       )}
       <div className="border-t pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
         <p className="mb-2 text-sm font-medium">Đánh giá của bạn</p>
-        {signedIn ? (
+        {signedIn === undefined ? (
+          <Skeleton className="h-8 w-44" />
+        ) : signedIn ? (
           <MyRating slug={slug} />
         ) : (
           <p className="text-sm text-muted-foreground">{loginLink} để chấm điểm truyện.</p>
@@ -139,9 +178,32 @@ function MyRating({ slug }: { slug: string }) {
     <div>
       <StarRatingInput value={value} onChange={(s) => rate.mutate(s)} disabled={mine.isPending} />
       <p className="mt-1.5 h-4 text-xs text-muted-foreground" role="status">
+        {rate.isPending && 'Đang lưu…'}
         {rate.isSuccess && `Đã lưu: ${rate.data} sao. Cảm ơn bạn!`}
         {rate.isError && <span className="text-destructive">Chưa lưu được điểm. Thử lại nhé.</span>}
       </p>
+    </div>
+  )
+}
+
+/** Cùng bố cục RatingSummary: điểm lớn + sao + số lượt, cạnh 5 thanh phân bố */
+function RatingSummarySkeleton() {
+  return (
+    <div className="flex items-center gap-6" aria-hidden>
+      <div className="flex flex-col items-center gap-2">
+        <Skeleton className="h-14 w-20" />
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="flex h-4 items-center gap-2">
+            <Skeleton className="h-3 w-7" />
+            <Skeleton className="h-1.5 flex-1 rounded-full" />
+            <Skeleton className="h-3 w-8" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

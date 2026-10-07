@@ -4,6 +4,7 @@ import { useSession } from '@/features/auth/hooks'
 import { useGenres } from '@/features/genres/hooks'
 import { StoryForm } from '@/features/studio/components/StoryForm'
 import { StudioBreadcrumb } from '@/features/studio/components/StudioBreadcrumb'
+import { StoryFormSkeleton } from '@/features/studio/components/StudioSkeletons'
 import { useCreateStory } from '@/features/studio/hooks'
 import { paths } from '@/lib/routes'
 
@@ -20,7 +21,7 @@ export default function NewStoryPage() {
   const isAdmin = !!user?.isAdmin
 
   // Chờ danh sách thể loại để form khởi tạo đúng giá trị chọn sẵn
-  if (preset && genres.isPending) return <div className="h-96 animate-pulse rounded-xl bg-muted" />
+  const waitGenres = !!preset && genres.isPending
 
   return (
     <>
@@ -35,34 +36,38 @@ export default function NewStoryPage() {
           ? '"Đăng truyện" để công khai ngay.'
           : '"Đăng và gửi duyệt" để xuất bản chương đầu và gửi truyện cho ban quản trị duyệt (duyệt xong truyện mới công khai).'}
       </p>
-      <StoryForm
-        defaultValues={{
-          title: '',
-          description: '',
-          genreSlugs: presetGenres,
-          status: 'ongoing',
-          coverUrl: null,
-          authorName: '',
-        }}
-        authorName={user?.displayName ?? ''}
-        firstChapter
-        publishLabel={isAdmin ? 'Đăng truyện' : 'Đăng và gửi duyệt'}
-        submitLabel="Lưu nháp"
-        pendingLabel="Đang lưu…"
-        pending={create.isPending}
-        error={create.error}
-        onSubmit={(story, { chapter, publish, allowLeave }) =>
-          create.mutate(
-            { story, firstChapter: chapter ? { chapter, publish } : undefined },
-            {
-              onSuccess: (created) => {
-                allowLeave()
-                navigate(paths.studioStory(created.id), { replace: true })
+      {waitGenres ? (
+        <StoryFormSkeleton />
+      ) : (
+        <StoryForm
+          defaultValues={{
+            title: '',
+            description: '',
+            genreSlugs: presetGenres,
+            status: 'ongoing',
+            coverUrl: null,
+            authorName: '',
+          }}
+          authorName={user?.displayName ?? ''}
+          firstChapter
+          publishLabel={isAdmin ? 'Đăng truyện' : 'Đăng và gửi duyệt'}
+          submitLabel="Lưu nháp"
+          pendingLabel="Đang lưu…"
+          pending={create.isPending}
+          error={create.error}
+          onSubmit={(story, { chapter, publish, allowLeave }) =>
+            create.mutate(
+              { story, firstChapter: chapter ? { chapter, publish } : undefined },
+              {
+                onSuccess: (created) => {
+                  allowLeave()
+                  navigate(paths.studioStory(created.id), { replace: true })
+                },
               },
-            },
-          )
-        }
-      />
+            )
+          }
+        />
+      )}
     </>
   )
 }

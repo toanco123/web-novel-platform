@@ -2,6 +2,7 @@ import { Alert, App, Button, Card, Grid, Input, Popconfirm, Table, Tag } from 'a
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { ADMIN_USER_SORTS, type AdminUser, adminErrorMessage } from '@/features/admin/api'
+import { TableEmpty } from '@/features/admin/components/TableEmpty'
 import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
 import {
   onTableChange,
@@ -42,7 +43,7 @@ export default function AdminUsersPage() {
   const status = pick(STATUSES, params.get('status'))
   const provider = pick(Object.keys(providerNames), params.get('provider'))
   const { sort, order, pageSize } = readTableParams(params, ADMIN_USER_SORTS)
-  const { data, isPending, isFetching, isError } = useAdminUsers({
+  const { data, isPending, isFetching, isError, isPlaceholderData } = useAdminUsers({
     q,
     role,
     status,
@@ -130,10 +131,13 @@ export default function AdminUsersPage() {
             dataSource={data?.items}
             scroll={{ x: 1180 }}
             locale={{
-              emptyText:
-                q || role || status || provider
-                  ? 'Không có ai khớp bộ lọc'
-                  : 'Chưa có người dùng nào',
+              emptyText: (
+                <TableEmpty loading={isPending || isPlaceholderData}>
+                  {q || role || status || provider
+                    ? 'Không có ai khớp bộ lọc'
+                    : 'Chưa có người dùng nào'}
+                </TableEmpty>
+              ),
             }}
             pagination={tablePagination(data, page, pageSize, update)}
             onChange={onTableChange(update)}

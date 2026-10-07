@@ -352,7 +352,8 @@ test('tác giả mới: "Đăng và gửi duyệt" thì chờ duyệt; bị từ
   const linh = await registerUser('Linh', 'linh@gmail.com')
   const { router, user } = renderApp('/studio/new-story?genre=ngon-tinh')
   expect(await screen.findByText(/Đăng và gửi duyệt/, { selector: 'p' }, slow)).toBeInTheDocument()
-  await user.type(screen.getByLabelText('Tên truyện'), 'Gió Mùa Thu')
+  // Tiêu đề trang hiện ngay, form chờ danh sách thể loại (có ?genre=) rồi mới hiện
+  await user.type(await screen.findByLabelText('Tên truyện', {}, slow), 'Gió Mùa Thu')
   await user.type(
     screen.getByLabelText('Giới thiệu'),
     'Một câu chuyện tình học trò nhẹ nhàng giữa hai người bạn cùng bàn.',

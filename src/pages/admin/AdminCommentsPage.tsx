@@ -7,6 +7,7 @@ import {
   type AdminCommentQuery,
   adminErrorMessage,
 } from '@/features/admin/api'
+import { TableEmpty } from '@/features/admin/components/TableEmpty'
 import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
 import {
   onTableChange,
@@ -40,7 +41,7 @@ export default function AdminCommentsPage() {
   const q = params.get('q') ?? ''
   const kind = KINDS.find((k) => k === params.get('kind'))
   const { sort, order, pageSize } = readTableParams(params, ADMIN_COMMENT_SORTS)
-  const { data, isPending, isFetching, isError } = useAdminComments({
+  const { data, isPending, isFetching, isError, isPlaceholderData } = useAdminComments({
     view,
     q,
     kind,
@@ -121,12 +122,15 @@ export default function AdminCommentsPage() {
             dataSource={data?.items}
             scroll={{ x: 1100 }}
             locale={{
-              emptyText:
-                q || kind
-                  ? 'Không có bình luận nào khớp'
-                  : view === 'reported'
-                    ? 'Không có bình luận nào đang bị báo cáo'
-                    : 'Chưa có bình luận',
+              emptyText: (
+                <TableEmpty loading={isPending || isPlaceholderData}>
+                  {q || kind
+                    ? 'Không có bình luận nào khớp'
+                    : view === 'reported'
+                      ? 'Không có bình luận nào đang bị báo cáo'
+                      : 'Chưa có bình luận'}
+                </TableEmpty>
+              ),
             }}
             pagination={tablePagination(data, page, pageSize, update)}
             onChange={onTableChange(update)}

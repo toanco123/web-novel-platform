@@ -1,6 +1,7 @@
 import { Trophy } from 'lucide-react'
 import { Link } from 'react-router'
 import { SectionError, SectionHeading } from '@/components/common/SectionHeading'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatCount } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
@@ -8,6 +9,8 @@ import { useTrendingWeekly } from '../hooks'
 import { StoryCover } from '../StoryCover'
 
 const rankColor = ['text-neon', 'text-rose-gold', 'text-rose-gold/80']
+// Số truyện getTrendingWeekly trả về mặc định
+const COUNT = 10
 
 export function TrendingWeekly() {
   const { data, isPending, isError } = useTrendingWeekly()
@@ -30,8 +33,16 @@ export function TrendingWeekly() {
       ) : (
         <ol className="grid gap-1 md:grid-cols-2 md:gap-x-6 lg:grid-cols-1">
           {isPending
-            ? Array.from({ length: 6 }, (_, i) => (
-                <li key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
+            ? Array.from({ length: COUNT }, (_, i) => (
+                // Cùng khung với dòng thật: số hạng, bìa w-10 (cao 60px), hai dòng chữ
+                <li key={i} className="flex items-center gap-3 p-2">
+                  <Skeleton className="h-7 w-7 shrink-0" />
+                  <Skeleton className="aspect-[2/3] w-10 shrink-0 rounded" />
+                  <div className="min-w-0 flex-1">
+                    <Skeleton className="my-0.5 h-4 w-3/4" />
+                    <Skeleton className="my-0.5 h-3 w-1/2" />
+                  </div>
+                </li>
               ))
             : data.map(({ story: s, value }, i) => (
                 <li key={s.slug}>

@@ -1,8 +1,12 @@
 import { Link } from 'react-router'
 import { SectionError, SectionHeading } from '@/components/common/SectionHeading'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import { useLatestUpdated } from '../hooks'
+
+// Số truyện getLatestUpdated trả về mặc định: khung chờ đủ chừng ấy dòng để khối không co giãn
+const COUNT = 12
 
 export function LatestUpdates() {
   const { data, isPending, isError } = useLatestUpdated()
@@ -21,10 +25,18 @@ export function LatestUpdates() {
       ) : (
         <ul className="divide-y rounded-xl border bg-card/50">
           {isPending
-            ? Array.from({ length: 8 }, (_, i) => (
-                <li key={i} className="px-4 py-3.5">
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-                  <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-muted" />
+            ? Array.from({ length: COUNT }, (_, i) => (
+                // Cùng lưới và chiều cao dòng chữ với dòng thật (24px tên, 16px thể loại...)
+                <li
+                  key={i}
+                  className="grid gap-x-4 gap-y-1 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_6.5rem] sm:items-center"
+                >
+                  <div>
+                    <Skeleton className="my-0.5 h-5 w-2/3" />
+                    <Skeleton className="my-0.5 h-3 w-20" />
+                  </div>
+                  <Skeleton className="my-0.5 h-4 w-32" />
+                  <Skeleton className="my-0.5 h-3 w-16 sm:ml-auto" />
                 </li>
               ))
             : data.map((s) => (

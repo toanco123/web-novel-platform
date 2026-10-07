@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { FollowButton } from '@/features/library/components/FollowButton'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { formatCount } from '@/lib/format'
@@ -126,6 +127,7 @@ export function HeroShowcase() {
           <StoryCover
             key={story.slug}
             story={story}
+            priority
             className="motion-safe:animate-in motion-safe:duration-700 motion-safe:zoom-in-95 motion-safe:fade-in"
           />
         </Link>
@@ -170,17 +172,30 @@ export function HeroShowcase() {
   )
 }
 
+/** Khung chờ cùng chiều cao với banner thật (kể cả hàng nút và dải bìa nhỏ) để trang không nhảy */
 function HeroSkeleton() {
   return (
-    <div className="border-b bg-muted/40">
-      <Container className="grid items-center gap-10 py-12 md:grid-cols-[1fr_auto] lg:py-20">
-        <div className="space-y-4">
-          <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-          <div className="h-16 w-3/4 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
-          <div className="h-20 w-full max-w-xl animate-pulse rounded bg-muted" />
+    <div aria-hidden className="border-b bg-muted/40">
+      <Container className="grid items-center gap-10 py-12 md:grid-cols-[1fr_auto] lg:gap-16 lg:py-20">
+        <div>
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="mt-4 h-[2.15rem] w-3/4 sm:h-[2.85rem] lg:h-[4.3rem]" />
+          <Skeleton className="mt-4 h-7 w-1/3" />
+          <Skeleton className="mt-5 h-[4.875rem] w-full max-w-xl" />
+          <Skeleton className="mt-6 h-5 w-full max-w-sm" />
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Skeleton className="h-11 w-48 rounded-full" />
+            <Skeleton className="h-11 w-52 rounded-full" />
+          </div>
         </div>
-        <div className="hidden aspect-[2/3] w-56 animate-pulse rounded-xl bg-muted md:block lg:w-72" />
+        <Skeleton className="hidden aspect-[2/3] w-56 rounded-xl md:block lg:w-72" />
+      </Container>
+      <Container className="pb-8">
+        <div className="flex gap-3">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="aspect-[2/3] w-12 sm:w-14" />
+          ))}
+        </div>
       </Container>
     </div>
   )

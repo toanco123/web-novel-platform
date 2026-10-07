@@ -4,6 +4,7 @@ import { Header } from '@/components/common/Header'
 import { OfflineBanner } from '@/components/common/OfflineBanner'
 import { AppScrollRestoration } from '@/components/common/AppScrollRestoration'
 import { AppBanner } from '@/features/appBanner/AppBanner'
+import { NavigationProgress } from '@/components/common/NavigationProgress'
 
 export function MainLayout() {
   return (
@@ -14,6 +15,7 @@ export function MainLayout() {
       >
         Bỏ qua điều hướng
       </a>
+      <NavigationProgress />
       <Header />
       <OfflineBanner />
       <main id="main" className="flex-1">

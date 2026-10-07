@@ -1,4 +1,4 @@
-import { Alert, Card, Col, Row, Segmented, Skeleton, Statistic } from 'antd'
+import { Alert, Card, Col, Row, Segmented, Spin, Statistic } from 'antd'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { SITE_NAME } from '@/config/site'
@@ -12,6 +12,7 @@ import {
   periodDelta,
 } from '@/features/admin/api'
 import { AttentionPanel } from '@/features/admin/components/AttentionPanel'
+import { DashboardSkeleton } from '@/features/admin/components/DashboardSkeleton'
 import { KpiTile } from '@/features/admin/components/KpiTile'
 import {
   CategoryBars,
@@ -25,6 +26,7 @@ import { TopStoriesTable } from '@/features/admin/components/TopStoriesTable'
 import { ViewsCalendar } from '@/features/admin/components/ViewsCalendar'
 import { useAdminOverview } from '@/features/admin/hooks'
 import { paths } from '@/lib/routes'
+import { cn } from '@/lib/utils'
 
 const number = new Intl.NumberFormat('vi-VN')
 const DEFAULT_PERIOD: AdminPeriod = 30
@@ -35,7 +37,7 @@ const parsePeriod = (value: string | null): AdminPeriod =>
 export default function AdminDashboardPage() {
   const [params, setParams] = useSearchParams()
   const period = parsePeriod(params.get('period'))
-  const { data, isPending, isError } = useAdminOverview(period)
+  const { data, isPending, isError, isPlaceholderData } = useAdminOverview(period)
 
   const setPeriod = (value: AdminPeriod) =>
     setParams(
@@ -56,20 +58,33 @@ export default function AdminDashboardPage() {
           <h1 className="font-heading text-3xl font-semibold">Tổng quan</h1>
           {data && <p className="mt-1 text-sm text-muted-foreground">{compareRange(data)}</p>}
         </div>
-        <Segmented<AdminPeriod>
-          value={period}
-          onChange={setPeriod}
-          options={ADMIN_PERIODS.map((p) => ({ label: `${p} ngày`, value: p }))}
-          aria-label="Kỳ thống kê"
-        />
+        <div className="flex items-center gap-3">
+          {/* Đổi kỳ: số cũ vẫn hiện (mờ đi) trong lúc tải số của kỳ mới */}
+          {isPlaceholderData && <Spin size="small" aria-label="Đang tải số liệu" />}
+          <Segmented<AdminPeriod>
+            value={period}
+            onChange={setPeriod}
+            options={ADMIN_PERIODS.map((p) => ({ label: `${p} ngày`, value: p }))}
+            aria-label="Kỳ thống kê"
+          />
+        </div>
       </div>
 
       {isError ? (
         <Alert type="error" showIcon title="Không tải được số liệu. Thử tải lại trang." />
       ) : isPending ? (
-        <Skeleton active paragraph={{ rows: 12 }} />
+        <DashboardSkeleton />
       ) : (
-        <Overview data={data} period={period} />
+        <div
+          aria-busy={isPlaceholderData}
+          className={cn('space-y-6 transition-opacity', isPlaceholderData && 'opacity-60')}
+        >
+          {/* Nhãn kỳ theo số liệu đang hiện (số cũ khi đang tải kỳ mới), không theo nút vừa chọn */}
+          <Overview
+            data={data}
+            period={isPlaceholderData ? parsePeriod(String(data.days.length)) : period}
+          />
+        </div>
       )}
     </div>
   )

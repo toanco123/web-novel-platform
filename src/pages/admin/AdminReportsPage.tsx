@@ -2,6 +2,7 @@ import { Alert, App, Button, Card, Grid, Input, Segmented, Table, Tag } from 'an
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { type AdminReport, type AdminReportQuery } from '@/features/admin/api'
+import { TableEmpty } from '@/features/admin/components/TableEmpty'
 import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
 import {
   onTableChange,
@@ -33,7 +34,7 @@ export default function AdminReportsPage() {
   const reason = reportReasons.find((r) => r.value === params.get('reason'))?.value
   const q = params.get('q') ?? ''
   const { order, pageSize } = readTableParams(params, SORTS)
-  const { data, isPending, isFetching, isError } = useAdminReports({
+  const { data, isPending, isFetching, isError, isPlaceholderData } = useAdminReports({
     status,
     reason,
     q,
@@ -106,12 +107,15 @@ export default function AdminReportsPage() {
             dataSource={data?.items}
             scroll={{ x: 1100 }}
             locale={{
-              emptyText:
-                q || reason
-                  ? 'Không có báo lỗi nào khớp bộ lọc'
-                  : status === 'open'
-                    ? 'Không có báo lỗi nào đang mở'
-                    : 'Chưa có báo lỗi',
+              emptyText: (
+                <TableEmpty loading={isPending || isPlaceholderData}>
+                  {q || reason
+                    ? 'Không có báo lỗi nào khớp bộ lọc'
+                    : status === 'open'
+                      ? 'Không có báo lỗi nào đang mở'
+                      : 'Chưa có báo lỗi'}
+                </TableEmpty>
+              ),
             }}
             pagination={tablePagination(data, page, pageSize, update)}
             onChange={onTableChange(update)}

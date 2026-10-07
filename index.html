@@ -13,10 +13,146 @@
         var t = JSON.parse(localStorage.getItem('theme')).state.theme
         if (t === 'light') document.documentElement.classList.remove('dark')
       } catch (e) {}
+      // Khung trang tĩnh trong #root (hiện trước khi JS chạy): trang đọc chương không có header và
+      // theo màu nền đọc; trang quản trị, đăng nhập chỉ có nền
+      var d = document.documentElement.dataset
+      var p = location.pathname
+      if (/^\/story\/[^/]+\/chapter-/.test(p)) {
+        d.shell = 'reader'
+        try {
+          d.shellTone = JSON.parse(localStorage.getItem('reader-settings')).state.tone
+        } catch (e) {}
+      } else if (/^\/(admin|login|register|forgot-password|reset-password|auth\/)/.test(p)) {
+        d.shell = 'plain'
+      }
     </script>
+    <style>
+      /* Khung trang tĩnh: React thay toàn bộ #root khi chạy. Màu lấy từ token của index.css */
+      .app-shell {
+        min-height: 100svh;
+        background: var(--background);
+      }
+      .app-shell-wrap {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 0 1rem;
+      }
+      .app-shell-header {
+        border-bottom: 1px solid var(--border);
+      }
+      .app-shell-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        height: 4rem;
+      }
+      .app-shell-nav {
+        display: none;
+        gap: 0.375rem;
+        align-items: center;
+        height: 3rem;
+      }
+      .app-shell .sk {
+        display: block;
+        flex: none;
+        border-radius: 0.5rem;
+        background: var(--muted);
+        animation: app-shell-pulse 1.6s ease-in-out infinite;
+      }
+      .app-shell-main {
+        display: grid;
+        gap: 1.25rem;
+        padding-top: 2rem;
+      }
+      .app-shell-cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+      .app-shell-reader {
+        display: none;
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 6rem 1.25rem 0;
+        gap: 0.9rem;
+      }
+      [data-shell='reader'] .app-shell-header,
+      [data-shell='reader'] .app-shell-main,
+      [data-shell='plain'] .app-shell-header,
+      [data-shell='plain'] .app-shell-main {
+        display: none;
+      }
+      [data-shell='reader'] .app-shell-reader {
+        display: grid;
+      }
+      @media (min-width: 768px) {
+        .app-shell-wrap {
+          padding: 0 1.5rem;
+        }
+        .app-shell-cards {
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+      }
+      @media (min-width: 1024px) {
+        .app-shell-nav {
+          display: flex;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .app-shell .sk {
+          animation: none;
+        }
+      }
+      @keyframes app-shell-pulse {
+        50% {
+          opacity: 0.55;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-shell" aria-hidden="true">
+        <div class="app-shell-header">
+          <div class="app-shell-wrap app-shell-bar">
+            <span class="sk" style="width: 9rem; height: 2.25rem"></span>
+            <span
+              class="sk"
+              style="margin-left: auto; width: 2.25rem; height: 2.25rem; border-radius: 9999px"
+            ></span>
+            <span class="sk" style="width: 2.25rem; height: 2.25rem; border-radius: 9999px"></span>
+          </div>
+          <div class="app-shell-wrap app-shell-nav">
+            <span class="sk" style="width: 6rem; height: 2.25rem; border-radius: 9999px"></span>
+            <span class="sk" style="width: 6rem; height: 2.25rem; border-radius: 9999px"></span>
+            <span class="sk" style="width: 6rem; height: 2.25rem; border-radius: 9999px"></span>
+            <span class="sk" style="width: 6rem; height: 2.25rem; border-radius: 9999px"></span>
+          </div>
+        </div>
+        <div class="app-shell-wrap app-shell-main">
+          <span class="sk" style="height: 14rem; border-radius: 1rem"></span>
+          <span class="sk" style="width: 12rem; height: 2rem"></span>
+          <div class="app-shell-cards">
+            <span class="sk" style="aspect-ratio: 2 / 3"></span>
+            <span class="sk" style="aspect-ratio: 2 / 3"></span>
+            <span class="sk" style="aspect-ratio: 2 / 3"></span>
+            <span class="sk" style="aspect-ratio: 2 / 3"></span>
+            <span class="sk" style="aspect-ratio: 2 / 3"></span>
+            <span class="sk" style="aspect-ratio: 2 / 3"></span>
+          </div>
+        </div>
+        <div class="app-shell-reader">
+          <span class="sk" style="width: 60%; height: 2rem; margin: 0 auto 1.5rem"></span>
+          <span class="sk" style="height: 1rem"></span>
+          <span class="sk" style="height: 1rem"></span>
+          <span class="sk" style="width: 85%; height: 1rem"></span>
+          <span class="sk" style="height: 1rem"></span>
+          <span class="sk" style="width: 70%; height: 1rem"></span>
+          <span class="sk" style="height: 1rem"></span>
+          <span class="sk" style="width: 90%; height: 1rem"></span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { ListSkeleton } from '@/features/library/components/FollowingList'
+import { ListSkeleton } from '@/features/library/components/ListSkeleton'
 import type { ResumeState } from '@/features/library/resume'
 import { StoryCover } from '@/features/stories/StoryCover'
 import { formatBytes } from '@/lib/format'

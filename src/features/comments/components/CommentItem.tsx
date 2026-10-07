@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/features/auth/components/UserAvatar'
 import { BlockUserDialog } from '@/features/blocks/components/BlockUserDialog'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
@@ -62,7 +63,9 @@ export function CommentItem({ comment, viewer }: Props) {
               Không tải được trả lời. Thử lại sau.
             </p>
           ) : replies.isPending ? (
-            <div className="mt-3 h-12 animate-pulse rounded-lg bg-muted" />
+            <div className="mt-3 border-l pl-4">
+              <CommentSkeleton reply />
+            </div>
           ) : (
             replies.data.length > 0 && (
               <ul
@@ -107,6 +110,26 @@ export function CommentItem({ comment, viewer }: Props) {
         )}
       </div>
     </article>
+  )
+}
+
+/** Khung chờ cùng dáng một bình luận: ảnh đại diện, tên + thời gian, hai dòng chữ, hàng nút */
+export function CommentSkeleton({ reply = false }: { reply?: boolean }) {
+  return (
+    <div className={cn('flex', reply ? 'gap-2.5' : 'gap-3 py-4')} aria-hidden>
+      <Skeleton className={cn('shrink-0 rounded-full', reply ? 'size-7' : 'size-9')} />
+      <div className="min-w-0 flex-1">
+        <div className="flex h-5 items-center gap-2">
+          <Skeleton className="h-3.5 w-28" />
+          <Skeleton className="h-3 w-14" />
+        </div>
+        <div className="mt-1.5 space-y-2">
+          <Skeleton className="h-3.5 w-full" />
+          <Skeleton className="h-3.5 w-2/3" />
+        </div>
+        <Skeleton className="mt-3 h-3 w-24" />
+      </div>
+    </div>
   )
 }
 

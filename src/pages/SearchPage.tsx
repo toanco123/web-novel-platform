@@ -6,6 +6,7 @@ import { Pagination } from '@/components/common/Pagination'
 import { SectionError } from '@/components/common/SectionHeading'
 import { Button } from '@/components/ui/button'
 import { SITE_NAME } from '@/config/site'
+import { SEARCH_PER_PAGE } from '@/features/stories/api'
 import { useSearchStories } from '@/features/stories/hooks'
 import { GenreCloud } from '@/features/stories/sections/GenreCloud'
 import { TrendingWeekly } from '@/features/stories/sections/TrendingWeekly'
@@ -118,7 +119,7 @@ function Results({ q, page }: { q: string; page: number }) {
 
       {isPending ? (
         <div className="mt-4 divide-y">
-          {Array.from({ length: 4 }, (_, i) => (
+          {Array.from({ length: SEARCH_PER_PAGE }, (_, i) => (
             <StoryRowSkeleton key={i} />
           ))}
         </div>

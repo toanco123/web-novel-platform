@@ -7,6 +7,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { SITE_NAME } from '@/config/site'
 import { FormAlert } from '@/features/auth/components/FormAlert'
 import { StudioBreadcrumb } from '@/features/studio/components/StudioBreadcrumb'
+import { StudioLoadError } from '@/features/studio/components/StudioLoadError'
+import { ImportChaptersSkeleton } from '@/features/studio/components/StudioSkeletons'
+import { isNotFoundError, loadFailed } from '@/features/studio/components/loadState'
 import { studioErrorMessage } from '@/features/studio/errors'
 import { useImportChapters, useMyChapters, useMyStory } from '@/features/studio/hooks'
 import { parseChapters, readChapterFile, type ParseResult } from '@/features/studio/parseChapters'
@@ -27,10 +30,15 @@ export default function ImportChaptersPage() {
   const [publish, setPublish] = useState(false)
   const [dragging, setDragging] = useState(false)
 
-  if (story.isPending || chapters.isPending)
-    return <div className="h-64 animate-pulse rounded-xl bg-muted" />
-  if (!story.data)
-    return <NotFound message="Không tìm thấy truyện này trong khu Sáng tác của bạn." />
+  const notFound = <NotFound message="Không tìm thấy truyện này trong khu Sáng tác của bạn." />
+  // Lỗi "không tìm thấy" thì hiện 404, lỗi khác (mạng...) cho thử lại
+  const failed = [story, chapters].filter(loadFailed)
+  if (story.data === null || failed.some((q) => isNotFoundError(q.error))) return notFound
+  if (failed.length > 0) {
+    return <StudioLoadError onRetry={() => failed.forEach((q) => void q.refetch())} />
+  }
+  if (story.isPending || chapters.isPending) return <ImportChaptersSkeleton />
+  if (!story.data) return notFound
 
   const start = (chapters.data?.at(-1)?.number ?? 0) + 1
   const parsed = file?.result.chapters ?? []

@@ -1,6 +1,5 @@
 // Nơi DUY NHẤT xử lý đăng nhập. Có Supabase thì dùng Supabase Auth (api.remote.ts), không thì dùng
 // auth giả trong localStorage (api.mock.ts: test tự động, làm UI offline). Hai bản cùng chữ ký hàm.
-import { supabase } from '@/lib/supabase'
 import * as mock from './api.mock'
 import * as remote from './api.remote'
 import {
@@ -12,7 +11,8 @@ import {
 
 export * from './shared'
 
-const api: typeof mock = supabase ? remote : mock
+// __USE_MOCK__ là hằng lúc build (vite.config.ts): bản build có Supabase bỏ hẳn api.mock.ts
+const api: typeof mock = __USE_MOCK__ ? mock : remote
 
 export const {
   getSession,
@@ -43,6 +43,6 @@ export async function requireUserId() {
  * Nút đăng nhập mạng xã hội được hiện. Supabase: chỉ provider đã bật (VITE_AUTH_PROVIDERS, cần
  * Client ID/Secret trên Dashboard); bản giả: đủ cả hai.
  */
-export const socialProviders: SocialProvider[] = supabase
-  ? parseSocialProviders(import.meta.env.VITE_AUTH_PROVIDERS)
-  : SOCIAL_PROVIDERS
+export const socialProviders: SocialProvider[] = __USE_MOCK__
+  ? SOCIAL_PROVIDERS
+  : parseSocialProviders(import.meta.env.VITE_AUTH_PROVIDERS)

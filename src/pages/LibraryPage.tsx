@@ -1,12 +1,13 @@
 import { Link, useSearchParams } from 'react-router'
 import { Container } from '@/components/common/Container'
-import { PageLoader } from '@/components/common/PageLoader'
 import { SegmentedLinks } from '@/components/common/SegmentedLinks'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { SITE_NAME } from '@/config/site'
 import { useSession } from '@/features/auth/hooks'
 import { FollowingList } from '@/features/library/components/FollowingList'
 import { HistoryList } from '@/features/library/components/HistoryList'
+import { ListSkeleton } from '@/features/library/components/ListSkeleton'
 import { useLibraryUpdateCount } from '@/features/library/hooks'
 import { SavedList } from '@/features/offline/components/SavedList'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
@@ -22,8 +23,9 @@ export default function LibraryPage() {
   const current = useCurrentPath()
 
   const requested = params.get('tab')
-  // Tab Đã lưu chỉ đọc kho trên máy: không chờ phiên (lúc offline supabase-js có thể treo khá lâu)
-  if (isPending && requested !== 'saved') return <PageLoader />
+  // Tab Đã lưu chỉ đọc kho trên máy: không chờ phiên (lúc offline supabase-js có thể treo khá lâu).
+  // Đang chờ phiên thì giữ khung trang (tiêu đề thật, tab và danh sách chờ) thay vì vòng xoay
+  const loading = isPending && requested !== 'saved'
   // Khách mặc định xem lịch sử (tab theo dõi cần tài khoản)
   const tab: Tab =
     requested === 'saved'
@@ -42,44 +44,51 @@ export default function LibraryPage() {
             Truyện bạn theo dõi, những chương đang đọc dở và chương đã lưu để đọc offline.
           </p>
         </div>
-        <SegmentedLinks
-          label="Mục trong tủ truyện"
-          replace
-          items={[
-            {
-              key: 'following',
-              to: { search: '?tab=following' },
-              active: tab === 'following',
-              label: (
-                <>
-                  Đang theo dõi
-                  {updates > 0 && (
-                    <span className="rounded-full bg-neon px-1.5 text-[0.7rem] leading-4 font-semibold text-background">
-                      {updates}
-                      <span className="sr-only"> truyện có chương mới</span>
-                    </span>
-                  )}
-                </>
-              ),
-            },
-            {
-              key: 'history',
-              to: { search: '?tab=history' },
-              active: tab === 'history',
-              label: 'Lịch sử đọc',
-            },
-            {
-              key: 'saved',
-              to: { search: '?tab=saved' },
-              active: tab === 'saved',
-              label: 'Đã lưu',
-            },
-          ]}
-        />
+        {loading ? (
+          // Cùng cỡ nhóm tab (ba tab, cao h-8 + viền)
+          <Skeleton className="h-9.5 w-80 max-w-full rounded-full" />
+        ) : (
+          <SegmentedLinks
+            label="Mục trong tủ truyện"
+            replace
+            items={[
+              {
+                key: 'following',
+                to: { search: '?tab=following' },
+                active: tab === 'following',
+                label: (
+                  <>
+                    Đang theo dõi
+                    {updates > 0 && (
+                      <span className="rounded-full bg-neon px-1.5 text-[0.7rem] leading-4 font-semibold text-background">
+                        {updates}
+                        <span className="sr-only"> truyện có chương mới</span>
+                      </span>
+                    )}
+                  </>
+                ),
+              },
+              {
+                key: 'history',
+                to: { search: '?tab=history' },
+                active: tab === 'history',
+                label: 'Lịch sử đọc',
+              },
+              {
+                key: 'saved',
+                to: { search: '?tab=saved' },
+                active: tab === 'saved',
+                label: 'Đã lưu',
+              },
+            ]}
+          />
+        )}
       </div>
 
       <div className="mt-8">
-        {tab === 'saved' ? (
+        {loading ? (
+          <ListSkeleton />
+        ) : tab === 'saved' ? (
           <SavedList />
         ) : tab === 'history' ? (
           <>

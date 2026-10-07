@@ -5,13 +5,17 @@ const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const forceMock = import.meta.env.VITE_USE_MOCK === 'true'
 
+// Dùng dữ liệu giả: __USE_MOCK__ là hằng do vite.config.ts thay vào lúc build. Các api.ts cũng đọc
+// thẳng __USE_MOCK__ (không qua module này) để bản build có Supabase loại hẳn api.mock.ts
+const useMock = __USE_MOCK__ || !url || !anonKey || forceMock
+
 /**
  * null khi chưa cấu hình .env hoặc đặt VITE_USE_MOCK=true: các api.ts khi đó dùng dữ liệu giả trong
  * localStorage (api.mock.ts). Test tự động luôn chạy trên dữ liệu giả (xem vite.config.ts).
  * Kiểu Database sinh từ schema: supabase gen types typescript --linked --schema public
  */
 export const supabase =
-  url && anonKey && !forceMock
+  !useMock && url && anonKey
     ? createClient<Database>(url, anonKey, {
         // PKCE: link đăng nhập mạng xã hội / đặt lại mật khẩu trả về ?code= thay vì token trên URL
         auth: { flowType: 'pkce' },

@@ -184,6 +184,8 @@ Thiết kế chi tiết (bảng, luật nghiệp vụ, RLS, RPC, storage, bảng
 5g. **Lọc, sắp xếp, phân trang cho bảng quản trị** ✅ (01/10/2026, chi tiết ở `plan-bang-quan-tri-loc-sap-xep.md`): bấm tiêu đề cột để sắp xếp, ô lọc theo từng bảng, chọn 10/20/50/100 dòng, sửa cột bị khuất và chữ đè cột.
 5h. **Duyệt truyện** ✅ (01/10/2026, chi tiết ở `plan-duyet-truyen.md`): truyện của tác giả phải được quản trị viên duyệt mới công khai; hàng chờ `/admin/reviews`, trạng thái chờ duyệt / bị từ chối trong khu Sáng tác.
 5i. **Banner mời tải app di động** ✅ (07/10/2026, chi tiết ở `plan-banner-cai-app.md`): thanh dính đáy màn hình trên điện thoại, trỏ App Store / Google Play theo máy, tắt thì 30 ngày sau hiện lại; chỉ hiện khi đã khai báo `VITE_APP_STORE_URL` / `VITE_PLAY_STORE_URL`.
+5j. **Điểm danh và phiếu đề cử** 📝 (07/10/2026, chờ duyệt plan `plan-diem-danh-va-de-cu.md`): điểm danh mỗi ngày nhận phiếu đề cử (chuỗi 7 ngày được thưởng thêm), đề cử truyện, bảng xếp hạng "Đề cử" và khối "Đề cử tuần" trên trang chủ; sổ giao dịch có loại tài sản để giai đoạn 2 thêm xu.
+5j. **Tối ưu tải trang** ✅ (07/10/2026, chi tiết ở `plan-toi-uu-tai-trang.md`): khung trang tĩnh hiện ngay, skeleton đúng hình mọi trang, bớt nhấp nháy khi đăng nhập, bỏ dữ liệu giả khỏi bản production. Đợt 3 (route loader, bỏ request nối tiếp, ảnh thu nhỏ) chưa làm.
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---

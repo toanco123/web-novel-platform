@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { NotFound } from '@/components/common/NotFound'
@@ -16,6 +16,9 @@ import { StoryForm } from '@/features/studio/components/StoryForm'
 import { StoryReportsPanel } from '@/features/studio/components/StoryReportsPanel'
 import { StoryStatsPanel } from '@/features/studio/components/StoryStatsPanel'
 import { StudioBreadcrumb } from '@/features/studio/components/StudioBreadcrumb'
+import { StudioLoadError } from '@/features/studio/components/StudioLoadError'
+import { ManageStorySkeleton } from '@/features/studio/components/StudioSkeletons'
+import { isNotFoundError } from '@/features/studio/components/loadState'
 import { studioErrorMessage } from '@/features/studio/errors'
 import {
   useMyStory,
@@ -28,9 +31,12 @@ import { paths } from '@/lib/routes'
 
 export default function ManageStoryPage() {
   const { storyId = '' } = useParams()
-  const { data: story, isPending } = useMyStory(storyId)
+  const { data: story, isPending, error, refetch } = useMyStory(storyId)
 
-  if (isPending) return <div className="h-64 animate-pulse rounded-xl bg-muted" />
+  if (isPending) return <ManageStorySkeleton />
+  // Lỗi mạng/máy chủ (chưa có dữ liệu): cho thử lại, chỉ hiện 404 khi thật sự không có truyện
+  if (story === undefined && !isNotFoundError(error))
+    return <StudioLoadError onRetry={() => void refetch()} />
   if (!story) return <NotFound message="Không tìm thấy truyện này trong khu Sáng tác của bạn." />
   return <ManageStory story={story} />
 }
@@ -199,7 +205,8 @@ function PublishControls({ story }: { story: MyStory }) {
             disabled={visibility.isPending}
             onClick={() => visibility.mutate(false)}
           >
-            Ẩn truyện
+            {visibility.isPending && <LoaderCircle className="animate-spin" aria-hidden />}
+            {visibility.isPending ? 'Đang ẩn…' : 'Ẩn truyện'}
           </Button>
         ) : approved ? (
           <Button
@@ -208,7 +215,8 @@ function PublishControls({ story }: { story: MyStory }) {
             aria-describedby={needsChapter ? 'publish-hint' : undefined}
             onClick={() => visibility.mutate(true)}
           >
-            Xuất bản truyện
+            {visibility.isPending && <LoaderCircle className="animate-spin" aria-hidden />}
+            {visibility.isPending ? 'Đang xuất bản…' : 'Xuất bản truyện'}
           </Button>
         ) : (
           review !== 'pending' && (
@@ -218,7 +226,12 @@ function PublishControls({ story }: { story: MyStory }) {
               aria-describedby={needsChapter ? 'publish-hint' : 'review-hint'}
               onClick={() => submit.mutate()}
             >
-              {review === 'rejected' ? 'Gửi duyệt lại' : 'Gửi duyệt'}
+              {submit.isPending && <LoaderCircle className="animate-spin" aria-hidden />}
+              {submit.isPending
+                ? 'Đang gửi…'
+                : review === 'rejected'
+                  ? 'Gửi duyệt lại'
+                  : 'Gửi duyệt'}
             </Button>
           )
         )}

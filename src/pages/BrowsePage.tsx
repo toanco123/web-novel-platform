@@ -40,8 +40,9 @@ export default function BrowsePage() {
         />
       </div>
       <div className="mt-8">
-        {/* key: đổi danh sách thì bộ lọc bắt đầu lại */}
-        <StoryBrowser key={type} fixed={{ status: list.status }} />
+        {/* Không đặt key: bộ lọc nằm trên URL (link tab không mang theo nên tự bắt đầu lại), giữ
+            nguyên component thì đổi tab vẫn thấy lưới cũ mờ đi thay vì nháy khung chờ */}
+        <StoryBrowser fixed={{ status: list.status }} />
       </div>
     </Container>
   )

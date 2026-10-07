@@ -1,5 +1,5 @@
-import { act, cleanup, screen } from '@testing-library/react'
-import { getChapterRange } from '@/features/chapters/api'
+import { act, cleanup, screen, within } from '@testing-library/react'
+import { getChapter, getChapterRange } from '@/features/chapters/api'
 import { READER_DEFAULTS, useReaderSettings } from '@/features/reader/useReaderSettings'
 import * as studio from '@/features/studio/api'
 import { registerUser } from '@/test/helpers'
@@ -9,7 +9,11 @@ import { getSavedChapter } from './store'
 
 vi.mock('@/features/chapters/api', async (importOriginal) => {
   const api = await importOriginal<typeof import('@/features/chapters/api')>()
-  return { ...api, getChapterRange: vi.fn(api.getChapterRange) }
+  return {
+    ...api,
+    getChapter: vi.fn(api.getChapter),
+    getChapterRange: vi.fn(api.getChapterRange),
+  }
 })
 
 const slug = 'truong-an-khong-tuyet'
@@ -20,6 +24,7 @@ beforeEach(() => {
   localStorage.clear()
   useReaderSettings.setState(READER_DEFAULTS)
   vi.mocked(getChapterRange).mockClear()
+  vi.mocked(getChapter).mockClear()
 })
 
 test('mở chương thì 5 chương sau vào kho; mất mạng vẫn đọc tiếp được', async () => {
@@ -89,4 +94,19 @@ test('truyện chưa công khai (chủ truyện xem trước) thì không tải 
   await heading()
   await new Promise((resolve) => setTimeout(resolve, 800))
   expect(getChapterRange).not.toHaveBeenCalled()
+})
+
+test('chương trước vào cache; rê chuột vào link "Chương sau" thì tải trước chương đó', async () => {
+  // Không cho tải trước theo lô để chương sau chưa có trong cache
+  vi.mocked(getChapterRange).mockResolvedValueOnce([])
+  const { user } = renderApp(`${base}/chapter-12`)
+  await heading()
+  await expect
+    .poll(() => vi.mocked(getChapter).mock.calls, { timeout: 3000 })
+    .toContainEqual([slug, 11])
+  expect(getChapter).not.toHaveBeenCalledWith(slug, 13)
+
+  const [top] = screen.getAllByRole('navigation', { name: /Chuyển chương/ })
+  await user.hover(within(top).getByRole('link', { name: /Chương sau|Sau/ }))
+  await expect.poll(() => vi.mocked(getChapter).mock.calls).toContainEqual([slug, 13])
 })

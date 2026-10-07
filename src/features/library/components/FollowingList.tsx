@@ -8,6 +8,7 @@ import { paths } from '@/lib/routes'
 import type { LibraryItem } from '@/types/library'
 import { useLibrary, useToggleFollow } from '../hooks'
 import { resumeState } from '../resume'
+import { ListSkeleton } from './ListSkeleton'
 import { ProgressMeter } from './ProgressMeter'
 
 export function FollowingList() {
@@ -121,21 +122,5 @@ function FollowingRow({ item: { story, newChapters, progress } }: { item: Librar
         </Button>
       </div>
     </article>
-  )
-}
-
-export function ListSkeleton() {
-  return (
-    <div className="divide-y rounded-xl border">
-      {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="flex gap-4 p-4">
-          <div className="aspect-[2/3] w-14 animate-pulse rounded bg-muted" />
-          <div className="flex-1 space-y-2">
-            <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
-            <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
-          </div>
-        </div>
-      ))}
-    </div>
   )
 }
