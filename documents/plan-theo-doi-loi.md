@@ -1,6 +1,8 @@
 # Plan: Theo dõi lỗi bằng Sentry (web)
 
-Trạng thái: ✅ code xong (07/10/2026), chờ khai báo biến trên Vercel và thử trên bản preview (bước 4). Nhánh `error-monitoring`.
+Trạng thái: ✅ xong (07/10/2026). Đã khai báo biến trên Vercel, gộp `main`, thử trên production: lỗi tới Sentry. Nhánh `error-monitoring`.
+
+Ghi chú: người đã mở web trước đó vẫn chạy bản cũ (service worker của PWA) cho tới khi bấm "Cập nhật" hoặc đóng hết tab, nên vài ngày đầu Sentry nhận ít lỗi hơn thực tế. Thử trên máy mình thì Application → Service workers → Unregister rồi tải lại.
 
 Khác với plan:
 - **Tải Sentry sau khi trang đã hiện.** `@sentry/react` nằm ở `src/lib/sentryClient.ts`, được `monitoring.ts` tải bằng import động khi trình duyệt rảnh (`requestIdleCallback`, tối đa 4 giây). Nạp ngay thì JS lúc mở trang tăng ~31 KB gzip (255 → 286 KB); tải sau thì chỉ còn +1,2 KB, chunk Sentry ~30 KB tải riêng.
