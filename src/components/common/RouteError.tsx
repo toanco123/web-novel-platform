@@ -1,14 +1,21 @@
 // Lỗi khi mở trang, thường là không tải được file JS của trang: mất mạng với trang không có trong
 // bộ nhớ đệm (khu Sáng tác, Quản trị), hoặc web vừa lên phiên bản mới
 import { WifiOff } from 'lucide-react'
-import { Link } from 'react-router'
+import { useEffect } from 'react'
+import { isRouteErrorResponse, Link, useRouteError } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useOnline } from '@/hooks/useOnline'
 import { reloadApp } from '@/lib/appUpdate'
+import { reportError } from '@/lib/monitoring'
 import { paths } from '@/lib/routes'
 
 export function RouteError() {
   const online = useOnline()
+  const error = useRouteError()
+  // Lỗi tải file JS và mất mạng bị lọc trong reportError; còn lại là lỗi code của trang
+  useEffect(() => {
+    if (!isRouteErrorResponse(error)) reportError(error, { source: 'route' })
+  }, [error])
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-background px-4 text-center text-foreground">
       {online ? (

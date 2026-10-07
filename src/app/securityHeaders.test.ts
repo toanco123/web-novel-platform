@@ -30,3 +30,9 @@ test('không cho trang khác nhúng web vào iframe (chống clickjacking)', () 
   expect(siteHeaders['x-frame-options']).toBe('DENY')
   expect(siteHeaders['content-security-policy']).toContain("frame-ancestors 'none'")
 })
+
+test('CSP cho phép gửi lỗi tới Sentry (host trong VITE_SENTRY_DSN)', () => {
+  expect(siteHeaders['content-security-policy']).toMatch(
+    /connect-src [^;]*https:\/\/o4512213536866304\.ingest\.us\.sentry\.io/,
+  )
+})

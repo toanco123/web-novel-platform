@@ -4,15 +4,9 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthSync } from '@/features/auth/components/AuthSync'
 import { OfflineSync } from '@/features/library/components/OfflineSync'
+import { createQueryClient } from './queryClient'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+const queryClient = createQueryClient()
 
 // Banner mời tải app (AppBanner) dính đáy màn hình: đẩy toast lên trên nó. 24px/16px là khoảng
 // mặc định của sonner cho màn lớn/điện thoại

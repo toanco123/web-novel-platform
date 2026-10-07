@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { type HtmlTagDescriptor, loadEnv, type Plugin } from 'vite'
@@ -65,6 +67,11 @@ export default defineConfig(({ mode }) => {
     env.VITE_USE_MOCK === 'true' ||
     !env.VITE_SUPABASE_URL ||
     !env.VITE_SUPABASE_ANON_KEY
+  const version: string = JSON.parse(readFileSync('package.json', 'utf-8')).version
+  // Tải source map lên Sentry chỉ khi build trên Vercel có SENTRY_AUTH_TOKEN (bí mật, không ở .env).
+  // Source map tạo dạng 'hidden' (file JS không trỏ tới) và bị xóa sau khi tải lên, nên người dùng
+  // không tải được mã nguồn; không có token thì không tạo source map
+  const uploadSourcemaps = !useMock && !!process.env.SENTRY_AUTH_TOKEN
 
   return {
     plugins: [
@@ -73,8 +80,22 @@ export default defineConfig(({ mode }) => {
       ...pwa(),
       seoFiles(env.VITE_SITE_URL || DEFAULT_SITE_URL),
       htmlHints(useMock ? undefined : env.VITE_SUPABASE_URL),
+      // Plugin Sentry phải đứng cuối
+      uploadSourcemaps &&
+        sentryVitePlugin({
+          org: 'hanoi-university-of-business-a',
+          project: 'web-novel-platform',
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          release: { name: version },
+          sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] },
+          telemetry: false,
+        }),
     ],
-    define: { __USE_MOCK__: JSON.stringify(useMock) },
+    define: {
+      __USE_MOCK__: JSON.stringify(useMock),
+      __APP_VERSION__: JSON.stringify(version),
+      __SENTRY_ENV__: JSON.stringify(process.env.VERCEL_ENV ?? 'local'),
+    },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),
@@ -83,6 +104,7 @@ export default defineConfig(({ mode }) => {
     server,
     preview: server,
     build: {
+      sourcemap: uploadSourcemaps ? 'hidden' : false,
       rolldownOptions: {
         treeshake: {
           // Dữ liệu giả (src/mocks, api.mock.ts) chỉ khai báo hàm/hằng: báo không có hiệu ứng phụ để

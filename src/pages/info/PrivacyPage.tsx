@@ -4,7 +4,7 @@ import { paths } from '@/lib/routes'
 
 export default function PrivacyPage() {
   return (
-    <InfoPage path={paths.privacy} updatedAt="2026-09-25">
+    <InfoPage path={paths.privacy} updatedAt="2026-10-07">
       <InfoNote>
         Bản thử nghiệm hiện lưu mọi dữ liệu (tài khoản, tủ truyện, lịch sử đọc, bình luận) ngay trên
         trình duyệt của bạn, chưa gửi lên máy chủ. Xóa dữ liệu trình duyệt là mất các dữ liệu này.
@@ -26,6 +26,11 @@ export default function PrivacyPage() {
         <li>
           <strong>Cài đặt đọc:</strong> phông chữ, cỡ chữ, màu nền, giọng đọc. Phần này chỉ lưu trên
           trình duyệt.
+        </li>
+        <li>
+          <strong>Thông tin lỗi kỹ thuật:</strong> khi web gặp lỗi, thông tin về lỗi (trang đang mở,
+          trình duyệt, mã tài khoản) được gửi tới dịch vụ theo dõi lỗi Sentry để chúng tôi sửa.
+          Không kèm email, tên hay nội dung bạn nhập.
         </li>
       </ul>
 
