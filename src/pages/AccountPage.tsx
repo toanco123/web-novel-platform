@@ -6,6 +6,7 @@ import { ChangePasswordForm } from '@/features/auth/components/ChangePasswordFor
 import { DeleteAccountForm } from '@/features/auth/components/DeleteAccountForm'
 import { ProfileForm } from '@/features/auth/components/ProfileForm'
 import { useSession } from '@/features/auth/hooks'
+import { BlockedUsersList } from '@/features/blocks/components/BlockedUsersList'
 import { cn } from '@/lib/utils'
 import { Seo } from '@/components/common/Seo'
 
@@ -35,6 +36,9 @@ function Account() {
         </Section>
         <Section id="password-title" title="Mật khẩu">
           <ChangePasswordForm user={user} />
+        </Section>
+        <Section id="blocked-title" title="Người đã chặn">
+          <BlockedUsersList />
         </Section>
         <Section id="delete-title" title="Xóa tài khoản" danger>
           <DeleteAccountForm user={user} />

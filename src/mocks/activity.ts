@@ -1,4 +1,4 @@
-// Hoạt động của người đọc (theo dõi, lịch sử đọc, lượt đọc, chấm điểm, bình luận, báo lỗi),
+// Hoạt động của người đọc (theo dõi, lịch sử đọc, lượt đọc, chấm điểm, bình luận, chặn, báo lỗi),
 // lưu localStorage trong giai đoạn mock. Nhiều api.ts cùng đọc các dữ liệu này (vd studio đếm
 // người theo dõi), nên gom về một chỗ thay vì để api này đọc thẳng key của api khác.
 import { readMock, writeMock } from '@/lib/mockStorage'
@@ -15,6 +15,7 @@ const COMMENTS_KEY = 'mock-comments'
 const COMMENT_REPORTS_KEY = 'mock-comment-reports'
 const REPORTS_KEY = 'mock-reports'
 const CONTACT_KEY = 'mock-contact-messages'
+const BLOCKS_KEY = 'mock-user-blocks'
 
 /** Chủ lịch sử đọc khi chưa đăng nhập */
 export const GUEST = 'guest'
@@ -147,6 +148,24 @@ export function removeComments(match: (comment: Comment) => boolean) {
   saveCommentReports(loadCommentReports().filter((r) => !removed.has(r.commentId)))
   return matched.length
 }
+
+// ── Chặn người dùng ─────────────────────────────────────────────────────
+
+export type BlockEntry = { userId: string; blockedAt: string }
+
+/** userId → người đã chặn (chặn gần nhất trước) */
+export const loadAllBlocks = () => readMock<Record<string, BlockEntry[]>>(BLOCKS_KEY, {})
+
+export const loadBlocks = (userId: string) => loadAllBlocks()[userId] ?? []
+
+export function saveBlocks(userId: string, entries: BlockEntry[]) {
+  const { [userId]: _old, ...rest } = loadAllBlocks()
+  writeMock(BLOCKS_KEY, entries.length ? { ...rest, [userId]: entries } : rest)
+}
+
+/** Người `viewerId` đã chặn, bình luận của họ bị ẩn (như private.my_blocked_ids()); khách: rỗng */
+export const blockedIds = (viewerId: string | null) =>
+  new Set(viewerId ? loadBlocks(viewerId).map((e) => e.userId) : [])
 
 // ── Báo lỗi chương ──────────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { UserAvatar } from '@/features/auth/components/UserAvatar'
+import { BlockUserDialog } from '@/features/blocks/components/BlockUserDialog'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
@@ -129,11 +130,14 @@ type ActionsProps = {
   comment: Comment
   viewer: User | null
   onReply: () => void
-  /** Khách bấm "Báo cáo" */
+  /** Khách bấm "Báo cáo" hoặc "Chặn" */
   onGuest: () => void
 }
 
-/** Hàng nút dưới một bình luận hoặc trả lời: Trả lời, rồi Xóa (của mình) hoặc Báo cáo (của người khác) */
+/**
+ * Hàng nút dưới một bình luận hoặc trả lời: Trả lời, rồi Xóa (của mình) hoặc Báo cáo, Chặn (của
+ * người khác)
+ */
 function CommentActions({ comment, viewer, onReply, onGuest }: ActionsProps) {
   const remove = useDeleteComment(comment.storySlug)
   return (
@@ -152,7 +156,10 @@ function CommentActions({ comment, viewer, onReply, onGuest }: ActionsProps) {
           onConfirm={() => remove.mutate(comment.id)}
         />
       ) : (
-        <ReportCommentDialog comment={comment} onGuest={viewer ? undefined : onGuest} />
+        <>
+          <ReportCommentDialog comment={comment} onGuest={viewer ? undefined : onGuest} />
+          <BlockUserDialog user={comment.user} onGuest={viewer ? undefined : onGuest} />
+        </>
       )}
     </div>
   )
