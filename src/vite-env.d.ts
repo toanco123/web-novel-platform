@@ -14,10 +14,16 @@ interface ImportMetaEnv {
   /** Link App Store / Google Play của app di động; bỏ trống thì không hiện banner mời tải app */
   readonly VITE_APP_STORE_URL?: string
   readonly VITE_PLAY_STORE_URL?: string
+  /** DSN của project Sentry (không phải bí mật); bỏ trống thì không gửi lỗi */
+  readonly VITE_SENTRY_DSN?: string
 }
 
 /** Dùng dữ liệu giả thay Supabase; hằng do vite.config.ts thay vào lúc build */
 declare const __USE_MOCK__: boolean
+/** Version trong package.json (release của Sentry) */
+declare const __APP_VERSION__: string
+/** Môi trường gửi lên Sentry: VERCEL_ENV (production, preview) hoặc 'local' */
+declare const __SENTRY_ENV__: string
 
 interface ImportMeta {
   readonly env: ImportMetaEnv
