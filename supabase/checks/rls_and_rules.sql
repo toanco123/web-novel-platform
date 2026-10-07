@@ -1473,6 +1473,168 @@ select pg_temp.expect(
   'admin_overview: top truyện hiện bút danh');
 reset role;
 
+-- ── Điểm danh hằng ngày và phiếu đề cử ──────────────────────────────────
+-- 51: tác giả, 52: bạn đọc mới (điểm danh lần đầu), 53: bạn đọc đang có chuỗi 6 ngày
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000051', 'dd1@kiem-tra.local', '{"display_name": "Tác Giả Đề Cử"}'),
+  ('00000000-0000-4000-8000-000000000052', 'dd2@kiem-tra.local', '{"display_name": "Bạn Đọc Đề Cử"}'),
+  ('00000000-0000-4000-8000-000000000053', 'dd3@kiem-tra.local', '{"display_name": "Người Có Chuỗi"}');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000051", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Truyện Được Đề Cử', 'Truyện để kiểm tra điểm danh và đề cử.', 'ongoing', array['bang-tin-mot'],
+  null, '{"title": "Một", "content": "Nội dung chương một."}', true);
+select * from public.create_story(
+  'Bản Nháp Đề Cử', 'Bản nháp không đề cử được.', 'ongoing', array['bang-tin-mot'], null,
+  '{"title": "Một", "content": "Nội dung chương một."}', false);
+reset role;
+select pg_temp.approve('truyen-duoc-de-cu');
+
+-- Điểm danh lần đầu, điểm danh lại trong ngày
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000052", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  public.reward_status() @> '{"balance": 0, "checkedInToday": false, "streak": 0, "nextReward": 1}',
+  'reward_status: người mới 0 phiếu, chưa điểm danh');
+select pg_temp.expect(
+  public.daily_checkin() = '{"reward": 1, "streak": 1, "balance": 1}'::jsonb,
+  'daily_checkin: lần đầu +1 phiếu, chuỗi 1');
+select pg_temp.expect_error($$select public.daily_checkin()$$, 'already_checked_in');
+select pg_temp.expect(
+  public.reward_status() @> '{"balance": 1, "checkedInToday": true, "streak": 1}',
+  'reward_status: đã điểm danh hôm nay');
+
+-- Không ghi thẳng được bảng ví, sổ, điểm danh, đề cử, số đề cử; không gọi được hàm ghi sổ
+select pg_temp.expect_error(
+  $$insert into public.wallet_balances (user_id, currency, balance)
+    values ('00000000-0000-4000-8000-000000000052', 'ticket', 999)$$, '42501');
+select pg_temp.expect_error($$update public.wallet_balances set balance = 999$$, '42501');
+select pg_temp.expect_error(
+  $$insert into public.wallet_ledger (user_id, currency, amount, reason, balance_after)
+    values ('00000000-0000-4000-8000-000000000052', 'ticket', 999, 'checkin', 999)$$, '42501');
+select pg_temp.expect_error(
+  $$insert into public.daily_checkins (user_id, day, streak, reward)
+    values ('00000000-0000-4000-8000-000000000052', current_date + 1, 1, 1)$$, '42501');
+select pg_temp.expect_error(
+  $$insert into public.story_votes (story_id, user_id, amount)
+    values (pg_temp.story_id('truyen-duoc-de-cu'), '00000000-0000-4000-8000-000000000052', 5)$$,
+  '42501');
+select pg_temp.expect_error($$update public.story_stats set vote_count = 999$$, '42501');
+select pg_temp.expect_error(
+  $$select private.ledger_post('00000000-0000-4000-8000-000000000052', 'ticket', 100, 'checkin')$$,
+  '42501');
+
+-- Chuỗi: hôm qua là ngày 6 thì hôm nay +3; lỡ một ngày thì chuỗi về 0 rồi bắt đầu lại từ 1
+reset role;
+insert into public.daily_checkins (user_id, day, streak, reward) values
+  ('00000000-0000-4000-8000-000000000053', (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1, 6, 1),
+  ('00000000-0000-4000-8000-000000000051', (now() at time zone 'Asia/Ho_Chi_Minh')::date - 2, 4, 1);
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000053", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  public.reward_status() @> '{"streak": 6, "checkedInToday": false, "nextReward": 3}',
+  'reward_status: hôm qua là ngày 6 thì lần tới +3');
+select pg_temp.expect(
+  public.daily_checkin() = '{"reward": 3, "streak": 7, "balance": 3}'::jsonb,
+  'daily_checkin: ngày 7 của chuỗi +3 phiếu');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000051", "role": "authenticated"}', true);
+select pg_temp.expect(public.reward_status() @> '{"streak": 0}', 'reward_status: lỡ một ngày, chuỗi 0');
+select pg_temp.expect(
+  public.daily_checkin() @> '{"reward": 1, "streak": 1}', 'daily_checkin: lỡ ngày thì chuỗi lại từ 1');
+
+-- Đề cử: tài khoản mới tạo chưa đủ 3 ngày
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000052", "role": "authenticated"}', true);
+select pg_temp.expect_error($$select public.vote_story('truyen-duoc-de-cu', 1)$$, 'account_too_new');
+reset role;
+update public.profiles set created_at = now() - interval '4 days'
+where id in ('00000000-0000-4000-8000-000000000051', '00000000-0000-4000-8000-000000000052',
+  '00000000-0000-4000-8000-000000000053');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000052", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error($$select public.vote_story('truyen-duoc-de-cu', 0)$$, 'invalid_amount');
+select pg_temp.expect_error($$select public.vote_story('truyen-duoc-de-cu', 1001)$$, 'invalid_amount');
+select pg_temp.expect_error($$select public.vote_story('truyen-duoc-de-cu', 2)$$, 'insufficient_tickets');
+select pg_temp.expect_error($$select public.vote_story('khong-co-truyen-nay', 1)$$, 'not_found');
+select pg_temp.expect_error($$select public.vote_story('ban-nhap-de-cu', 1)$$, 'not_found');
+select pg_temp.expect(
+  public.vote_story('truyen-duoc-de-cu', 1) = '{"balance": 0, "total": 1}'::jsonb,
+  'vote_story: trừ phiếu, cộng vào tổng của truyện');
+select pg_temp.expect(
+  (select array_agg(amount order by id) = array[1, -1]
+     and (array_agg(balance_after order by id))[2] = 0
+     and (array_agg(story_id order by id))[2] = pg_temp.story_id('truyen-duoc-de-cu')
+   from public.wallet_ledger),
+  'wallet_ledger: chỉ thấy sổ của mình, đủ hai dòng kèm số dư và truyện');
+select pg_temp.expect(public.reward_status() @> '{"balance": 0}', 'reward_status: còn 0 phiếu');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000053", "role": "authenticated"}', true);
+select pg_temp.expect(
+  public.vote_story('truyen-duoc-de-cu', 2) = '{"balance": 1, "total": 3}'::jsonb,
+  'vote_story: người thứ hai đề cử 2 phiếu');
+select pg_temp.expect(
+  public.story_vote_summary('truyen-duoc-de-cu') = '{"total": 3, "week": 3, "mine": 2}'::jsonb,
+  'story_vote_summary: tổng, 7 ngày và phiếu của mình');
+select pg_temp.expect(
+  (select count(*) = 1 from public.story_votes) and (select count(*) = 2 from public.wallet_ledger)
+    and (select count(*) = 2 from public.daily_checkins),
+  'story_votes, wallet_ledger, daily_checkins: chỉ thấy dòng của mình');
+
+-- Tác giả không đề cử truyện của mình; thấy số đề cử trong thống kê
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000051", "role": "authenticated"}', true);
+select pg_temp.expect_error($$select public.vote_story('truyen-duoc-de-cu', 1)$$, 'own_story');
+select pg_temp.expect(
+  public.studio_story_stats(pg_temp.story_id('truyen-duoc-de-cu')) -> 'votes'
+    = '{"total": 3, "week": 3}'::jsonb,
+  'studio_story_stats: có số đề cử');
+
+-- Khách: xem tổng đề cử và bảng xếp hạng, không điểm danh / đề cử được
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect(
+  public.story_vote_summary('truyen-duoc-de-cu') = '{"total": 3, "week": 3, "mine": 0}'::jsonb,
+  'story_vote_summary: khách xem được, phiếu của mình là 0');
+select pg_temp.expect_error($$select public.story_vote_summary('ban-nhap-de-cu')$$, 'not_found');
+select pg_temp.expect(
+  exists (select 1 from public.story_ranking('votes', 'week')
+    where story_id = pg_temp.story_id('truyen-duoc-de-cu') and value = 3)
+  and exists (select 1 from public.story_ranking('votes', 'all')
+    where story_id = pg_temp.story_id('truyen-duoc-de-cu') and value = 3),
+  'story_ranking: tiêu chí votes theo 7 ngày và mọi lúc');
+select pg_temp.expect_error($$select public.daily_checkin()$$, '42501');
+select pg_temp.expect_error($$select public.vote_story('truyen-duoc-de-cu', 1)$$, '42501');
+select pg_temp.expect_error($$select public.reward_status()$$, '42501');
+select pg_temp.expect_error($$select count(*) from public.wallet_ledger$$, '42501');
+
+-- Xóa truyện: lượt đề cử mất theo, dòng sổ còn với story_id null
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000051", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected($$delete from public.stories where slug = 'truyen-duoc-de-cu'$$) = 1,
+  'xóa truyện được đề cử');
+reset role;
+select pg_temp.expect(
+  (select count(*) = 2 from public.wallet_ledger
+    where reason = 'vote' and story_id is null
+      and user_id in ('00000000-0000-4000-8000-000000000052', '00000000-0000-4000-8000-000000000053'))
+  and not exists (select 1 from public.story_votes
+    where user_id in ('00000000-0000-4000-8000-000000000052', '00000000-0000-4000-8000-000000000053')),
+  'xóa truyện: dòng sổ còn (story_id null), lượt đề cử mất theo');
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

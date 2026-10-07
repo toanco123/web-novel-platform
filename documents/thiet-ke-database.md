@@ -34,6 +34,8 @@ profiles 1─n push_tokens                       (mã thông báo đẩy của m
 profiles × stories: follows, reading_history, ratings   (khóa chính user_id + story_id)
 stories 1─n curated_stories             ("Nổi bật", "Biên tập chọn" trên trang chủ)
 contact_messages                        (độc lập, chỉ ghi)
+profiles 1─n wallet_balances, wallet_ledger, daily_checkins   (phiếu đề cử, plan-diem-danh-va-de-cu.md)
+profiles × stories: story_votes          (lượt đề cử; wallet_ledger.story_id set null khi xóa truyện)
 ```
 
 ## 3. Bảng
@@ -59,6 +61,10 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `user_blocks` | `blocker_id` (mặc định `auth.uid()`), `blocked_id` (khóa ngoại tới `profiles`, để PostgREST nhúng tên, ảnh), `created_at` | Khóa chính `(blocker_id, blocked_id)`, không tự chặn mình (`23514`). Chặn ai thì mọi bình luận, trả lời của người đó ẩn với mình (policy đọc `comments`); người bị chặn không biết. Giao diện chặn / bỏ chặn có ở cả app (App Store Guideline 1.2) và web (`features/blocks`: nút "Chặn" dưới bình luận, mục "Người đã chặn" ở `/account`) |
 | `push_tokens` | `token` (khóa chính, mã Expo), `user_id`, `platform` (`ios` \| `android`), `updated_at` | Ghi qua `register_push_token` (máy đổi tài khoản thì mã chuyển chủ; mỗi tài khoản tối đa 10 máy, bỏ máy cũ nhất). Xóa mã của mình khi đăng xuất |
 | `private.story_push_log` | `story_id`, `sent_at` | Lần gửi thông báo chương mới gần nhất của từng truyện (chống dội: 30 phút một lần, `private.push_cooldown()`). Không ai đọc ghi qua API |
+| `wallet_balances` | `user_id`, `currency`, `balance` (≥ 0), `updated_at` | Khóa chính `(user_id, currency)`. Chỉ `private.ledger_post` ghi |
+| `wallet_ledger` | `id`, `user_id`, `currency`, `amount` (≠ 0), `reason` (`checkin` \| `vote`), `story_id` (null khi điểm danh hoặc truyện đã xóa), `balance_after`, `created_at` | Sổ giao dịch, mỗi lần cộng / trừ một dòng. Chỉ chủ đọc. Giai đoạn 2 thêm `currency = 'coin'` |
+| `daily_checkins` | `user_id`, `day` (giờ Việt Nam), `streak`, `reward`, `created_at` | Khóa chính `(user_id, day)`. Ghi qua `daily_checkin` |
+| `story_votes` | `id`, `story_id`, `user_id`, `amount` (1–1000), `created_at` | Ghi qua `vote_story`. Chỉ chủ đọc (ai đề cử truyện nào là riêng tư); số công khai qua `story_vote_summary`, `story_ranking` |
 | `curated_stories` | `list` (`featured` \| `editor_pick`), `story_id`, `position` | Thay `featuredSlugs`/`editorPickSlugs`; quản trị viên sửa ở `/admin/featured` (RPC `admin_set_curated`) |
 
 **Enum:**
@@ -68,6 +74,8 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 - `report_reason`: `typo` \| `missing` \| `order` \| `violation` \| `other`
 - `report_status`: `open` \| `resolved`
 - `contact_topic`: `general` \| `bug` \| `copyright` \| `partnership`
+- `wallet_currency`: `ticket` (phiếu đề cử; giai đoạn 2 thêm `coin`)
+- `ledger_reason`: `checkin` \| `vote`
 
 ## 4. Luật nghiệp vụ và mã lỗi
 
@@ -92,6 +100,9 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `already_pending`, `already_approved` | Gửi duyệt truyện đang chờ duyệt / đã được duyệt | `StudioError` |
 | `not_pending`, `reason_required` | Admin duyệt/từ chối truyện không còn chờ duyệt / từ chối không ghi lý do | `AdminError` |
 | `story_limit`, `chapter_limit` | Vượt hạn mức tác giả mỗi ngày (bảng dưới) | `StudioError('story_limit' / 'chapter_limit')` |
+| `already_checked_in` | Điểm danh lần hai trong ngày (giờ Việt Nam) | `RewardError` |
+| `invalid_amount`, `own_story`, `account_too_new`, `insufficient_tickets` | Đề cử: số phiếu ngoài 1–1000 / truyện của mình / tài khoản tạo chưa đủ 3 ngày / không đủ phiếu | `RewardError` |
+| `insufficient_balance` | `private.ledger_post` làm số dư âm (chung mọi loại tài sản) | `RewardError('insufficient_tickets')` |
 | `invalid_avatar_url` | Đặt `profiles.avatar_url` không phải ảnh trong thư mục `avatars/{uid}/` của mình (chỉ xảy ra khi gọi thẳng API) | Lỗi chung |
 | `23505` (unique) | Trùng số chương / trùng thể loại | `chapter_exists` / `GenreExistsError` |
 | `42501` | Không có quyền (RLS hoặc grant) | Lỗi chung |
@@ -147,6 +158,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `contact_messages` | không ai | `anon` và `authenticated` insert |
 | `user_blocks` | chỉ người chặn | người chặn: insert (`blocked_id`), delete |
 | `push_tokens` | chỉ chủ | thêm / chuyển chủ qua `register_push_token`; chủ xóa |
+| `wallet_balances`, `wallet_ledger`, `daily_checkins`, `story_votes` | chỉ chủ (`authenticated`) | không ai ghi từ client: chỉ qua `daily_checkin`, `vote_story` (DEFINER) |
 
 **Quy tắc khi viết migration mới:**
 - Luôn `revoke all … from anon, authenticated` rồi mới `grant` đúng quyền. Grant theo cột chỉ có tác dụng khi không có quyền mức bảng.
@@ -173,7 +185,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `create_story(title, description, status, genres[], cover_path?, first_chapter?, publish?)` | đã đăng nhập | Tạo truyện, thể loại và chương đầu trong một transaction; trả về dòng `studio_stories`. `first_chapter` = `{"number"?, "title", "content"}`. Slug trùng thì thêm `-2`, `-3`… `publish`: xuất bản chương đầu, rồi tác giả thì gửi duyệt, quản trị viên thì công khai |
 | `submit_story_for_review(story_id)` | chủ truyện | Gửi duyệt / gửi lại sau khi bị từ chối (`pending`). Lỗi: `not_found`, `story_taken_down`, `already_pending`, `already_approved`, `no_published_chapters` |
 | `update_story(id, title, description, status, genres[], cover_path?)` | đã đăng nhập | Sửa truyện và thay thể loại cùng lúc |
-| `studio_story_stats(story_id)` | chủ truyện | jsonb giống kiểu `StoryStats` |
+| `studio_story_stats(story_id)` | chủ truyện | jsonb giống kiểu `StoryStats` (có `votes: {total, week}`) |
 | `record_chapter_view(slug, number)` | mọi người | +1 lượt đọc (bỏ qua chủ truyện, chương chưa xuất bản và lượt lặp lại trong ngày) |
 | `delete_account()` | đã đăng nhập | Xóa tài khoản của chính người gọi; khóa ngoại cascade xóa hồ sơ, truyện, chương, bình luận, tủ truyện... |
 | `save_reading_progress(slug, chapter, chapter_title, progress?)` | đã đăng nhập | Ghi chỗ đang đọc. Không truyền `progress` thì giữ vị trí cũ nếu vẫn chương đó |
@@ -183,9 +195,13 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `comment_threads(story_id, chapter?)` | mọi người | Bình luận gốc của truyện (`chapter` null) hoặc của một chương, kèm tên, ảnh người viết và `reply_count`. INVOKER nên RLS áp dụng; client thêm `order` và `range` |
 | `report_comment(comment_id, reason, note)` | đã đăng nhập | Báo cáo bình luận của người khác trong truyện đang công khai; đã có báo cáo đang mở thì cập nhật lý do và ghi chú |
 | `search_stories(q)` | mọi người | `(story_id, score, view_count)`, chấm điểm như `matchScore` |
-| `story_ranking(by, period, limit)` | mọi người | `(story_id, value)`. `by`: `views` \| `rating` \| `follows`; `period`: `week` \| `month` \| `all` |
+| `story_ranking(by, period, limit)` | mọi người | `(story_id, value)`. `by`: `views` \| `votes` \| `rating` \| `follows`; `period`: `week` \| `month` \| `all`. `votes` theo kỳ đếm qua `private.vote_ranking` (DEFINER, chỉ trả tổng) |
 | `related_stories(slug, limit)` | mọi người | `(story_id, overlap)` |
 | `slugify(text)` | mọi người | Giống `src/lib/slugify.ts` |
+| `daily_checkin()` | đã đăng nhập | Điểm danh hôm nay: chuỗi = hôm qua + 1 (không thì 1), ngày 7, 14… +3 phiếu, còn lại +1. Trả `{reward, streak, balance}`. Lỗi `already_checked_in` |
+| `reward_status()` | đã đăng nhập | `{balance, today, checkedInToday, streak, nextReward}` (INVOKER) |
+| `vote_story(slug, amount)` | đã đăng nhập | Đề cử truyện công khai, trừ phiếu, cộng `story_stats.vote_count`. Trả `{balance, total}`. Lỗi mục 4 |
+| `story_vote_summary(slug)` | mọi người | `{total, week, mine}` (7 ngày gần nhất; khách `mine = 0`); truyện không công khai → `not_found` |
 | `admin_overview(days)` | quản trị viên | jsonb giống kiểu `AdminOverview` (giờ Việt Nam): tổng số; chuỗi theo ngày (người dùng mới, lượt đọc, truyện mới, chương mới, bình luận mới, theo dõi mới, `viewsPrev` = lượt đọc của ngày tương ứng ở kỳ trước); `current`/`previous` (tổng kỳ này và kỳ liền trước cùng số ngày, kỳ này tính cả hôm nay chưa hết ngày); `calendar` (lượt đọc từng ngày, 12 cột tuần từ thứ Hai, cho lịch nhiệt); truyện theo thể loại; `genreViews` (lượt đọc trong kỳ theo thể loại, truyện nhiều thể loại tính vào từng thể loại); `topAuthors` (chủ truyện + bút danh, như `author_key`); top 10 lượt đọc (tên tác giả là bút danh nếu có). Đếm một lần trên cửa sổ bao trùm kỳ này, kỳ trước và lịch nhiệt; bình luận và theo dõi đã xóa thì không còn trong số liệu cũ |
 | `admin_users(query?)` | quản trị viên | Mọi tài khoản kèm email, provider, lần đăng nhập cuối, số truyện/bình luận/theo dõi; tìm tên/email không dấu |
 | `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp, kèm trạng thái gỡ, bút danh, thể loại và trạng thái duyệt (hàng chờ `/admin/reviews` lọc `review_status`). `sort`: `updated` \| `views` \| `created` |
@@ -271,6 +287,9 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | blocks | `getBlockedUsers` | `user_blocks.select('created_at, user:profiles!user_blocks_blocked_id_fkey(…)').order('created_at', desc)` |
 | feedback | `sendContactMessage` | `contact_messages.insert(...)` (không gọi `.select()`) |
 | feedback | `reportChapter` | `rpc('report_chapter')` |
+| rewards | `getRewardStatus`, `checkIn` | `rpc('reward_status')`, `rpc('daily_checkin')` |
+| rewards | `getTicketHistory` | `wallet_ledger.select('…, story:stories(slug, title)', { count: 'exact' }).eq('currency', 'ticket')` mới nhất trước, qua `loadPage` (truyện đã ẩn → `story = null`) |
+| rewards | `getStoryVoteSummary`, `voteStory` | `rpc('story_vote_summary', { p_slug })`, `rpc('vote_story', { p_slug, p_amount })`. Mã lỗi → `RewardError` |
 | admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |
 | admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports`, `getAdminComments` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports' / 'admin_comments', {...}, { count: 'exact' })`, rồi lọc (`.eq()`, `.gt()`, `.not('taken_down_at', 'is', null)`) và sắp xếp (`.order(cột, { nullsFirst: false }).order('id')`) bằng PostgREST ngay trên kết quả của hàm, `.range()` qua `loadPage`. Hàng chờ duyệt: `getAdminStories({ review })` → `.eq('review_status', …)`, sắp theo `review_submitted_at`. Số dòng mỗi trang: `adminPageSize()` (10 / 20 / 50 / 100) |
 | admin | `setMessageHandled`, `setAdminReportStatus`, `setUserBanned`, `setStoryTakedown`, `updateGenre`, `deleteGenre`, `mergeGenres` | RPC `admin_*` cùng tên (mục 6) |

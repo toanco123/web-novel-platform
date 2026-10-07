@@ -13,6 +13,7 @@ import {
   recentViews,
   saveReports,
   removeComments,
+  storyVoteCount,
   totalViews,
 } from '@/mocks/activity'
 import { takenStorySlugs } from '@/mocks/catalog'
@@ -406,6 +407,7 @@ export async function getStoryStats(storyId: string): Promise<StoryStats> {
     ratingAvg: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0,
     ratingCount: ratings.length,
     comments: loadUserComments().filter((c) => c.storySlug === story.slug).length,
+    votes: { total: storyVoteCount(story.slug), week: storyVoteCount(story.slug, 7) },
   }
 }
 

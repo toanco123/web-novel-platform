@@ -117,6 +117,8 @@ export type StoryStats = {
   ratingAvg: number
   ratingCount: number
   comments: number
+  /** Phiếu đề cử: tổng mọi lúc và 7 ngày gần nhất */
+  votes: { total: number; week: number }
 }
 
 /** Tên gọn khoảng trắng, bỏ thể loại chọn trùng */

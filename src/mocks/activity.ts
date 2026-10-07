@@ -1,4 +1,5 @@
-// Hoạt động của người đọc (theo dõi, lịch sử đọc, lượt đọc, chấm điểm, bình luận, chặn, báo lỗi),
+// Hoạt động của người đọc (theo dõi, lịch sử đọc, lượt đọc, chấm điểm, bình luận, chặn, báo lỗi,
+// điểm danh và phiếu đề cử),
 // lưu localStorage trong giai đoạn mock. Nhiều api.ts cùng đọc các dữ liệu này (vd studio đếm
 // người theo dõi), nên gom về một chỗ thay vì để api này đọc thẳng key của api khác.
 import { readMock, writeMock } from '@/lib/mockStorage'
@@ -16,6 +17,9 @@ const COMMENT_REPORTS_KEY = 'mock-comment-reports'
 const REPORTS_KEY = 'mock-reports'
 const CONTACT_KEY = 'mock-contact-messages'
 const BLOCKS_KEY = 'mock-user-blocks'
+const CHECKINS_KEY = 'mock-checkins'
+const LEDGER_KEY = 'mock-ticket-ledger'
+const VOTES_KEY = 'mock-story-votes'
 
 /** Chủ lịch sử đọc khi chưa đăng nhập */
 export const GUEST = 'guest'
@@ -197,3 +201,47 @@ export const loadContactMessages = () =>
   }))
 export const saveContactMessages = (messages: StoredContactMessage[]) =>
   writeMock(CONTACT_KEY, messages)
+
+// ── Điểm danh và phiếu đề cử (features/rewards) ─────────────────────────
+
+export type CheckinEntry = {
+  /** Ngày theo giờ Việt Nam (YYYY-MM-DD) */
+  day: string
+  streak: number
+  reward: number
+}
+
+/** Lần điểm danh của một người, mới nhất trước */
+export const loadCheckins = (userId: string) =>
+  readMock<Record<string, CheckinEntry[]>>(CHECKINS_KEY, {})[userId] ?? []
+export const saveCheckins = (userId: string, entries: CheckinEntry[]) =>
+  writeMock(CHECKINS_KEY, { ...readMock(CHECKINS_KEY, {}), [userId]: entries })
+
+export type StoredLedgerEntry = {
+  id: string
+  amount: number
+  reason: 'checkin' | 'vote'
+  storySlug: string | null
+  balanceAfter: number
+  createdAt: string
+}
+
+/** Sổ phiếu của một người, mới nhất trước */
+export const loadLedger = (userId: string) =>
+  readMock<Record<string, StoredLedgerEntry[]>>(LEDGER_KEY, {})[userId] ?? []
+export const saveLedger = (userId: string, entries: StoredLedgerEntry[]) =>
+  writeMock(LEDGER_KEY, { ...readMock(LEDGER_KEY, {}), [userId]: entries })
+
+export type StoredVote = { storySlug: string; userId: string; amount: number; createdAt: string }
+
+/** Mọi lượt đề cử (mọi người), cũ trước */
+export const loadVotes = () => readMock<StoredVote[]>(VOTES_KEY, [])
+export const saveVotes = (votes: StoredVote[]) => writeMock(VOTES_KEY, votes)
+
+/** Tổng phiếu của truyện; `days`: chỉ tính trong số ngày gần nhất */
+export function storyVoteCount(slug: string, days?: number) {
+  const since = days === undefined ? -Infinity : Date.now() - days * 86_400_000
+  return loadVotes()
+    .filter((v) => v.storySlug === slug && Date.parse(v.createdAt) > since)
+    .reduce((sum, v) => sum + v.amount, 0)
+}

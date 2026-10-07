@@ -41,7 +41,7 @@ export type SearchResult = Page<Story> & { genres: Genre[] }
 
 // ── Bảng xếp hạng ───────────────────────────────────────────────────────
 
-export type RankingCriterion = 'views' | 'rating' | 'follows'
+export type RankingCriterion = 'views' | 'votes' | 'rating' | 'follows'
 export type RankingPeriod = 'week' | 'month' | 'all'
 export type RankedStory = { story: Story; value: number }
 

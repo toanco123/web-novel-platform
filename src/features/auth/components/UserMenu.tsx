@@ -1,4 +1,12 @@
-import { BookMarked, Download, LayoutDashboard, LogOut, PenLine, UserRound } from 'lucide-react'
+import {
+  BookMarked,
+  Download,
+  LayoutDashboard,
+  LogOut,
+  PenLine,
+  Ticket,
+  UserRound,
+} from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import {
   DropdownMenu,
@@ -61,6 +69,12 @@ export function UserMenu({ user }: { user: User }) {
             <BookMarked />
             Tủ truyện
             <UpdateBadge count={updates} />
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to={paths.rewards}>
+            <Ticket />
+            Phiếu đề cử
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

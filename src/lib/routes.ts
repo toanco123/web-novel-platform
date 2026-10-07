@@ -8,6 +8,8 @@ export const paths = {
   completed: '/list/completed',
   ongoing: '/list/ongoing',
   ranking: '/ranking',
+  /** Bảng xếp hạng theo phiếu đề cử (7 ngày) */
+  rankingVotes: '/ranking?by=votes',
   search: (q?: string) => (q ? `/search?q=${encodeURIComponent(q)}` : '/search'),
   login: (next?: string) => withNext('/login', next),
   register: (next?: string) => withNext('/register', next),
@@ -30,6 +32,8 @@ export const paths = {
   studioChapter: (id: string, number: number) => `/studio/story/${id}/chapter/${number}`,
   studioImport: (id: string) => `/studio/story/${id}/import`,
   library: '/library',
+  /** Điểm danh và lịch sử phiếu đề cử */
+  rewards: '/rewards',
   readingHistory: '/library?tab=history',
   /** Tab "Đã lưu" của tủ truyện: chương đọc được khi không có mạng */
   savedChapters: '/library?tab=saved',

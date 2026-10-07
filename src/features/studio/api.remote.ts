@@ -470,6 +470,7 @@ export async function getStoryStats(storyId: string): Promise<StoryStats> {
     ratingAvg: Number(stats.ratingAvg),
     ratingCount: Number(stats.ratingCount),
     comments: Number(stats.comments),
+    votes: { total: Number(stats.votes.total), week: Number(stats.votes.week) },
   }
 }
 

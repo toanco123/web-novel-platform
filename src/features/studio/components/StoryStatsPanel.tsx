@@ -26,7 +26,7 @@ export function StoryStatsPanel({ storyId, published }: { storyId: string; publi
   if (isError) return <SectionError />
   if (isPending) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
         ))}
@@ -52,6 +52,11 @@ export function StoryStatsPanel({ storyId, published }: { storyId: string; publi
           hint={data.ratingCount ? `${number.format(data.ratingCount)} lượt chấm` : 'Chưa có'}
         />
         <StatTile label="Bình luận" value={formatCount(data.comments)} />
+        <StatTile
+          label="Đề cử"
+          value={formatCount(data.votes.total)}
+          hint={`${number.format(data.votes.week)} phiếu 7 ngày qua`}
+        />
       </dl>
       <div className="grid gap-6 lg:grid-cols-2">
         <DailyViews days={data.viewsByDay} />

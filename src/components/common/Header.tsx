@@ -6,6 +6,7 @@ import {
   Menu,
   PenLine,
   Search,
+  Ticket,
   UserRound,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -30,6 +31,7 @@ import { UpdateBadge, UserMenu } from '@/features/auth/components/UserMenu'
 import { useSession, useSignOut } from '@/features/auth/hooks'
 import { useGenres } from '@/features/genres/hooks'
 import { useLibraryUpdateCount } from '@/features/library/hooks'
+import { CheckInButton } from '@/features/rewards/components/CheckInButton'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
@@ -69,7 +71,9 @@ export function Header() {
               <span className="hidden lg:inline">Đăng truyện</span>
             </Link>
           </Button>
-          <ThemeToggle />
+          <CheckInButton />
+          {/* Màn hẹp: nút theme nằm trong menu (MobileNav) để header không tràn ngang */}
+          <ThemeToggle className="hidden sm:inline-flex" />
           <AccountSlot />
         </div>
       </Container>
@@ -185,6 +189,10 @@ function MobileNav() {
                 Tủ truyện
                 <UpdateBadge count={updates} />
               </Link>
+              <Link to={paths.rewards} onClick={close} className={menuLink}>
+                <Ticket className="size-4" aria-hidden />
+                Phiếu đề cử
+              </Link>
               <Link to={paths.studio} onClick={close} className={menuLink}>
                 <PenLine className="size-4" aria-hidden />
                 Sáng tác
@@ -230,6 +238,7 @@ function MobileNav() {
               Đăng truyện
             </Link>
           </Button>
+          <ThemeToggle row className="sm:hidden" />
           <SearchBox onNavigate={close} showGenreHints={false} />
           <nav aria-label="Điều hướng chính" className="flex flex-col gap-1">
             {navItems.map((item) => (

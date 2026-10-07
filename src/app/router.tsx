@@ -28,6 +28,7 @@ export const routes: RouteObject[] = [
       { path: 'ranking', lazy: page(() => import('@/pages/RankingPage')) },
       { path: 'search', lazy: page(() => import('@/pages/SearchPage')) },
       { path: 'library', lazy: page(() => import('@/pages/LibraryPage')) },
+      { path: 'rewards', lazy: page(() => import('@/pages/RewardsPage')) },
       { path: 'account', lazy: page(() => import('@/pages/AccountPage')) },
       { path: 'about', lazy: page(() => import('@/pages/info/AboutPage')) },
       { path: 'contact', lazy: page(() => import('@/pages/info/ContactPage')) },

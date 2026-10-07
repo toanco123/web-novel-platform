@@ -403,6 +403,8 @@ test('thống kê và báo lỗi đổi về đúng kiểu của bản giả', a
       ratingAvg: 4.5,
       ratingCount: 2,
       comments: 3,
+      // bigint của Postgres về dạng chuỗi
+      votes: { total: '12', week: 4 },
     }),
   ]
   expect(await api.getStoryStats(STORY_ID)).toEqual({
@@ -414,6 +416,7 @@ test('thống kê và báo lỗi đổi về đúng kiểu của bản giả', a
     ratingAvg: 4.5,
     ratingCount: 2,
     comments: 3,
+    votes: { total: 12, week: 4 },
   })
   expect(lastQuery()[0]).toEqual(['rpc', 'studio_story_stats', { p_story_id: STORY_ID }])
 

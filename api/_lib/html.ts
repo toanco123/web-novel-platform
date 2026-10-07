@@ -22,7 +22,7 @@ const CHAPTER = new RegExp(`^/story/(${SLUG})/chapter-([1-9][0-9]{0,8})$`)
 const GENRE = new RegExp(`^/genres/(${SLUG})$`)
 
 const PRIVATE =
-  /^\/(search|library|account|login|register|forgot-password|reset-password|auth|studio|admin)(\/|$)/
+  /^\/(search|library|rewards|account|login|register|forgot-password|reset-password|auth|studio|admin)(\/|$)/
 
 /** Trang ứng với một đường dẫn (pathname, không kèm query) */
 export function matchRoute(pathname: string): Route {
