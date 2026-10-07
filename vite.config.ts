@@ -58,6 +58,10 @@ export default defineConfig(({ mode }) => {
     host: env.HOST || 'localhost',
     port: Number(env.PORT) || 3000,
     strictPort: true,
+    // Dev server không chạy hàm Vercel: Giọng AI gọi /api/tts của một bản đã deploy (TTS_DEV_PROXY)
+    ...(env.TTS_DEV_PROXY && {
+      proxy: { '/api/tts': { target: env.TTS_DEV_PROXY, changeOrigin: true } },
+    }),
   }
   // Dữ liệu giả thay cho Supabase: test tự động, chưa cấu hình .env, hoặc VITE_USE_MOCK=true. Thay
   // vào code lúc build (__USE_MOCK__) để bản build có Supabase loại hẳn api.mock.ts và src/mocks

@@ -1635,6 +1635,109 @@ select pg_temp.expect(
     where user_id in ('00000000-0000-4000-8000-000000000052', '00000000-0000-4000-8000-000000000053')),
   'xóa truyện: dòng sổ còn (story_id null), lượt đề cử mất theo');
 
+-- ── Giọng AI: sổ file âm thanh và hạn mức ký tự ──────────────────────────
+-- 61, 62: người nghe. Chỉ service_role (hàm Vercel api/tts) gọi được tts_*; mức chặn tháng trong
+-- kiểm tra tính từ số ký tự DB thật đã dùng trong tháng (kiem_tra.tts_base)
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000061', 'tts1@kiem-tra.local', '{"display_name": "Người Nghe Một"}'),
+  ('00000000-0000-4000-8000-000000000062', 'tts2@kiem-tra.local', '{"display_name": "Người Nghe Hai"}');
+select set_config('kiem_tra.tts_base', coalesce((select m.chars from private.tts_usage_month m
+  where m.month = date_trunc('month', (now() at time zone 'Asia/Ho_Chi_Minh')::date)::date), 0)::text,
+  true);
+
+-- Khách và người đăng nhập không gọi được hàm của api, không đọc được bảng
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect_error($$select public.tts_lookup('Aoede', array[repeat('a', 64)])$$, '42501');
+select pg_temp.expect_error(
+  $$select public.tts_reserve('00000000-0000-4000-8000-000000000061', 10, 1000, 1000)$$, '42501');
+select pg_temp.expect_error($$select public.admin_tts_usage()$$, '42501');
+select pg_temp.expect_error($$select count(*) from private.tts_clips$$, '42501');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000061", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$select public.tts_reserve('00000000-0000-4000-8000-000000000061', 10, 1000, 1000)$$, '42501');
+select pg_temp.expect_error(
+  $$select public.tts_commit('00000000-0000-4000-8000-000000000061', 'Aoede', '[]', 0)$$, '42501');
+select pg_temp.expect_error($$select count(*) from private.tts_usage_day$$, '42501');
+select pg_temp.expect_error($$select public.admin_tts_usage()$$, 'forbidden');
+
+-- service_role: giữ trước ký tự trong hạn mức ngày (300) và tháng (đã dùng + 1000)
+reset role;
+select set_config('request.jwt.claims', '{"role": "service_role"}', true);
+set local role service_role;
+select pg_temp.expect(
+  public.tts_reserve('00000000-0000-4000-8000-000000000061', 100,
+    current_setting('kiem_tra.tts_base')::bigint + 1000, 300) ->> 'day' = '100',
+  'tts_reserve: lần đầu trong ngày');
+select pg_temp.expect(
+  public.tts_reserve('00000000-0000-4000-8000-000000000061', 150,
+    current_setting('kiem_tra.tts_base')::bigint + 1000, 300) ->> 'day' = '250',
+  'tts_reserve: cộng dồn trong ngày');
+select pg_temp.expect_error($$select public.tts_reserve('00000000-0000-4000-8000-000000000061', 100,
+  current_setting('kiem_tra.tts_base')::bigint + 1000, 300)$$, 'tts_daily_quota');
+select pg_temp.expect_error($$select public.tts_reserve('00000000-0000-4000-8000-000000000062', 400,
+  current_setting('kiem_tra.tts_base')::bigint + 1000, 300)$$, 'tts_daily_quota');
+-- Cả tháng còn 750 ký tự: người thứ hai giữ 100 trong mức chặn 300 thì vượt mức tháng
+select pg_temp.expect_error($$select public.tts_reserve('00000000-0000-4000-8000-000000000062', 100,
+  current_setting('kiem_tra.tts_base')::bigint + 300, 300)$$, 'tts_month_quota');
+select pg_temp.expect_error(
+  $$select public.tts_reserve('00000000-0000-4000-8000-000000000062', 0, 1000, 300)$$,
+  'invalid_input');
+
+-- Ghi file đã tạo và hoàn lại phần lỗi; ghi trùng thì bỏ qua
+select public.tts_commit('00000000-0000-4000-8000-000000000061', 'Aoede',
+  jsonb_build_array(jsonb_build_object('hash', repeat('a', 64), 'chars', 100, 'bytes', 2000)), 50);
+select public.tts_commit('00000000-0000-4000-8000-000000000061', 'Aoede',
+  jsonb_build_array(jsonb_build_object('hash', repeat('a', 64), 'chars', 100, 'bytes', 2000)), 0);
+select pg_temp.expect(
+  array(select public.tts_lookup('Aoede', array[repeat('a', 64), repeat('b', 64)]))
+    = array[repeat('a', 64)]
+  and not exists (select public.tts_lookup('Kore', array[repeat('a', 64)])),
+  'tts_lookup: chỉ trả hash đã có của đúng giọng');
+
+reset role;
+select pg_temp.expect(
+  (select count(*) = 1 from private.tts_clips
+    where voice = 'Aoede' and text_hash = repeat('a', 64)
+      and created_by = '00000000-0000-4000-8000-000000000061')
+  and (select chars = 200 from private.tts_usage_day
+    where user_id = '00000000-0000-4000-8000-000000000061')
+  and not exists (select 1 from private.tts_usage_day
+    where user_id = '00000000-0000-4000-8000-000000000062')
+  and (select m.chars = current_setting('kiem_tra.tts_base')::bigint + 200
+    from private.tts_usage_month m
+    where m.month = date_trunc('month', (now() at time zone 'Asia/Ho_Chi_Minh')::date)::date),
+  'tts: ghi trùng bỏ qua, hoàn lại 50 ký tự, lượt bị chặn không trừ gì');
+
+-- Quản trị viên xem số liệu tháng
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000062", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (public.admin_tts_usage() ->> 'chars')::bigint = current_setting('kiem_tra.tts_base')::bigint + 200
+  and (public.admin_tts_usage() ->> 'clips')::bigint >= 1
+  and (public.admin_tts_usage() ->> 'users')::bigint >= 1
+  and (public.admin_tts_usage() -> 'days' -> -1 ->> 'chars')::bigint >= 200,
+  'admin_tts_usage: ký tự tháng này, số file, số người, ký tự theo ngày');
+
+-- Hoàn lại nhiều hơn số đã dùng thì về 0, không âm
+reset role;
+select set_config('request.jwt.claims', '{"role": "service_role"}', true);
+set local role service_role;
+select public.tts_commit('00000000-0000-4000-8000-000000000061', 'Aoede', '[]', 100000);
+reset role;
+select pg_temp.expect(
+  (select chars = 0 from private.tts_usage_day
+    where user_id = '00000000-0000-4000-8000-000000000061'),
+  'tts_commit: hoàn lại không làm số ký tự âm');
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

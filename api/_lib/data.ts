@@ -101,3 +101,73 @@ export async function sitemapEntries(config = supabaseConfig()): Promise<Sitemap
     ...stories.map((s) => ({ path: `/story/${s.slug}`, lastmod: s.updated_at })),
   ]
 }
+
+// ── Giọng AI (api/tts) ──────────────────────────────────────────────────
+
+/** Cấu hình quyền service_role (chỉ dùng ở hàm Vercel, không bao giờ lộ ra client); thiếu thì null */
+export function serviceConfig(env: Record<string, string | undefined> = process.env) {
+  const url = env.VITE_SUPABASE_URL?.replace(/\/+$/, '')
+  const key = env.SUPABASE_SERVICE_ROLE_KEY
+  return url && key ? { url, key } : null
+}
+
+/** Khóa mới (`sb_secret_…`) không phải JWT nên chỉ gửi ở header apikey */
+const authHeaders = (key: string): Record<string, string> =>
+  key.startsWith('sb_') ? { apikey: key } : { apikey: key, authorization: `Bearer ${key}` }
+
+/** Lỗi của RPC: `code` là mã nghiệp vụ (message của lỗi P0001) hoặc SQLSTATE */
+export class RpcError extends Error {
+  code: string
+  constructor(code: string) {
+    super(code)
+    this.name = 'RpcError'
+    this.code = code
+  }
+}
+
+/** Gọi RPC (POST /rest/v1/rpc/<fn>) */
+export async function rpc<T>(config: Config, fn: string, args: Record<string, unknown>) {
+  const response = await fetch(`${config.url}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { ...authHeaders(config.key), 'content-type': 'application/json' },
+    body: JSON.stringify(args),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      code?: string
+      message?: string
+    } | null
+    throw new RpcError(
+      body?.code === 'P0001' && body.message
+        ? body.message
+        : (body?.code ?? `http_${response.status}`),
+    )
+  }
+  const text = await response.text()
+  return (text ? JSON.parse(text) : null) as T
+}
+
+/** Id người đăng nhập từ access token của Supabase Auth; token sai, hết hạn hoặc bị khóa thì null */
+export async function fetchUserId(config: Config | null, token: string) {
+  if (!config) throw new Error('Chưa cấu hình Supabase')
+  const response = await fetch(`${config.url}/auth/v1/user`, {
+    headers: { apikey: config.key, authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  })
+  if (response.status === 401 || response.status === 403) return null
+  if (!response.ok) throw new Error(`Supabase Auth trả mã ${response.status}`)
+  const user = (await response.json()) as { id?: string; banned_until?: string | null }
+  if (!user.id) return null
+  if (user.banned_until && new Date(user.banned_until) > new Date()) return null
+  return user.id
+}
+
+/** Chương đã xuất bản của truyện công khai (anon key: RLS như khách xem); slug đã được kiểm tra */
+export async function publicChapter(config: Config | null, slug: string, number: number) {
+  const [row] = await rest<{ number: number; title: string | null; content: string }>(
+    config,
+    `chapters?select=number,title,content,stories!inner(slug)&stories.slug=eq.${slug}&number=eq.${number}&status=eq.published&limit=1`,
+  )
+  return row ? { number: row.number, title: row.title ?? '', content: row.content } : null
+}

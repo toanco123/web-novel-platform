@@ -20,6 +20,7 @@ const EXPECTED_ERRORS = new Set([
   'OfflineStorageFullError',
   'StorageFullError',
   'RewardError',
+  'TtsError',
   // App di động: máy không nhận được thông báo đẩy (máy ảo, chưa cho phép)
   'PushUnavailableError',
 ])

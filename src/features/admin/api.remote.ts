@@ -18,6 +18,7 @@ import {
   type AdminContactMessage,
   type AdminMessageQuery,
   type AdminOverview,
+  type AdminTtsUsage,
   type AdminReport,
   type AdminReportQuery,
   type AdminStory,
@@ -53,6 +54,12 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
   await requireUserId()
   const data = unwrap(await db().rpc('admin_overview', { p_days: days }), adminError)
   return data as unknown as AdminOverview
+}
+
+export async function getAdminTtsUsage(): Promise<AdminTtsUsage> {
+  await requireUserId()
+  const data = unwrap(await db().rpc('admin_tts_usage'), adminError)
+  return data as unknown as AdminTtsUsage
 }
 
 const userSortColumns = {

@@ -23,6 +23,7 @@ import {
 } from '@/features/admin/components/OverviewCharts'
 import { TopAuthorsTable } from '@/features/admin/components/TopAuthorsTable'
 import { TopStoriesTable } from '@/features/admin/components/TopStoriesTable'
+import { TtsUsageCard } from '@/features/admin/components/TtsUsageCard'
 import { ViewsCalendar } from '@/features/admin/components/ViewsCalendar'
 import { useAdminOverview } from '@/features/admin/hooks'
 import { paths } from '@/lib/routes'
@@ -317,6 +318,8 @@ function Overview({ data, period }: { data: AdminOverview; period: AdminPeriod }
           <TopAuthorsTable authors={data.topAuthors} period={period} />
         </Col>
       </Section>
+
+      <TtsUsageCard />
 
       <Card title="Toàn hệ thống" size="small">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">

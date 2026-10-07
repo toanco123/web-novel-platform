@@ -49,6 +49,11 @@ test('quản trị viên xem tổng quan, người dùng và truyện của mộ
   expect(panel.getAllByText('Ổn')).toHaveLength(4)
   expect(panel.getByText('Không có việc tồn')).toBeInTheDocument()
 
+  // Hạn mức Giọng AI: tháng này chưa ai tạo âm thanh
+  expect(
+    await screen.findByText('Tháng này chưa ai tạo âm thanh Giọng AI.', {}, slow),
+  ).toBeInTheDocument()
+
   // Ô chính: lượt đọc trong kỳ, so với kỳ trước
   const hero = screen.getByText('Lượt đọc trong kỳ', { selector: 'p' }).closest('.ant-card')!
   expect(hero).toHaveTextContent('chưa có số liệu so với 30 ngày trước')

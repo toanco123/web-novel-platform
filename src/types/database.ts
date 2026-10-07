@@ -1188,6 +1188,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["publication_status"]
         }[]
       }
+      admin_tts_usage: { Args: never; Returns: Json }
       admin_update_genre: {
         Args: { p_description: string; p_name: string; p_slug: string }
         Returns: Json
@@ -1374,6 +1375,28 @@ export type Database = {
       submit_story_for_review: {
         Args: { p_story_id: string }
         Returns: undefined
+      }
+      tts_commit: {
+        Args: {
+          p_clips: Json
+          p_refund: number
+          p_user: string
+          p_voice: string
+        }
+        Returns: undefined
+      }
+      tts_lookup: {
+        Args: { p_hashes: string[]; p_voice: string }
+        Returns: string[]
+      }
+      tts_reserve: {
+        Args: {
+          p_chars: number
+          p_day_cap: number
+          p_month_cap: number
+          p_user: string
+        }
+        Returns: Json
       }
       update_story: {
         Args: {

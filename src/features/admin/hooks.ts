@@ -7,6 +7,7 @@ import { importStory } from './bulkImport'
 export const adminKeys = {
   all: (userId: string) => ['admin', userId] as const,
   overview: (userId: string, days: number) => ['admin', userId, 'overview', days] as const,
+  ttsUsage: (userId: string) => ['admin', userId, 'tts-usage'] as const,
   users: (userId: string, query: api.AdminUserQuery) => ['admin', userId, 'users', query] as const,
   stories: (userId: string, query: api.AdminStoryQuery) =>
     ['admin', userId, 'stories', query] as const,
@@ -14,6 +15,14 @@ export const adminKeys = {
 
 function useUserId() {
   return useSession().data?.id ?? 'guest'
+}
+
+export function useAdminTtsUsage() {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: adminKeys.ttsUsage(userId),
+    queryFn: api.getAdminTtsUsage,
+  })
 }
 
 export function useAdminOverview(days: number) {

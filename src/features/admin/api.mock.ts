@@ -45,6 +45,7 @@ import {
   type AdminContactMessage,
   type AdminMessageQuery,
   type AdminOverview,
+  type AdminTtsUsage,
   type AdminPeriodTotals,
   type AdminReport,
   type AdminReportQuery,
@@ -152,6 +153,17 @@ function allStories(): AdminStory[] {
   })
 
   return [...seeds, ...mine]
+}
+
+/** Bản giả không tạo âm thanh thật (Giọng AI giả chỉ có clip im lặng) nên số liệu luôn bằng 0 */
+export async function getAdminTtsUsage(): Promise<AdminTtsUsage> {
+  await delay()
+  await requireAdmin()
+  const today = dayKey(new Date())
+  const month = `${today.slice(0, 8)}01`
+  const days: AdminTtsUsage['days'] = []
+  for (let day = month; day <= today; day = addDays(day, 1)) days.push({ day, chars: 0 })
+  return { month, chars: 0, cap: null, users: 0, clips: 0, clipsThisMonth: 0, bytes: 0, days }
 }
 
 export async function getAdminOverview(days: number): Promise<AdminOverview> {

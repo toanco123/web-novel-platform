@@ -7,6 +7,8 @@ type SpeechSettings = {
   rate: number
   /** voiceURI của giọng đã chọn; null: tự chọn giọng tiếng Việt đầu tiên */
   voiceURI: string | null
+  /** Giọng AI đã chọn (id trong TTS_VOICES); null: dùng giọng của máy */
+  aiVoice: string | null
   /** Hết chương thì tự chuyển sang chương sau và đọc tiếp */
   autoNext: boolean
   update: (patch: Partial<Omit<SpeechSettings, 'update'>>) => void
@@ -17,6 +19,7 @@ export const useSpeechSettings = create<SpeechSettings>()(
     (set) => ({
       rate: 1,
       voiceURI: null,
+      aiVoice: null,
       autoNext: true,
       update: (patch) => set(patch),
     }),

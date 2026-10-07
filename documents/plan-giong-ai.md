@@ -2,6 +2,20 @@
 
 Trạng thái: 🚧 đang làm. Nhánh `ai-voices`.
 
+Tiến độ (07/10/2026):
+- [x] Lõi `session.ts` + `deviceEngine.ts` (không đổi hành vi)
+- [x] Migration `tts_ai_voices` (đã push), ca kiểm tra, sinh lại kiểu, `thiet-ke-database.md`
+- [x] Hàm Vercel `api/tts` + test
+- [x] Web: Giọng AI (`features/tts`, `clipQueue`, `cloudEngine`), cài đặt, gợi ý cài giọng, toast, CSP, proxy dev
+- [x] Admin: ô "Giọng AI tháng này"
+- [ ] Tài khoản Google Cloud, Cloudflare R2, biến môi trường Vercel (người dùng làm); nghe thử và chốt 4 giọng
+- [ ] Thử thật trên bản preview (Chrome, Safari, iPhone)
+- [ ] App di động
+
+Khác với plan:
+- CSP `media-src` cho mọi `https:` thay vì viết cứng tên miền R2 (tên miền chưa có; file âm thanh không chạy được mã).
+- Server bỏ qua các đoạn nằm ngoài chương trong `generate` thay vì báo lỗi (tạo sẵn chương sau khi chưa biết số đoạn).
+
 ## Context
 
 Nghe truyện hiện chỉ dùng giọng có sẵn trên máy: web dùng Web Speech API (`web-novel-platform/src/features/reader/speech/`), app dùng `expo-speech` (`mobile-novel-platform/src/features/reader/speech/`). Ô chọn giọng đã có, nhưng Android/Chrome thường chỉ có 1 giọng Google tiếng Việt, iPhone chỉ có "Linh", nên user gần như không có gì để chọn. Mục tiêu là cho user chọn được giọng AI tự nhiên mà **không tốn tiền**: dùng hạn mức miễn phí của Google và lưu file để mỗi đoạn văn chỉ phải tạo một lần.

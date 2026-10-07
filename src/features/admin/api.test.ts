@@ -14,6 +14,16 @@ test('khách không xem được, người thường nhận AdminError', async (
   await registerUser()
   await expect(admin.getAdminUsers({ page: 1 })).rejects.toBeInstanceOf(admin.AdminError)
   await expect(admin.getAdminStories({ page: 1 })).rejects.toBeInstanceOf(admin.AdminError)
+  await expect(admin.getAdminTtsUsage()).rejects.toBeInstanceOf(admin.AdminError)
+})
+
+test('hạn mức Giọng AI: bản giả luôn 0, có đủ các ngày từ đầu tháng tới hôm nay', async () => {
+  signInAs('demo')
+  const usage = await admin.getAdminTtsUsage()
+  expect(usage).toMatchObject({ chars: 0, cap: null, users: 0, clips: 0 })
+  expect(usage.month).toMatch(/^\d{4}-\d{2}-01$/)
+  expect(usage.days[0].day).toBe(usage.month)
+  expect(usage.days.at(-1)!.day).toBe(dayKey(new Date()))
 })
 
 test('quản trị viên thấy người dùng mới, truyện nháp và số liệu', async () => {

@@ -1,7 +1,7 @@
 {
   "name": "web-truyen",
   "private": true,
-  "version": "0.0.25",
+  "version": "0.0.26",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -32,9 +32,12 @@
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
     "antd": "^6.6.5",
+    "aws4fetch": "^1.0.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.4.0",
+    "domhandler": "^6.0.1",
+    "htmlparser2": "^12.0.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.48.0",
     "radix-ui": "^1.6.7",

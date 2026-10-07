@@ -36,3 +36,7 @@ test('CSP cho phép gửi lỗi tới Sentry (host trong VITE_SENTRY_DSN)', () =
     /connect-src [^;]*https:\/\/o4512213536866304\.ingest\.us\.sentry\.io/,
   )
 })
+
+test('CSP cho phát file âm thanh của Giọng AI (R2, https) và clip im lặng (data:)', () => {
+  expect(siteHeaders['content-security-policy']).toMatch(/media-src 'self' data: blob: https:;/)
+})

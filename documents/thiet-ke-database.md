@@ -36,6 +36,8 @@ stories 1─n curated_stories             ("Nổi bật", "Biên tập chọn" t
 contact_messages                        (độc lập, chỉ ghi)
 profiles 1─n wallet_balances, wallet_ledger, daily_checkins   (phiếu đề cử, plan-diem-danh-va-de-cu.md)
 profiles × stories: story_votes          (lượt đề cử; wallet_ledger.story_id set null khi xóa truyện)
+profiles 1─n private.tts_usage_day; profiles 0─n private.tts_clips (created_by)   (Giọng AI, plan-giong-ai.md)
+private.tts_usage_month                  (độc lập: ký tự Google theo tháng)
 ```
 
 ## 3. Bảng
@@ -65,6 +67,9 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `wallet_ledger` | `id`, `user_id`, `currency`, `amount` (≠ 0), `reason` (`checkin` \| `vote`), `story_id` (null khi điểm danh hoặc truyện đã xóa), `balance_after`, `created_at` | Sổ giao dịch, mỗi lần cộng / trừ một dòng. Chỉ chủ đọc. Giai đoạn 2 thêm `currency = 'coin'` |
 | `daily_checkins` | `user_id`, `day` (giờ Việt Nam), `streak`, `reward`, `created_at` | Khóa chính `(user_id, day)`. Ghi qua `daily_checkin` |
 | `story_votes` | `id`, `story_id`, `user_id`, `amount` (1–1000), `created_at` | Ghi qua `vote_story`. Chỉ chủ đọc (ai đề cử truyện nào là riêng tư); số công khai qua `story_vote_summary`, `story_ranking` |
+| `private.tts_clips` | `voice`, `text_hash` (sha256 hex), `chars`, `bytes`, `created_by` (set null khi xóa tài khoản), `created_at` | Sổ file MP3 của Giọng AI đã có trên Cloudflare R2 (`tts/v1/{voice}/{text_hash}.mp3`), khóa chính `(voice, text_hash)`. Chỉ hàm Vercel `api/tts` ghi qua `tts_commit` |
+| `private.tts_usage_month` | `month` (ngày 1, giờ Việt Nam), `chars`, `cap` | Số ký tự đã gửi Google trong tháng; `cap` là mức chặn api dùng lần gần nhất |
+| `private.tts_usage_day` | `user_id`, `day` (giờ Việt Nam), `chars` | Khóa chính `(user_id, day)`: số ký tự mỗi người làm tốn trong ngày |
 | `curated_stories` | `list` (`featured` \| `editor_pick`), `story_id`, `position` | Thay `featuredSlugs`/`editorPickSlugs`; quản trị viên sửa ở `/admin/featured` (RPC `admin_set_curated`) |
 
 **Enum:**
@@ -139,6 +144,13 @@ Lỗi nghiệp vụ nằm trong `error.message` (mã `P0001`). Các luật tự 
 
 **Captcha** (Cloudflare Turnstile, `features/auth/useCaptcha.tsx`): đăng nhập, đăng ký, quên mật khẩu và kiểm tra lại mật khẩu (đổi mật khẩu, xóa tài khoản) gửi `captchaToken`. Bật bằng `VITE_TURNSTILE_SITE_KEY` (Vercel) rồi mới bật Captcha ở Supabase Dashboard (Authentication > Attack Protection, dán Secret Key); làm ngược lại thì mọi form trên bị Supabase từ chối (`captcha_failed`).
 
+**Giọng AI** (migration `tts_ai_voices`, plan `plan-giong-ai.md`): hàm Vercel `api/tts` gọi `tts_reserve` trước khi gửi chữ cho Google, giữ trước số ký tự của các đoạn chưa có file; vượt thì ném lỗi và không trừ gì. Nghe lại đoạn đã có file không tính. Google hoặc R2 lỗi thì `tts_commit` hoàn lại phần chưa tạo được. Mức chặn đặt bằng biến môi trường của Vercel:
+
+| Việc | Giới hạn |
+|---|---|
+| Ký tự gửi Google mỗi tháng (cả web) | `TTS_MONTH_CHAR_CAP`, mặc định 900.000 = 90% phần miễn phí của Chirp 3 HD (`tts_month_quota`) |
+| Ký tự mỗi người mỗi ngày | `TTS_USER_DAY_CHAR_CAP`, mặc định 30.000 ≈ 2 chương (`tts_daily_quota`) |
+
 IP chỉ lưu dạng hash SHA-256 kèm bí mật ngẫu nhiên (`private.secrets`), không lưu IP gốc.
 
 ## 5. RLS và quyền
@@ -159,6 +171,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `user_blocks` | chỉ người chặn | người chặn: insert (`blocked_id`), delete |
 | `push_tokens` | chỉ chủ | thêm / chuyển chủ qua `register_push_token`; chủ xóa |
 | `wallet_balances`, `wallet_ledger`, `daily_checkins`, `story_votes` | chỉ chủ (`authenticated`) | không ai ghi từ client: chỉ qua `daily_checkin`, `vote_story` (DEFINER) |
+| `private.tts_clips`, `private.tts_usage_month`, `private.tts_usage_day` | không ai (client) | chỉ `service_role` qua `tts_lookup`, `tts_reserve`, `tts_commit` (DEFINER); quản trị viên xem tổng qua `admin_tts_usage` |
 
 **Quy tắc khi viết migration mới:**
 - Luôn `revoke all … from anon, authenticated` rồi mới `grant` đúng quyền. Grant theo cột chỉ có tác dụng khi không có quyền mức bảng.
@@ -203,6 +216,10 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `vote_story(slug, amount)` | đã đăng nhập | Đề cử truyện công khai, trừ phiếu, cộng `story_stats.vote_count`. Trả `{balance, total}`. Lỗi mục 4 |
 | `story_vote_summary(slug)` | mọi người | `{total, week, mine}` (7 ngày gần nhất; khách `mine = 0`); truyện không công khai → `not_found` |
 | `admin_overview(days)` | quản trị viên | jsonb giống kiểu `AdminOverview` (giờ Việt Nam): tổng số; chuỗi theo ngày (người dùng mới, lượt đọc, truyện mới, chương mới, bình luận mới, theo dõi mới, `viewsPrev` = lượt đọc của ngày tương ứng ở kỳ trước); `current`/`previous` (tổng kỳ này và kỳ liền trước cùng số ngày, kỳ này tính cả hôm nay chưa hết ngày); `calendar` (lượt đọc từng ngày, 12 cột tuần từ thứ Hai, cho lịch nhiệt); truyện theo thể loại; `genreViews` (lượt đọc trong kỳ theo thể loại, truyện nhiều thể loại tính vào từng thể loại); `topAuthors` (chủ truyện + bút danh, như `author_key`); top 10 lượt đọc (tên tác giả là bút danh nếu có). Đếm một lần trên cửa sổ bao trùm kỳ này, kỳ trước và lịch nhiệt; bình luận và theo dõi đã xóa thì không còn trong số liệu cũ |
+| `admin_tts_usage()` | quản trị viên | Giọng AI tháng này: `{month, chars, cap, users, clips, clipsThisMonth, bytes, days: [{day, chars}]}` (giờ Việt Nam; `cap` null khi tháng này chưa ai tạo) |
+| `tts_lookup(voice, hashes[])` | `service_role` | Các hash đã có file của giọng đó |
+| `tts_reserve(user, chars, month_cap, day_cap)` | `service_role` | Giữ trước ký tự; vượt thì `tts_month_quota` / `tts_daily_quota` (không trừ gì). Trả `{month, day}` |
+| `tts_commit(user, voice, clips, refund)` | `service_role` | Ghi file đã tải lên R2 (`[{hash, chars, bytes}]`, trùng thì bỏ qua) và hoàn lại `refund` ký tự (không âm) |
 | `admin_users(query?)` | quản trị viên | Mọi tài khoản kèm email, provider, lần đăng nhập cuối, số truyện/bình luận/theo dõi; tìm tên/email không dấu |
 | `admin_stories(query?, visibility?, owner_id?, sort?)` | quản trị viên | Mọi truyện, cả nháp, kèm trạng thái gỡ, bút danh, thể loại và trạng thái duyệt (hàng chờ `/admin/reviews` lọc `review_status`). `sort`: `updated` \| `views` \| `created` |
 | `admin_review_story(story_id, approve, reason)` | quản trị viên | Truyện đang `pending`: duyệt (thành `approved` và công khai luôn) hoặc từ chối (`rejected`, bắt buộc lý do) |
@@ -226,6 +243,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 - Mỗi người chỉ ghi và xóa được trong thư mục `{user_id}/` của mình, tối đa 30 ảnh mới / 24 giờ và 300 ảnh đang lưu (mục 4).
 - Tên file ngẫu nhiên nên không lo cache ảnh cũ. Khi đổi ảnh hoặc xóa truyện thì api xóa file cũ.
 - `prepareCover`/`prepareAvatar` (`src/lib/image.ts`) giữ nguyên, chỉ đổi đầu ra từ data URL sang Blob để upload.
+- File âm thanh của Giọng AI không nằm ở Supabase Storage mà ở Cloudflare R2 (miễn phí băng thông tải về), sổ ở `private.tts_clips`. Chưa dọn file khi tác giả sửa hoặc xóa chương.
 
 ## 8. Bảng tra khi nối api.ts
 
@@ -291,6 +309,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | rewards | `getTicketHistory` | `wallet_ledger.select('…, story:stories(slug, title)', { count: 'exact' }).eq('currency', 'ticket')` mới nhất trước, qua `loadPage` (truyện đã ẩn → `story = null`) |
 | rewards | `getStoryVoteSummary`, `voteStory` | `rpc('story_vote_summary', { p_slug })`, `rpc('vote_story', { p_slug, p_amount })`. Mã lỗi → `RewardError` |
 | admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |
+| admin | `getAdminTtsUsage` | `rpc('admin_tts_usage')` |
+| tts | `fetchClips` | Không gọi Supabase trực tiếp: `POST /api/tts` (hàm Vercel, gửi access token) → `tts_lookup` / `tts_reserve` / `tts_commit` bằng service key. Mã lỗi → `TtsError` |
 | admin | `getAdminUsers`, `getAdminStories`, `getAdminMessages`, `getAdminReports`, `getAdminComments` | `rpc('admin_users' / 'admin_stories' / 'admin_contact_messages' / 'admin_reports' / 'admin_comments', {...}, { count: 'exact' })`, rồi lọc (`.eq()`, `.gt()`, `.not('taken_down_at', 'is', null)`) và sắp xếp (`.order(cột, { nullsFirst: false }).order('id')`) bằng PostgREST ngay trên kết quả của hàm, `.range()` qua `loadPage`. Hàng chờ duyệt: `getAdminStories({ review })` → `.eq('review_status', …)`, sắp theo `review_submitted_at`. Số dòng mỗi trang: `adminPageSize()` (10 / 20 / 50 / 100) |
 | admin | `setMessageHandled`, `setAdminReportStatus`, `setUserBanned`, `setStoryTakedown`, `updateGenre`, `deleteGenre`, `mergeGenres` | RPC `admin_*` cùng tên (mục 6) |
 | admin | `reviewStory` | `rpc('admin_review_story', { p_story_id, p_approve, p_reason })` |

@@ -82,6 +82,24 @@ export type AdminOverview = {
   }[]
 }
 
+/** Giọng AI tháng này (RPC admin_tts_usage; plan documents/plan-giong-ai.md) */
+export type AdminTtsUsage = {
+  /** Ngày đầu tháng (YYYY-MM-DD) */
+  month: string
+  /** Số ký tự đã gửi Google trong tháng */
+  chars: number
+  /** Mức chặn của tháng (null: tháng này chưa ai tạo âm thanh) */
+  cap: number | null
+  /** Số người đã tạo âm thanh trong tháng */
+  users: number
+  /** Số file âm thanh đã lưu (mọi lúc) và trong tháng */
+  clips: number
+  clipsThisMonth: number
+  /** Tổng dung lượng file đã lưu (byte) */
+  bytes: number
+  days: { day: string; chars: number }[]
+}
+
 export type AdminOverviewDay = {
   day: string
   signups: number

@@ -134,7 +134,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-6xNmnVhWC8gguiOPDLl8MjBTj88OvYb8Ub1LCMUtGJs=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://zsbyjxaaxtylgmxybzpf.supabase.co wss://zsbyjxaaxtylgmxybzpf.supabase.co https://o4512213536866304.ingest.us.sentry.io; frame-src https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-6xNmnVhWC8gguiOPDLl8MjBTj88OvYb8Ub1LCMUtGJs=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' data: blob: https:; connect-src 'self' data: blob: https://zsbyjxaaxtylgmxybzpf.supabase.co wss://zsbyjxaaxtylgmxybzpf.supabase.co https://o4512213536866304.ingest.us.sentry.io; frame-src https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         },
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },

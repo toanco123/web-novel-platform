@@ -1,19 +1,27 @@
 import { Minus, Plus, RotateCcw } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { useSession } from '@/features/auth/hooks'
+import { useCurrentPath } from '@/hooks/useCurrentPath'
+import { paths } from '@/lib/routes'
+import { findTtsVoice, TTS_VOICES } from '@/lib/ttsVoices'
 import { cn } from '@/lib/utils'
 import { fonts, toneClass, tones, widths } from '../readerOptions'
 import { useSpeechSettings } from '../speech/useSpeechSettings'
 import { pickVoice, speechSupported, useVoices } from '../speech/useVoices'
+import { voiceTips } from '../speech/voiceTips'
 import {
   FONT_SIZE_RANGE,
   LINE_HEIGHT_RANGE,
@@ -177,7 +185,7 @@ export function ReaderSettingsPanel() {
         </div>
       </Group>
 
-      {speechSupported() && <SpeechSettings />}
+      {(speechSupported() || typeof Audio !== 'undefined') && <SpeechSettings />}
 
       <Button
         variant="ghost"
@@ -192,38 +200,69 @@ export function ReaderSettingsPanel() {
   )
 }
 
-/** Giọng đọc và tự chuyển chương cho tính năng nghe truyện */
+/** Giọng đọc (Giọng AI hoặc giọng của máy) và tự chuyển chương cho tính năng nghe truyện */
 function SpeechSettings() {
-  const { voiceURI, autoNext, update } = useSpeechSettings()
+  const { voiceURI, aiVoice, autoNext, update } = useSpeechSettings()
   const { all, vietnamese } = useVoices()
-  const current = pickVoice(all, voiceURI)
+  const { data: user } = useSession()
+  const current = useCurrentPath()
+  const device = pickVoice(all, voiceURI)
+  const ai = user ? findTtsVoice(aiVoice) : null
+  const value = ai ? `ai:${ai.id}` : device ? `device:${device.voiceURI}` : ''
+  const choose = (v: string) =>
+    v.startsWith('ai:')
+      ? update({ aiVoice: v.slice(3) })
+      : update({ aiVoice: null, voiceURI: v.slice('device:'.length) })
 
   return (
     <Group label="Nghe truyện" id="reader-speech">
       <div className="space-y-3" role="group" aria-labelledby="reader-speech">
-        {all.length > 0 && (
-          <Select value={current?.voiceURI ?? ''} onValueChange={(v) => update({ voiceURI: v })}>
-            <SelectTrigger
-              aria-label="Giọng đọc"
-              className="w-full rounded-lg data-[size=default]:h-10"
-            >
-              <SelectValue placeholder="Giọng mặc định" />
-            </SelectTrigger>
-            <SelectContent position="popper" className="max-h-72">
-              {all.map((v) => (
-                <SelectItem key={v.voiceURI} value={v.voiceURI}>
-                  {v.name} ({v.lang})
+        <Select value={value} onValueChange={choose}>
+          <SelectTrigger
+            aria-label="Giọng đọc"
+            className="w-full rounded-lg data-[size=default]:h-10"
+          >
+            <SelectValue placeholder="Giọng mặc định" />
+          </SelectTrigger>
+          <SelectContent position="popper" className="max-h-72">
+            <SelectGroup>
+              <SelectLabel>Giọng AI{!user && ' (cần đăng nhập)'}</SelectLabel>
+              {TTS_VOICES.map((v) => (
+                <SelectItem key={v.id} value={`ai:${v.id}`} disabled={!user}>
+                  {v.label}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
+            </SelectGroup>
+            {all.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>Giọng của máy</SelectLabel>
+                {all.map((v) => (
+                  <SelectItem key={v.voiceURI} value={`device:${v.voiceURI}`}>
+                    {v.name} ({v.lang})
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
+        {!user && (
+          <p className="text-xs text-muted-foreground">
+            <Link
+              to={paths.login(current)}
+              className="font-medium text-rose-gold underline-offset-4 hover:underline"
+            >
+              Đăng nhập
+            </Link>{' '}
+            để nghe bằng Giọng AI đọc tự nhiên.
+          </p>
         )}
-        {vietnamese.length === 0 && (
+        {!ai && vietnamese.length === 0 && all.length > 0 && (
           <p className="text-xs text-muted-foreground">
             Máy bạn chưa có giọng tiếng Việt nên có thể đọc sai dấu. Cài thêm giọng tiếng Việt trong
             cài đặt ngôn ngữ của máy để nghe rõ hơn.
           </p>
         )}
+        {!ai && <VoiceTips />}
         <label className="flex cursor-pointer items-center gap-3 text-sm">
           <Checkbox
             checked={autoNext}
@@ -233,6 +272,23 @@ function SpeechSettings() {
         </label>
       </div>
     </Group>
+  )
+}
+
+/** Gợi ý cài giọng của máy hay hơn (thu gọn sẵn) */
+function VoiceTips() {
+  const tips = voiceTips(navigator.userAgent)
+  return (
+    <details className="text-xs text-muted-foreground">
+      <summary className="cursor-pointer select-none hover:text-foreground">
+        Cách có giọng của máy hay hơn
+      </summary>
+      <ul className="mt-1.5 list-disc space-y-1 pl-4">
+        {tips.map((tip) => (
+          <li key={tip}>{tip}</li>
+        ))}
+      </ul>
+    </details>
   )
 }
 

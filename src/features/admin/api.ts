@@ -11,6 +11,7 @@ const api: typeof mock = __USE_MOCK__ ? mock : remote
 
 export const {
   getAdminOverview,
+  getAdminTtsUsage,
   getAdminUsers,
   getAdminStories,
   getAdminMessages,

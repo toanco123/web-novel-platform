@@ -50,6 +50,8 @@ export type SpeechEngine = {
   speak: (job: SpeakJob, signal: AbortSignal) => Promise<void>
   /** Im ngay */
   cancel: () => void
+  /** Gọi ngay trong lúc người dùng bấm (trước khi tải gì): iOS Safari chỉ cho phát âm thanh như vậy */
+  prime?: () => void
   /** Có thì tạm dừng giữ nguyên vị trí; không có thì tạm dừng = dừng hẳn, nghe tiếp đọc lại cả đoạn */
   pause?: () => void
   resume?: () => void
@@ -180,6 +182,8 @@ export function createSpeechSession(options: SpeechSessionOptions) {
     start: (slug: string, chapter: number, paragraph = 0) => {
       if (state.status === 'idle') aiOff = false
       void play(slug, chapter, paragraph)
+      // Sau play(): phần chạy ngay của play() đã hủy lượt cũ (cancel) nên không cắt mất clip mở khóa
+      pickEngine()?.prime?.()
     },
     pause: () => {
       if (state.status !== 'playing') return
@@ -199,6 +203,7 @@ export function createSpeechSession(options: SpeechSessionOptions) {
         emit({ status: 'playing' })
       } else if (slug !== null && chapter !== null) {
         void play(slug, chapter, paragraph)
+        pickEngine()?.prime?.()
       }
     },
     stop: () => {
@@ -212,6 +217,7 @@ export function createSpeechSession(options: SpeechSessionOptions) {
       if (slug === null || chapter === null) return
       const last = Math.max(0, total - 1)
       void play(slug, chapter, Math.min(last, Math.max(0, paragraph + delta)))
+      pickEngine()?.prime?.()
     },
     /** Gọi sau khi đã lưu tốc độ mới vào cài đặt (engine đọc tốc độ từ cài đặt) */
     setRate: (rate: number) => {
