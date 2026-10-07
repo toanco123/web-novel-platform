@@ -14,6 +14,15 @@ const tokens = {
     accent: '#f6dde6',
     // Màu cột/đường của biểu đồ một chuỗi (--chart-1), đã kiểm bằng validator của skill dataviz
     series: '#b0144f',
+    // Các màu dưới đã kiểm bằng validator của skill dataviz (nền thẻ #ffffff):
+    // đường kỳ trước (xám làm nền, nét đứt + chú giải + nhãn), qua CVD với series
+    seriesMuted: '#9a8a92',
+    // Lịch nhiệt: một tông, nhạt → đậm, bậc nhạt nhất ≥ 2:1 so với nền thẻ
+    heat: ['#eba0bb', '#d9628f', '#b8285e', '#7d0d38'],
+    // Chữ tăng/giảm và trạng thái (≥ 4.5:1, luôn kèm mũi tên/icon và chữ)
+    up: '#18794e',
+    down: '#b42318',
+    warn: '#b45309',
   },
   dark: {
     background: '#1a0f1d',
@@ -24,6 +33,12 @@ const tokens = {
     primary: '#ff3d8b',
     accent: '#4a1d35',
     series: '#f5347f',
+    // Nền thẻ #24152a; xám kỳ trước là màu chữ phụ (qua CVD với series)
+    seriesMuted: '#b9a0ad',
+    heat: ['#842e5a', '#a92c63', '#d93474', '#ff86b0'],
+    up: '#4ade80',
+    down: '#ff8a80',
+    warn: '#fbbf24',
   },
 }
 

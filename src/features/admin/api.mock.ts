@@ -36,6 +36,7 @@ import { normalizeGenreName } from '@/features/genres/api'
 import type { Page } from '@/types/page'
 import type { CuratedList, Genre } from '@/types/story'
 import {
+  addDays,
   AdminError,
   adminPageSize,
   CURATED_LIMITS,
@@ -44,6 +45,7 @@ import {
   type AdminContactMessage,
   type AdminMessageQuery,
   type AdminOverview,
+  type AdminPeriodTotals,
   type AdminReport,
   type AdminReportQuery,
   type AdminStory,
@@ -156,18 +158,23 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
   await delay()
   await requireAdmin()
 
-  const today = new Date()
-  const keys = Array.from({ length: days }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() - (days - 1 - i))
-    return dayKey(d)
-  })
-  const inPeriod = new Set(keys)
+  // Như RPC admin_overview: kỳ đang xem, kỳ liền trước cùng số ngày, và 12 cột tuần của lịch
+  // nhiệt (từ thứ Hai 11 tuần trước); đếm một lần trên cửa sổ bao trùm cả ba
+  const now = new Date()
+  const today = dayKey(now)
+  const from = addDays(today, -(days - 1))
+  const prevFrom = addDays(from, -days)
+  const calFrom = addDays(today, -((now.getDay() + 6) % 7) - 77)
+  const winFrom = prevFrom < calFrom ? prevFrom : calFrom
+  const keys: string[] = []
+  for (let day = winFrom; day <= today; day = addDays(day, 1)) keys.push(day)
+  const inWindow = new Set(keys)
+
   const dayOf = (iso: string | null | undefined) => (iso ? dayKey(new Date(iso)) : null)
   const countByDay = (dates: (string | null | undefined)[]) => {
     const counts = new Map<string, number>()
     for (const day of dates.map(dayOf)) {
-      if (day && inPeriod.has(day)) counts.set(day, (counts.get(day) ?? 0) + 1)
+      if (day && inWindow.has(day)) counts.set(day, (counts.get(day) ?? 0) + 1)
     }
     return counts
   }
@@ -180,36 +187,92 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
   const viewsByDay = new Map<string, number>()
   for (const stats of Object.values(views)) {
     for (const [day, n] of Object.entries(stats.byDay)) {
-      if (inPeriod.has(day)) viewsByDay.set(day, (viewsByDay.get(day) ?? 0) + n)
+      if (inWindow.has(day)) viewsByDay.set(day, (viewsByDay.get(day) ?? 0) + n)
     }
   }
-  const signups = countByDay(users.map((u) => u.createdAt))
-  const newStories = countByDay(userStories.map((s) => s.createdAt))
-  const newChapters = countByDay(chapters.map((c) => c.publishedAt))
+  const series = {
+    signups: countByDay(users.map((u) => u.createdAt)),
+    views: viewsByDay,
+    stories: countByDay(userStories.map((s) => s.createdAt)),
+    chapters: countByDay(chapters.map((c) => c.publishedAt)),
+    comments: countByDay(loadUserComments().map((c) => c.createdAt)),
+    follows: countByDay(
+      Object.values(loadAllFollows())
+        .flat()
+        .map((f) => f.followedAt),
+    ),
+  }
+  const at = (name: keyof typeof series, day: string) => series[name].get(day) ?? 0
+  const sumBetween = (start: string, end: string): AdminPeriodTotals => {
+    const range = keys.filter((day) => day >= start && day <= end)
+    const sum = (name: keyof typeof series) => range.reduce((n, day) => n + at(name, day), 0)
+    return {
+      signups: sum('signups'),
+      views: sum('views'),
+      stories: sum('stories'),
+      chapters: sum('chapters'),
+      comments: sum('comments'),
+      follows: sum('follows'),
+    }
+  }
+  const current = sumBetween(from, today)
+
+  /** Lượt đọc trong kỳ của từng truyện */
+  const storyViews = (slug: string) =>
+    Object.entries(views[slug]?.byDay ?? {}).reduce(
+      (n, [day, v]) => (day >= from && day <= today ? n + v : n),
+      0,
+    )
 
   const published = stories.filter((s) => s.visibility === 'published')
   const genreCounts = new Map<string, number>()
+  const genreViewCounts = new Map<string, number>()
   const genreNames = new Map(allGenres().map((g) => [g.slug, g.name]))
-  const genreSlugsOf = (id: string) =>
-    seedStories.find((s) => s.id === id)?.genres.map((g) => g.slug) ??
-    userStories.find((s) => s.id === id)?.genreSlugs ??
-    []
-  for (const story of published) {
-    for (const slug of genreSlugsOf(story.id)) {
+  for (const story of stories) {
+    const read = storyViews(story.slug)
+    for (const slug of story.genreSlugs) {
       const name = genreNames.get(slug)
-      if (name) genreCounts.set(name, (genreCounts.get(name) ?? 0) + 1)
+      if (!name) continue
+      if (story.visibility === 'published') genreCounts.set(name, (genreCounts.get(name) ?? 0) + 1)
+      if (read) genreViewCounts.set(name, (genreViewCounts.get(name) ?? 0) + read)
     }
+  }
+  const ranked = <T extends { name: string }>(
+    entries: [string, number][],
+    make: (name: string, n: number) => T,
+  ) =>
+    entries
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'vi'))
+      .slice(0, 10)
+      .map(([name, n]) => make(name, n))
+
+  // Tác giả = chủ truyện + bút danh (như "cùng tác giả" ở trang truyện)
+  const authors = new Map<string, AdminOverview['topAuthors'][number]>()
+  for (const story of stories) {
+    const key = `${story.ownerId ?? ''}:${slugify(story.authorName ?? '')}`
+    const author = authors.get(key) ?? {
+      key,
+      ownerId: story.ownerId,
+      name: story.authorName ?? story.ownerName,
+      stories: 0,
+      views: 0,
+      followers: 0,
+    }
+    if (story.visibility === 'published') author.stories++
+    author.views += storyViews(story.slug)
+    author.followers += story.followers
+    authors.set(key, author)
   }
 
   return {
     totals: {
       users: users.length,
-      newUsers: [...signups.values()].reduce((a, b) => a + b, 0),
+      newUsers: current.signups,
       publishedStories: published.length,
       draftStories: stories.length - published.length,
       publishedChapters: stories.reduce((sum, s) => sum + s.publishedCount, 0),
       views: stories.reduce((sum, s) => sum + s.views, 0),
-      viewsInPeriod: [...viewsByDay.values()].reduce((a, b) => a + b, 0),
+      viewsInPeriod: current.views,
       comments: loadUserComments().length,
       openReports: loadReports().filter((r) => r.status === 'open').length,
       reportedComments: reportedCommentIds().size,
@@ -217,16 +280,26 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
       bannedUsers: users.filter((u) => u.bannedAt).length,
       pendingReviews: stories.filter((s) => s.review?.status === 'pending').length,
     },
-    days: keys.map((day) => ({
-      day,
-      signups: signups.get(day) ?? 0,
-      views: viewsByDay.get(day) ?? 0,
-      stories: newStories.get(day) ?? 0,
-      chapters: newChapters.get(day) ?? 0,
-    })),
-    genres: [...genreCounts]
-      .map(([name, count]) => ({ name, stories: count }))
-      .sort((a, b) => b.stories - a.stories || a.name.localeCompare(b.name, 'vi'))
+    days: keys
+      .filter((day) => day >= from)
+      .map((day) => ({
+        day,
+        signups: at('signups', day),
+        views: at('views', day),
+        stories: at('stories', day),
+        chapters: at('chapters', day),
+        comments: at('comments', day),
+        follows: at('follows', day),
+        viewsPrev: at('views', addDays(day, -days)),
+      })),
+    current,
+    previous: sumBetween(prevFrom, addDays(from, -1)),
+    calendar: keys.filter((day) => day >= calFrom).map((day) => ({ day, views: at('views', day) })),
+    genres: ranked([...genreCounts], (name, n) => ({ name, stories: n })),
+    genreViews: ranked([...genreViewCounts], (name, n) => ({ name, views: n })),
+    topAuthors: [...authors.values()]
+      .filter((a) => a.views > 0)
+      .sort((a, b) => b.views - a.views || a.name.localeCompare(b.name, 'vi'))
       .slice(0, 10),
     topStories: stories
       .filter((s) => s.views > 0)
@@ -237,7 +310,7 @@ export async function getAdminOverview(days: number): Promise<AdminOverview> {
         slug: s.slug,
         title: s.title,
         visibility: s.visibility,
-        authorName: s.ownerName,
+        authorName: s.authorName ?? s.ownerName,
         views: s.views,
         followers: s.followers,
         ratingAvg: s.ratingAvg,

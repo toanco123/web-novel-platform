@@ -1370,6 +1370,109 @@ select pg_temp.expect((select count(*) = 2 from pg_temp.push_bodies()),
   'chương nháp được xuất bản lần đầu thì gửi');
 reset role;
 
+-- ── Tổng quan quản trị: kỳ trước, bình luận/theo dõi, lịch nhiệt, thể loại, tác giả ──
+-- DB thật có dữ liệu: chụp số liệu trước, thêm dữ liệu mẫu rồi so phần chênh lệch
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000041', 'tq1@kiem-tra.local', '{"display_name": "Chủ Bảng Tin"}'),
+  ('00000000-0000-4000-8000-000000000042', 'tq2@kiem-tra.local', '{"display_name": "Bạn Đọc Bảng Tin"}');
+
+-- Như quản trị viên: gọi thẳng hàm private (chủ phiên) để lưu số liệu vào bảng tạm
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+create temp table overview_before as select private.admin_overview(7) as o;
+
+-- Chủ truyện đăng hai truyện với hai bút danh, cùng hai thể loại mới
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000041", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.genres (name) values ('Bảng Tin Một'), ('Bảng Tin Hai');
+select * from public.create_story(
+  'Truyện Bảng Tin', 'Truyện để kiểm tra trang tổng quan quản trị.', 'ongoing',
+  array['bang-tin-mot', 'bang-tin-hai'], null, '{"title": "Một", "content": "Nội dung chương một."}',
+  true, 'Bút Danh Một');
+select * from public.create_story(
+  'Truyện Bảng Tin Hai', 'Truyện thứ hai để kiểm tra tác giả nổi bật.', 'ongoing',
+  array['bang-tin-mot'], null, '{"title": "Một", "content": "Nội dung chương một."}',
+  true, 'Bút Danh Hai');
+reset role;
+select pg_temp.approve('truyen-bang-tin');
+select pg_temp.approve('truyen-bang-tin-hai');
+
+-- Bạn đọc theo dõi và bình luận hôm nay
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000042", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.follows (story_id) values (pg_temp.story_id('truyen-bang-tin'));
+insert into public.comments (story_id, content)
+values (pg_temp.story_id('truyen-bang-tin'), 'Bình luận để kiểm tra trang tổng quan.');
+
+-- Lượt đọc lớn để chắc chắn vào top 10: hôm nay và đúng 7 ngày trước (kỳ trước của kỳ 7 ngày)
+reset role;
+insert into public.chapter_views (story_id, chapter_number, day, views) values
+  (pg_temp.story_id('truyen-bang-tin'), 1, (now() at time zone 'Asia/Ho_Chi_Minh')::date, 900000000),
+  (pg_temp.story_id('truyen-bang-tin'), 1, (now() at time zone 'Asia/Ho_Chi_Minh')::date - 7, 300000000),
+  (pg_temp.story_id('truyen-bang-tin-hai'), 1, (now() at time zone 'Asia/Ho_Chi_Minh')::date, 800000000);
+update public.story_stats set view_count = 2000000000
+where story_id = pg_temp.story_id('truyen-bang-tin');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+create temp table overview_after as select private.admin_overview(7) as o;
+
+create function pg_temp.diff(p_path text[])
+returns numeric
+language sql
+as $$
+  select (a.o #>> p_path)::numeric - (b.o #>> p_path)::numeric
+  from overview_after a, overview_before b
+$$;
+
+select pg_temp.expect(
+  (select (o -> 'days' -> 0) ?& array['comments', 'follows', 'viewsPrev']
+      and jsonb_array_length(o -> 'days') = 7
+    from overview_after),
+  'admin_overview: mỗi ngày có bình luận, theo dõi, lượt đọc kỳ trước');
+select pg_temp.expect(
+  pg_temp.diff(array['days', '6', 'views']) = 1700000000
+    and pg_temp.diff(array['days', '6', 'viewsPrev']) = 300000000,
+  'admin_overview: lượt đọc hôm nay và ngày tương ứng của kỳ trước');
+select pg_temp.expect(
+  pg_temp.diff(array['current', 'views']) = 1700000000
+    and pg_temp.diff(array['previous', 'views']) = 300000000
+    and pg_temp.diff(array['totals', 'viewsInPeriod']) = 1700000000,
+  'admin_overview: tổng kỳ này, kỳ trước; viewsInPeriod không cộng lẫn kỳ trước');
+select pg_temp.expect(
+  pg_temp.diff(array['current', 'follows']) = 1
+    and pg_temp.diff(array['current', 'comments']) = 1
+    and pg_temp.diff(array['days', '6', 'follows']) = 1
+    and pg_temp.diff(array['days', '6', 'comments']) = 1,
+  'admin_overview: theo dõi và bình luận mới hôm nay');
+select pg_temp.expect(
+  (select extract(isodow from (o -> 'calendar' -> 0 ->> 'day')::date) = 1
+      and (o -> 'calendar' -> -1 ->> 'day')::date = (now() at time zone 'Asia/Ho_Chi_Minh')::date
+      and jsonb_array_length(o -> 'calendar') between 78 and 84
+    from overview_after),
+  'admin_overview: lịch nhiệt bắt đầu thứ Hai, kết thúc hôm nay, 12 tuần');
+select pg_temp.expect(
+  (select o -> 'genreViews' @> '[{"name": "Bảng Tin Một", "views": 1700000000},
+      {"name": "Bảng Tin Hai", "views": 900000000}]'
+    from overview_after),
+  'admin_overview: lượt đọc theo thể loại, truyện nhiều thể loại tính vào từng thể loại');
+select pg_temp.expect(
+  (select o -> 'topAuthors' @> '[{"name": "Bút Danh Một", "stories": 1, "views": 900000000, "followers": 1,
+        "ownerId": "00000000-0000-4000-8000-000000000041"},
+      {"name": "Bút Danh Hai", "stories": 1, "views": 800000000, "followers": 0}]'
+    from overview_after),
+  'admin_overview: một chủ truyện hai bút danh là hai tác giả');
+select pg_temp.expect(
+  (select o -> 'topStories' -> 0 ->> 'authorName' = 'Bút Danh Một' from overview_after),
+  'admin_overview: top truyện hiện bút danh');
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

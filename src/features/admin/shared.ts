@@ -39,9 +39,35 @@ export type AdminOverview = {
     pendingReviews: number
   }
   /** Mỗi ngày trong kỳ (cũ trước), day dạng 2026-09-25 */
-  days: { day: string; signups: number; views: number; stories: number; chapters: number }[]
+  days: AdminOverviewDay[]
+  /** Tổng trong kỳ đang xem (tính cả hôm nay, chưa hết ngày) */
+  current: AdminPeriodTotals
+  /** Tổng của kỳ liền trước, cùng số ngày */
+  previous: AdminPeriodTotals
+  /** Lượt đọc từng ngày cho lịch nhiệt: từ thứ Hai 11 tuần trước tới hôm nay, không theo kỳ */
+  calendar: { day: string; views: number }[]
   /** Số truyện công khai theo thể loại, nhiều trước (tối đa 10) */
   genres: { name: string; stories: number }[]
+  /**
+   * Lượt đọc trong kỳ theo thể loại, nhiều trước (tối đa 10). Truyện nhiều thể loại tính vào từng
+   * thể loại, nên tổng các mục lớn hơn tổng lượt đọc
+   */
+  genreViews: { name: string; views: number }[]
+  /** Tác giả nhiều lượt đọc nhất trong kỳ (tối đa 10); một chủ truyện có thể có nhiều bút danh */
+  topAuthors: {
+    /** Khóa ổn định: chủ truyện + bút danh */
+    key: string
+    /** null: truyện có sẵn của hệ thống (chỉ ở bản giả) */
+    ownerId: string | null
+    /** Bút danh, không có thì tên tài khoản */
+    name: string
+    /** Số truyện đang công khai */
+    stories: number
+    /** Lượt đọc trong kỳ */
+    views: number
+    /** Tổng lượt theo dõi các truyện */
+    followers: number
+  }[]
   /** Truyện nhiều lượt đọc nhất (tối đa 10, chỉ truyện đã có lượt đọc) */
   topStories: {
     id: string
@@ -54,6 +80,27 @@ export type AdminOverview = {
     ratingAvg: number
     ratingCount: number
   }[]
+}
+
+export type AdminOverviewDay = {
+  day: string
+  signups: number
+  views: number
+  stories: number
+  chapters: number
+  comments: number
+  follows: number
+  /** Lượt đọc của ngày tương ứng ở kỳ trước (lùi đúng số ngày của kỳ) */
+  viewsPrev: number
+}
+
+export type AdminPeriodTotals = {
+  signups: number
+  views: number
+  stories: number
+  chapters: number
+  comments: number
+  follows: number
 }
 
 export type AdminUser = {
@@ -190,6 +237,48 @@ const longDay = new Intl.DateTimeFormat('vi-VN', {
 export const formatShortDay = (day: string) => shortDay.format(parseDay(day))
 /** "2026-09-25" → "Thứ Sáu, 25/9/2026" */
 export const formatLongDay = (day: string) => longDay.format(parseDay(day))
+
+/** Dịch ngày "2026-09-25" thêm `n` ngày (âm: lùi lại) */
+export function addDays(day: string, n: number) {
+  const d = parseDay(day)
+  d.setDate(d.getDate() + n)
+  const pad = (x: number) => String(x).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** Thay đổi so với kỳ trước. none: cả hai bằng 0; new: kỳ trước bằng 0; flat: lệch dưới 0,5% */
+export type PeriodDelta =
+  | { kind: 'none' }
+  | { kind: 'new'; diff: number }
+  | { kind: 'up' | 'down' | 'flat'; diff: number; pct: number }
+
+export function periodDelta(current: number, previous: number): PeriodDelta {
+  const diff = current - previous
+  if (previous === 0) return current === 0 ? { kind: 'none' } : { kind: 'new', diff }
+  const pct = (diff / previous) * 100
+  if (Math.abs(pct) < 0.5) return { kind: 'flat', diff, pct: 0 }
+  return { kind: pct > 0 ? 'up' : 'down', diff, pct }
+}
+
+/**
+ * Lịch nhiệt: chia `calendar` (bắt đầu thứ Hai) thành các cột tuần, mỗi cột 7 ô từ thứ Hai tới
+ * Chủ nhật. Ngày chưa tới của tuần này là null.
+ */
+export function calendarWeeks<T extends { day: string }>(calendar: T[]): (T | null)[][] {
+  const weeks: (T | null)[][] = []
+  for (let i = 0; i < calendar.length; i += 7) {
+    const week: (T | null)[] = calendar.slice(i, i + 7)
+    while (week.length < 7) week.push(null)
+    weeks.push(week)
+  }
+  return weeks
+}
+
+/** Mức đậm của ô lịch nhiệt: 0 (không có lượt nào) hoặc 1–4 theo tỉ lệ với ngày nhiều nhất */
+export function heatLevel(value: number, max: number) {
+  if (value <= 0 || max <= 0) return 0
+  return Math.min(4, Math.ceil((value / max) * 4))
+}
 
 // ── Hộp thư & báo lỗi ───────────────────────────────────────────────────
 
