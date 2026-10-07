@@ -5,7 +5,13 @@ import { mockDelay as delay } from '@/lib/mockStorage'
 import { paginate } from '@/lib/pagination'
 import { seededRandom } from '@/lib/seededRandom'
 import { slugify } from '@/lib/slugify'
-import { followerCount, loadViews, recentViews, type ViewStats } from '@/mocks/activity'
+import {
+  followerCount,
+  loadViews,
+  recentViews,
+  storyVoteCount,
+  type ViewStats,
+} from '@/mocks/activity'
 import { allGenres, catalog, findStory } from '@/mocks/catalog'
 import { loadCurated } from '@/mocks/curated'
 import { editorPickSlugs, featuredSlugs, stories as seedStories } from '@/mocks/stories'
@@ -206,7 +212,11 @@ export async function getRanking({
 
   const views = loadViews()
   const value = (s: Story) =>
-    by === 'follows' ? followers(s) : periodViews(s, period, views[s.slug])
+    by === 'follows'
+      ? followers(s)
+      : by === 'votes'
+        ? storyVoteCount(s.slug, period === 'all' ? undefined : period === 'week' ? 7 : 30)
+        : periodViews(s, period, views[s.slug])
   return all
     .map((story) => ({ story, value: value(story) }))
     .filter((r) => r.value > 0)

@@ -1,6 +1,17 @@
 # Plan: Điểm danh hằng ngày và phiếu đề cử (giai đoạn 1)
 
-Trạng thái: 📝 chờ duyệt (07/10/2026). Nhánh dự kiến `daily-checkin-votes`.
+Trạng thái: ✅ xong (07/10/2026). Migration `20261007082322_checkin_and_votes` đã lên production, ca kiểm tra SQL và advisors qua. Nhánh `daily-checkin-votes`. Bản thiết kế giao diện (đã duyệt 07/10/2026): https://claude.ai/artifact/V3U92xanZqnKaLSfALznvs
+
+Khác với plan:
+- **Lịch sử phiếu không ghi "ngày thứ mấy"** của lần điểm danh. Chỉ ghi "Điểm danh", hoặc "Điểm danh · thưởng chuỗi 7 ngày" khi nhận +3 (`ledgerText`), nên `wallet_ledger` không cần thêm cột.
+- **Header ở màn hẹp (dưới `sm`):** nút đổi theme chuyển vào menu điện thoại (`ThemeToggle row`) để chừa chỗ cho nút điểm danh. Thêm nút mà giữ nút theme thì header tràn ngang 7px ở 375px.
+- **"Đi điểm danh"** trong hộp đề cử (khi hết phiếu) mở trang `/rewards`, không mở `CheckInCard` ngay trong hộp.
+- `RewardError` thêm vào danh sách lỗi dự kiến của Sentry (`src/lib/errorFilter.ts`).
+- `private.ledger_post`: cộng phiếu dùng upsert, trừ phiếu dùng `update` (dòng định chèn có số âm vi phạm `check (balance >= 0)` trước khi Postgres xét trùng khóa). Lỗi chung là `insufficient_balance`, client đổi thành `insufficient_tickets`.
+- `story_vote_summary` chỉ đếm "phiếu của mình" khi đã đăng nhập (khách không có quyền đọc `story_votes`).
+- Phiếu theo kỳ (bảng xếp hạng 7 / 30 ngày, 7 ngày trong thống kê) đếm qua hàm DEFINER `private.vote_ranking`, `private.story_vote_counts` vì `story_votes` chỉ cho chủ đọc.
+- `/rewards` thêm vào `PRIVATE` của `api/_lib/html.ts` (bot nhận trang riêng tư, không phải 404).
+- Test đăng xuất trong `auth-flow.test.tsx` chỉ tìm link "Đăng nhập" trong header: trang chủ thêm khối "Đề cử tuần" làm `findByRole` trên cả trang chậm, quá thời gian khi chạy song song.
 
 ## Context
 
@@ -153,34 +164,53 @@ Làm theo skill `db-migration`.
 
 ## 4. Giao diện
 
-- **Nút điểm danh ở header** (`features/rewards/components/CheckInButton`), chỉ hiện khi đã đăng nhập, nằm cạnh avatar:
-  - Icon `CalendarCheck`, có chấm màu `neon` khi hôm nay chưa điểm danh.
-  - Bấm mở Popover chứa `CheckInCard`.
-- **`CheckInCard`:**
-  - 7 ô "Ngày 1"… "Ngày 7": ô đã nhận có dấu tick, ô hôm nay nổi bật, ô 7 vẽ hình quà "+3".
-  - Dòng "Chuỗi X ngày liên tiếp" và "Bạn có N phiếu đề cử".
-  - Nút "Điểm danh +1 phiếu". Đã điểm danh thì nút khóa, ghi "Đã điểm danh, quay lại ngày mai".
-  - Điểm danh xong hiện toast "+1 phiếu đề cử", hoặc "+3 phiếu, thưởng chuỗi 7 ngày!".
-  - Link "Phiếu đề cử của tôi" sang `/rewards`.
+Theo bản thiết kế (link ở đầu file): giao diện tối mặc định, hệ màu và font có sẵn. Biểu tượng chung:
+- **Phiếu:** icon `Ticket`.
+- **Chuỗi ngày:** icon `Flame` màu `neon`.
+- **Quà ngày 7:** bông hoa 5 cánh lấy từ logo "Sách nở hoa" (`RewardBloom`, SVG nội tuyến, cánh `neon`, nhụy `rose-gold`). Dùng ở ô ngày 7, lời chúc sau khi điểm danh hoặc đề cử, và khối mời điểm danh.
+
+- **`CheckInCard`** (`features/rewards/components`):
+  - **Tiêu đề:** "Điểm danh hằng ngày" (`font-heading`) + dòng "Đủ 7 ngày liền nhận thêm quà 3 phiếu."
+  - **Hai ô số liệu:** "Chuỗi liên tiếp" (số lớn `font-heading` + "ngày") và "Phiếu đề cử" (số `rose-gold` + "phiếu").
+  - **7 ô ngày** (lưới 7 cột):
+    - Đã nhận: nền `secondary`, vòng `rose-gold` có dấu tick.
+    - Hôm nay: viền `neon` + quầng sáng mờ, vòng nét đứt "+1", nhãn "Hôm nay".
+    - Chưa tới: vòng "+1" mờ.
+    - Ngày 7: nền `wine` + `RewardBloom`, nhãn "+3".
+  - **Thanh tiến độ:** "Còn N ngày tới quà +3 phiếu" và "k/7".
+  - **Nút:** chưa điểm danh thì nút chính tròn "Điểm danh nhận +N phiếu". Đã điểm danh thì nút khóa "Đã điểm danh, quay lại ngày mai".
+  - **Ngay sau khi điểm danh:** khung lời chúc có `RewardBloom` ("+1 phiếu đề cử. Hẹn bạn ngày mai nhé!" / "+3 phiếu: thưởng chuỗi 7 ngày!") + toast.
+  - **Cuối thẻ:** "Dùng phiếu để đề cử truyện bạn thích" + link "Phiếu của tôi →" (`/rewards`). Trên trang `/rewards` thì không có link này.
+- **Nút điểm danh ở header** (`CheckInButton`), chỉ khi đã đăng nhập, đứng trước nút đổi theme:
+  - Icon `CalendarCheck`. Chưa điểm danh thì viền + chấm `neon`, `aria-label` "Điểm danh hằng ngày (chưa điểm danh hôm nay)".
+  - Từ màn `sm`: Popover rộng ~420px chứa `CheckInCard`.
+  - Dưới `sm`: Sheet trượt từ đáy (bo góc trên, thanh kéo, nút "Đóng").
+  - `MobileNav` và `UserMenu` có thêm mục "Phiếu đề cử" (`/rewards`).
 - **Trang `/rewards` "Phiếu đề cử"** (`paths.rewards`, bọc `RequireAuth`, `noindex`):
-  - `CheckInCard`.
-  - Khối "Cách nhận và dùng phiếu" (luật ngắn gọn).
-  - Lịch sử phiếu có phân trang (`?page=`): mỗi dòng gồm ngày giờ, lý do ("Điểm danh ngày 3" / "Đề cử *Tên truyện*" có link), số `+`/`−` và số dư sau giao dịch.
-  - Có mục trong `UserMenu` và `MobileNav`.
+  - Tiêu đề + một câu giới thiệu.
+  - Hàng 2 khối (`flex-wrap`, xếp chồng trên điện thoại): `CheckInCard` và "Cách nhận và dùng phiếu". Khối sau gồm 3 dòng có icon: điểm danh +1, đủ 7 ngày +3, đề cử truyện → bảng Đề cử tuần; cuối khối có ghi chú "Phiếu không hết hạn và không đổi ra tiền. Tài khoản tạo đủ 3 ngày mới đề cử được."
+  - "Lịch sử phiếu": bảng 4 cột (Thời gian, Nội dung, Thay đổi, Số dư), cuộn ngang trên điện thoại.
+    - Thay đổi `+N` màu `neon`, `−N` màu chữ thường; chấm màu đầu dòng.
+    - "Đề cử *Tên truyện*" có link tới truyện.
+    - Phân trang `?page=` (`Pagination` chung). Trạng thái rỗng: "Chưa có giao dịch nào. Điểm danh để nhận phiếu đầu tiên."
 - **Nút "Đề cử" ở trang truyện** (`VoteButton` trong `StoryHero`, cạnh `FollowButton`):
-  - Nút ghi số đề cử 7 ngày của truyện.
-  - Bấm mở Dialog gồm: tổng đề cử (7 ngày / mọi lúc), số phiếu mình đã đề cử truyện này, "Bạn có N phiếu", chọn số phiếu (nút nhanh 1 / 5 / Tất cả và ô số), nút "Đề cử".
-  - Khách bấm thì sang đăng nhập (`paths.login(current)`).
-  - Truyện của mình: không hiện nút.
-  - Hết phiếu: báo "Bạn chưa có phiếu" kèm link điểm danh.
-  - `account_too_new`: báo "Tài khoản cần tạo đủ 3 ngày mới đề cử được."
-  - Đề cử xong hiện toast "Đã đề cử N phiếu cho *Tên truyện*".
+  - Nút ghi "Đề cử" + số đề cử 7 ngày. Truyện của mình: không hiện. Khách bấm thì sang đăng nhập (`paths.login(current)`).
+  - Bấm mở Dialog (dưới `sm`: Sheet từ đáy) "Đề cử truyện":
+    - Dòng truyện: bìa nhỏ, tên, "Tuần này N phiếu", "Bạn đã đề cử k phiếu" nếu có.
+    - "Chọn số phiếu" + "Bạn có N phiếu".
+    - Bộ tăng giảm (− số lớn +), nút chọn nhanh 1 / 5 / 10 / Tất cả (nút quá số dư thì mờ).
+    - Nút "Đề cử N phiếu" + dòng "Phiếu đã đề cử không rút lại được."
+  - **Đề cử xong:** `RewardBloom` + "Đã đề cử N phiếu", "Cảm ơn bạn đã ủng hộ tác giả. Bạn còn M phiếu.", hai nút "Đề cử thêm" / "Xem Đề cử tuần" (`/ranking?by=votes`).
+  - **Hết phiếu:** "Bạn chưa có phiếu" + "Đi điểm danh" (mở `CheckInCard`).
+  - **`account_too_new`:** báo "Tài khoản cần tạo đủ 3 ngày mới đề cử được."
 - **Bảng xếp hạng `/ranking`:** thêm tiêu chí "Đề cử" (`?by=votes`, gợi ý "Xếp theo số phiếu đề cử độc giả dành cho truyện trong kỳ."), đứng sau "Đọc nhiều". Cột giá trị hiện "N phiếu".
-- **Trang chủ:** khối "Đề cử tuần" (`TopVotedWeekly`) ở cột phải, dưới "Top tuần".
-  - Hiện top 10, có link "Xem tất cả" → `/ranking?by=votes`.
-  - Trạng thái rỗng (DB thật bắt đầu trống): "Chưa có truyện nào được đề cử tuần này", kèm nút điểm danh nếu đã đăng nhập, hoặc link đăng nhập nếu là khách.
-- **Khu Sáng tác, tab Thống kê:** thêm ô "Đề cử" (tổng + 7 ngày) để tác giả thấy truyện được ủng hộ.
-- Kiểm tra giao diện ở 375 / 768 / 1440px, cả hai theme. Header ở màn 375px phải đủ chỗ cho icon mới, không tràn ngang.
+- **Trang chủ, khối "Đề cử tuần"** (`TopVotedWeekly`) ở cột phải, dưới "Top tuần":
+  - Tiêu đề có icon phiếu, link "Xem tất cả" → `/ranking?by=votes`.
+  - Top 6: hạng `font-heading` (hạng 1 `neon`, 2–3 `rose-gold`, còn lại chữ phụ), bìa nhỏ, tên + thể loại, số phiếu.
+  - Cuối khối là ô mời điểm danh (`RewardBloom` + nút "Điểm danh hôm nay"). Khách thì nút sang đăng nhập; đã điểm danh hôm nay thì ẩn ô này.
+  - Trạng thái rỗng (DB thật bắt đầu trống): "Chưa có truyện nào được đề cử tuần này", vẫn có ô mời điểm danh.
+- **Khu Sáng tác, tab Thống kê:** thêm ô "Đề cử" (tổng + 7 ngày).
+- Kiểm tra giao diện ở 375 / 768 / 1440px, cả hai theme. Giao diện sáng dùng token của theme sáng (bản thiết kế chỉ vẽ theme tối). Header ở màn 375px phải đủ chỗ cho icon mới, không tràn ngang.
 
 ## 5. Chuẩn bị cho giai đoạn 2
 

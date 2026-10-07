@@ -10,6 +10,7 @@ import { HeroShowcase } from '@/features/stories/sections/HeroShowcase'
 import { LatestUpdates } from '@/features/stories/sections/LatestUpdates'
 import { NewReleases } from '@/features/stories/sections/NewReleases'
 import { TrendingWeekly } from '@/features/stories/sections/TrendingWeekly'
+import { TopVotedWeekly } from '@/features/rewards/components/TopVotedWeekly'
 import { Seo } from '@/components/common/Seo'
 import { homeSeo } from '@/lib/seo'
 
@@ -38,6 +39,7 @@ export default function HomePage() {
         </div>
         <aside className="space-y-12">
           <TrendingWeekly />
+          <TopVotedWeekly />
           <GenreCloud />
         </aside>
       </Container>

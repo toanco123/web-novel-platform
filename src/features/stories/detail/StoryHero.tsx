@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useSession } from '@/features/auth/hooks'
 import { FollowButton } from '@/features/library/components/FollowButton'
 import { DownloadButton } from '@/features/offline/components/DownloadButton'
+import { VoteButton } from '@/features/rewards/components/VoteButton'
 import { useStoryProgress } from '@/features/library/hooks'
 import { resumeState } from '@/features/library/resume'
 import { formatCount, formatRelativeTime } from '@/lib/format'
@@ -133,6 +134,7 @@ export function StoryHero({ story }: { story: Story }) {
               ) : (
                 <FollowButton slug={story.slug} onDark />
               )}
+              <VoteButton story={story} />
               <StoryDownloadButton story={story} />
             </div>
           </div>

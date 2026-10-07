@@ -309,6 +309,38 @@ export type Database = {
           },
         ]
       }
+      daily_checkins: {
+        Row: {
+          created_at: string
+          day: string
+          reward: number
+          streak: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day: string
+          reward: number
+          streak: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          reward?: number
+          streak?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_checkins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           followed_at: string
@@ -695,6 +727,7 @@ export type Database = {
           rating_sum: number | null
           story_id: string
           view_count: number
+          vote_count: number
         }
         Insert: {
           chapter_count?: number
@@ -709,6 +742,7 @@ export type Database = {
           rating_sum?: number | null
           story_id: string
           view_count?: number
+          vote_count?: number
         }
         Update: {
           chapter_count?: number
@@ -723,6 +757,7 @@ export type Database = {
           rating_sum?: number | null
           story_id?: string
           view_count?: number
+          vote_count?: number
         }
         Relationships: [
           {
@@ -748,6 +783,59 @@ export type Database = {
           },
         ]
       }
+      story_votes: {
+        Row: {
+          amount: number
+          created_at: string
+          id: number
+          story_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: never
+          story_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: never
+          story_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_votes_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_votes_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_votes_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_blocks: {
         Row: {
           blocked_id: string
@@ -768,6 +856,97 @@ export type Database = {
           {
             foreignKeyName: "user_blocks_blocked_id_fkey"
             columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallet_balances: {
+        Row: {
+          balance: number
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          currency?: Database["public"]["Enums"]["wallet_currency"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_balances_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallet_ledger: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          id: number
+          reason: Database["public"]["Enums"]["ledger_reason"]
+          story_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          id?: never
+          reason: Database["public"]["Enums"]["ledger_reason"]
+          story_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          currency?: Database["public"]["Enums"]["wallet_currency"]
+          id?: never
+          reason?: Database["public"]["Enums"]["ledger_reason"]
+          story_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_ledger_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wallet_ledger_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wallet_ledger_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wallet_ledger_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1089,6 +1268,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      daily_checkin: { Args: never; Returns: Json }
       delete_account: { Args: never; Returns: undefined }
       get_library: {
         Args: never
@@ -1150,6 +1330,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      reward_status: { Args: never; Returns: Json }
       save_reading_progress: {
         Args: {
           p_chapter: number
@@ -1188,6 +1369,7 @@ export type Database = {
           value: number
         }[]
       }
+      story_vote_summary: { Args: { p_slug: string }; Returns: Json }
       studio_story_stats: { Args: { p_story_id: string }; Returns: Json }
       submit_story_for_review: {
         Args: { p_story_id: string }
@@ -1238,15 +1420,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      vote_story: { Args: { p_amount: number; p_slug: string }; Returns: Json }
     }
     Enums: {
       comment_report_reason: "spam" | "offensive" | "spoiler" | "other"
       contact_topic: "general" | "bug" | "copyright" | "partnership"
+      ledger_reason: "checkin" | "vote"
       publication_status: "draft" | "published"
       report_reason: "typo" | "missing" | "order" | "violation" | "other"
       report_status: "open" | "resolved"
       review_status: "pending" | "approved" | "rejected"
       story_status: "ongoing" | "completed"
+      wallet_currency: "ticket"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1376,11 +1561,13 @@ export const Constants = {
     Enums: {
       comment_report_reason: ["spam", "offensive", "spoiler", "other"],
       contact_topic: ["general", "bug", "copyright", "partnership"],
+      ledger_reason: ["checkin", "vote"],
       publication_status: ["draft", "published"],
       report_reason: ["typo", "missing", "order", "violation", "other"],
       report_status: ["open", "resolved"],
       review_status: ["pending", "approved", "rejected"],
       story_status: ["ongoing", "completed"],
+      wallet_currency: ["ticket"],
     },
   },
 } as const

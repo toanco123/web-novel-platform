@@ -26,6 +26,12 @@ const criteria: { value: RankingCriterion; param: string; label: string; hint: s
     hint: 'Xếp theo lượt đọc chương trong kỳ.',
   },
   {
+    value: 'votes',
+    param: 'votes',
+    label: 'Đề cử',
+    hint: 'Xếp theo số phiếu đề cử độc giả dành cho truyện trong kỳ.',
+  },
+  {
     value: 'rating',
     param: 'rating',
     label: 'Điểm cao',
@@ -82,7 +88,7 @@ export default function RankingPage() {
             active: c === criterion,
           }))}
         />
-        {criterion.value === 'views' && (
+        {(criterion.value === 'views' || criterion.value === 'votes') && (
           <SegmentedLinks
             label="Kỳ xếp hạng"
             replace
@@ -156,7 +162,10 @@ function RankingRow({
   const metric =
     criterion === 'rating'
       ? { value: `${value.toFixed(1)} ★`, unit: `${formatCount(story.ratingCount)} lượt chấm` }
-      : { value: formatCount(value), unit: criterion === 'views' ? 'lượt đọc' : 'theo dõi' }
+      : {
+          value: formatCount(value),
+          unit: { views: 'lượt đọc', votes: 'phiếu', follows: 'theo dõi' }[criterion],
+        }
 
   return (
     <div

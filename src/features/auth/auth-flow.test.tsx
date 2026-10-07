@@ -68,7 +68,9 @@ test('đăng ký: email trùng báo lỗi, email mới thì đăng nhập luôn 
   await user.click(account)
   const menu = await screen.findByRole('menu')
   await user.click(within(menu).getByRole('menuitem', { name: 'Đăng xuất' }))
-  expect(await screen.findByRole('link', { name: 'Đăng nhập' }, slow)).toBeInTheDocument()
+  // Chỉ tìm trong header: tìm cả trang chủ (nhiều khối) chậm, dễ quá thời gian khi chạy song song
+  const header = screen.getByRole('banner')
+  expect(await within(header).findByRole('link', { name: 'Đăng nhập' }, slow)).toBeInTheDocument()
 })
 
 test('đã đăng nhập mà mở trang đăng nhập thì bị chuyển đi', async () => {
