@@ -204,9 +204,9 @@ Lấy cảm hứng từ brief "Mộng Truyện" (romance, tông tối), áp cho 
   - Burgundy `#7A1F3D` (`wine`), vàng hồng `#D9A68F` (`rose-gold`), hồng neon `#FF3D8B` (`neon` / `primary`, chỉ cho điểm nhấn và nút chính)
   - Giao diện sáng: nền giấy hồng `#FBF4F6`, chữ `#2A1530`, primary `#B0144F`
 - **Font** (đều có bộ tiếng Việt, tự host qua @fontsource):
-  - Great Vibes: logo thư pháp (`font-script`)
   - Cormorant Garamond: tiêu đề, số thứ hạng (`font-heading`)
   - Be Vietnam Pro: giao diện, nội dung (`font-sans`)
+- **Logo** "Sách nở hoa" (sách mở + hoa 5 cánh, chữ "Web Truyện" kiểu Great Vibes đã chuyển thành nét vẽ): bản gốc và hướng dẫn ở `documents/logo/`. Header/footer dùng SVG nội tuyến `SiteLogo` (nét sách + chữ theo `rose-gold`, cánh hoa theo `neon`, tự đổi theo theme); favicon, icon PWA, ảnh `og-default.png` nằm trong `public/`.
 - **Bìa chữ tự sinh** (`StoryCover`): truyện chưa có ảnh bìa sẽ có bìa màu theo slug + tên truyện chữ serif; `compact` cho bìa nhỏ.
 - **Trang chủ** (từ trên xuống): Header kính mờ 2 tầng (logo, tìm kiếm + gợi ý thể loại, đổi theme, đăng nhập / thanh pill điều hướng) → Banner truyện nổi bật (tự chuyển 7s theo thanh tiến độ, dừng khi hover/focus, tắt khi bật giảm chuyển động) → Truyện đề cử (hàng cuộn ngang) → [Mới cập nhật + Truyện mới ra | Top tuần + Thể loại] → Footer.
 - **Responsive**: kiểm tra ở 375px, 768px, 1440px, không cuộn ngang. Mobile: menu trượt trái, nút đăng nhập thành icon, banner ẩn bìa lớn.

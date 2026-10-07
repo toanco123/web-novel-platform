@@ -1,4 +1,5 @@
-// Đổi tên web ở đây (vd 'Mộng Truyện') — logo, footer, <title> đều lấy từ hằng này.
+// Đổi tên web ở đây (vd 'Mộng Truyện') — footer, <title> đều lấy từ hằng này; riêng chữ trong logo là
+// nét vẽ (src/components/common/SiteLogo.tsx), đổi tên thì phải xuất lại logo.
 // File này còn được hàm Vercel (api/) và cấu hình build đọc, nên chỉ chứa hằng thuần: không import
 // gì và không dùng import.meta.
 export const SITE_NAME = 'Web Truyện'
