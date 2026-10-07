@@ -29,3 +29,4 @@ dist-ssr
 
 # Cài đặt Claude Code riêng của từng người
 .claude/settings.local.json
+tts-samples/

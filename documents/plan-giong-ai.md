@@ -8,13 +8,17 @@ Tiến độ (07/10/2026):
 - [x] Hàm Vercel `api/tts` + test
 - [x] Web: Giọng AI (`features/tts`, `clipQueue`, `cloudEngine`), cài đặt, gợi ý cài giọng, toast, CSP, proxy dev
 - [x] Admin: ô "Giọng AI tháng này"
-- [ ] Tài khoản Google Cloud, Cloudflare R2, biến môi trường Vercel (người dùng làm); nghe thử và chốt 4 giọng
+- [x] App di động (nhánh `ai-voices` của app): chép lõi, Giọng AI bằng expo-audio, phát nền, màn hình khóa, cài đặt
+- [x] Script nghe thử giọng: `GOOGLE_TTS_API_KEY=... node scripts/tts-voice-samples.mjs`
+- [ ] Tài khoản Google Cloud, Cloudflare R2, biến môi trường Vercel (người dùng làm); nghe thử và chốt 4 giọng (`TTS_VOICES`, hiện tạm Aoede, Kore, Charon, Puck)
 - [ ] Thử thật trên bản preview (Chrome, Safari, iPhone)
-- [ ] App di động
+- [ ] App: thử khóa màn hình trên máy thật bằng bản build riêng
 
 Khác với plan:
 - CSP `media-src` cho mọi `https:` thay vì viết cứng tên miền R2 (tên miền chưa có; file âm thanh không chạy được mã).
 - Server bỏ qua các đoạn nằm ngoài chương trong `generate` thay vì báo lỗi (tạo sẵn chương sau khi chưa biết số đoạn).
+- App không tải trước file MP3 kế tiếp (`preload` của expo-audio trên Android giữ file tới khi xóa tay); vẫn tạo trước manifest 3 đoạn như web.
+- App bật điều khiển trên màn hình khóa (`setActiveForLockScreen`, tên chương + tên truyện): Android bắt buộc có thì mới phát lâu khi khóa màn hình. Nút điều khiển riêng (tua, chương sau) vẫn ngoài phạm vi.
 
 ## Context
 
