@@ -110,7 +110,8 @@ function toUser(session: Session, profile: Profile): User {
     email: session.user.email ?? '',
     displayName: profile.displayName,
     avatarUrl: profile.avatarUrl,
-    provider: provider === 'google' || provider === 'facebook' ? provider : 'email',
+    provider:
+      provider === 'google' || provider === 'facebook' || provider === 'apple' ? provider : 'email',
     // app_metadata chỉ sửa được bằng quyền quản trị DB (cách cấp: thiet-ke-database.md)
     isAdmin: session.user.app_metadata.role === 'admin',
   }

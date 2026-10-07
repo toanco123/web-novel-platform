@@ -107,7 +107,7 @@ export async function signInWithProvider(provider: SocialProvider): Promise<User
     user = {
       id: crypto.randomUUID(),
       email,
-      displayName: provider === 'google' ? 'Bạn đọc Google' : 'Bạn đọc Facebook',
+      displayName: `Bạn đọc ${{ google: 'Google', facebook: 'Facebook', apple: 'Apple' }[provider]}`,
       avatarUrl: null,
       provider,
       password: null,

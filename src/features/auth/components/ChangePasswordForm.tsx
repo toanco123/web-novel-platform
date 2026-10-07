@@ -10,7 +10,7 @@ import { PasswordInput } from './PasswordInput'
 import { PasswordStrength } from './PasswordStrength'
 import { SubmitButton } from './SubmitButton'
 
-const providerName = { google: 'Google', facebook: 'Facebook' } as const
+const providerName = { google: 'Google', facebook: 'Facebook', apple: 'Apple' } as const
 
 export function ChangePasswordForm({ user }: { user: User }) {
   const change = useChangePassword()

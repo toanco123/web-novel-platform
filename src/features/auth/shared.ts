@@ -50,6 +50,7 @@ export type SignUpResult = { user: User | null; needsEmailConfirmation: boolean 
 
 export type SocialProvider = Exclude<AuthProvider, 'email'>
 
+/** Provider đăng nhập bằng chuyển trang (OAuth). Apple không có ở đây: app iOS đăng nhập bằng id token */
 export const SOCIAL_PROVIDERS: SocialProvider[] = ['google', 'facebook']
 
 /** 'google, facebook' → ['google', 'facebook'] (bỏ giá trị không hỗ trợ) */

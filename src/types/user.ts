@@ -1,4 +1,5 @@
-export type AuthProvider = 'email' | 'google' | 'facebook'
+/** 'apple': chỉ đăng nhập được trên app iOS (id token), web chưa có nút nhưng vẫn phải nhận ra tài khoản */
+export type AuthProvider = 'email' | 'google' | 'facebook' | 'apple'
 
 export type User = {
   id: string
