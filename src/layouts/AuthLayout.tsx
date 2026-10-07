@@ -60,7 +60,7 @@ function ShowcasePanel() {
       style={{ background: `linear-gradient(160deg, ${p.from}, #1a0f1d 70%)` }}
     >
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(50%_40%_at_50%_45%,rgb(255_61_139/0.22),transparent_70%)]" />
-      <SiteLogo className="text-[#d9a68f]" />
+      <SiteLogo className="text-[#d9a68f] [--neon:#ff3d8b]" />
 
       <div className="relative mx-auto h-[22rem] w-full max-w-md">
         {stories.map((s, i) => (
