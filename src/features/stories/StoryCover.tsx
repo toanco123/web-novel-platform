@@ -7,26 +7,32 @@ type Props = {
   story: Pick<Story, 'slug' | 'title' | 'coverUrl' | 'author'>
   /** Bìa cỡ nhỏ (thumbnail, bảng xếp hạng): chỉ giữ màu và khung, bỏ chữ */
   compact?: boolean
+  /** Ảnh nằm ngay màn hình đầu (banner, đầu trang truyện): tải ngay, ưu tiên cao */
+  priority?: boolean
   className?: string
 }
 
-export function StoryCover({ story, compact = false, className }: Props) {
+export function StoryCover({ story, compact = false, priority = false, className }: Props) {
   // Ảnh không tải được (offline chưa có trong bộ nhớ đệm, ảnh bị xóa): dùng bìa chữ tự sinh
   const [failed, setFailed] = useState<string | null>(null)
+  const p = coverPalette(story.slug)
   if (story.coverUrl && failed !== story.coverUrl) {
     const url = story.coverUrl
     return (
       <img
         src={url}
         alt={`Bìa truyện ${story.title}`}
-        loading="lazy"
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
+        decoding="async"
         onError={() => setFailed(url)}
         className={cn('aspect-[2/3] w-full object-cover', className)}
+        // Màu bìa theo truyện hiện trong lúc chờ ảnh, không để ô trống
+        style={{ background: `linear-gradient(165deg, ${p.from}, ${p.to})` }}
       />
     )
   }
 
-  const p = coverPalette(story.slug)
   return (
     <div
       role="img"

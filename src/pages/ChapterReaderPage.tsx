@@ -1,9 +1,10 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { NotFound } from '@/components/common/NotFound'
 import { Button } from '@/components/ui/button'
 import { SITE_NAME } from '@/config/site'
-import { useChapter, useRecordChapterView } from '@/features/chapters/hooks'
+import { chapterQuery, useRecordChapterView } from '@/features/chapters/hooks'
 import { ReportChapterDialog } from '@/features/feedback/components/ReportChapterDialog'
 import { NotSavedNotice } from '@/features/offline/components/NotSavedNotice'
 import { usePrefetchChapters } from '@/features/offline/prefetch'
@@ -31,6 +32,7 @@ import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import type { ChapterContent } from '@/types/chapter'
 import { Seo } from '@/components/common/Seo'
+import { ReaderSkeleton, ReaderToolbarSkeleton } from '@/features/reader/components/ReaderSkeleton'
 import { chapterSeo } from '@/lib/seo'
 
 // Router không hỗ trợ tham số nằm giữa đoạn URL ("chapter-:number") nên tự tách ở đây
@@ -54,7 +56,18 @@ export default function ChapterReaderPage() {
 }
 
 function Reader({ slug, number }: { slug: string; number: number }) {
-  const { data: chapter, isPending, isError, error, refetch } = useChapter(slug, number)
+  const queryClient = useQueryClient()
+  const { data, isPlaceholderData, isError, error, refetch } = useQuery({
+    ...chapterQuery(queryClient, slug, number),
+    // Sang chương chưa có trong cache: thanh công cụ giữ chương vừa đọc (cùng truyện) thay vì biến
+    // mất, chỉ vùng chữ hiện khung chờ
+    placeholderData: (previous) => (previous?.story.slug === slug ? previous : undefined),
+  })
+  // Chương của URL hiện tại: undefined khi đang tải, null khi không có chương này. Không dùng chương
+  // giữ chỗ cho nội dung, lịch sử, lượt đọc: mốc data-chapter/data-paragraph phải đúng chương
+  const chapter = isPlaceholderData ? undefined : data
+  // Chương cho thanh công cụ (có thể là chương vừa đọc khi chương mới đang tải)
+  const shown = data ?? undefined
   const navigate = useNavigate()
   const location = useLocation()
   const navState = location.state as ReaderNavState
@@ -121,7 +134,6 @@ function Reader({ slug, number }: { slug: string; number: number }) {
   useRecordChapterView(slug, chapter ? number : undefined)
   const resumed = useReadingTracker(chapter)
 
-  if (isPending) return <ReaderSkeleton />
   if (isError)
     return error instanceof ChapterNotSavedError ? (
       <div className="px-4 py-32">
@@ -135,7 +147,7 @@ function Reader({ slug, number }: { slug: string; number: number }) {
         </Button>
       </div>
     )
-  if (!chapter)
+  if (chapter === null)
     return (
       <div className="flex flex-col items-center gap-4 px-4 py-32 text-center">
         <Seo title={`Không tìm thấy chương | ${SITE_NAME}`} noindex />
@@ -178,23 +190,34 @@ function Reader({ slug, number }: { slug: string; number: number }) {
       }
     },
   }
-  const next = chapter.next
+  const next = chapter?.next
 
   return (
     <>
-      <Seo {...chapterSeo({ ...chapter.story, authorName: chapter.story.author.name }, chapter)} />
-      {chapter.prev && <link rel="prev" href={paths.chapter(slug, chapter.prev.number)} />}
-      {chapter.next && <link rel="next" href={paths.chapter(slug, chapter.next.number)} />}
+      {chapter && (
+        <>
+          <Seo
+            {...chapterSeo({ ...chapter.story, authorName: chapter.story.author.name }, chapter)}
+          />
+          {chapter.prev && <link rel="prev" href={paths.chapter(slug, chapter.prev.number)} />}
+          {chapter.next && <link rel="next" href={paths.chapter(slug, chapter.next.number)} />}
+        </>
+      )}
 
       <ReadingProgress chapter={number} />
-      <ReaderToolbar
-        chapter={chapter}
-        visible={toolbarVisible}
-        open={open}
-        setOpen={setOpen}
-        listen={listen}
-        autoScroll={autoScrollButton}
-      />
+      {shown ? (
+        <ReaderToolbar
+          chapter={shown}
+          loading={chapter ? undefined : number}
+          visible={toolbarVisible}
+          open={open}
+          setOpen={setOpen}
+          listen={listen}
+          autoScroll={autoScrollButton}
+        />
+      ) : (
+        <ReaderToolbarSkeleton />
+      )}
       {resumed && <ResumeNotice key={location.key} chapter={number} />}
 
       <main
@@ -205,7 +228,10 @@ function Reader({ slug, number }: { slug: string; number: number }) {
         )}
         style={{ maxWidth: `calc(${widths.find((w) => w.value === width)?.maxWidth} + 4rem)` }}
       >
-        {continuous ? (
+        {!chapter ? (
+          // Đang tải: khung chờ thay hẳn nội dung (không để chữ chương cũ mang mốc của chương mới)
+          <ReaderSkeleton inline />
+        ) : continuous ? (
           <ChapterStream
             key={streamStart}
             slug={slug}
@@ -280,23 +306,5 @@ function SingleChapter({
         <ChapterComments key={chapter.number} slug={slug} chapter={chapter.number} />
       </div>
     </>
-  )
-}
-
-function ReaderSkeleton() {
-  return (
-    <div className="mx-auto max-w-2xl px-5 pt-28 pb-20" aria-busy aria-label="Đang tải chương">
-      <div className="mx-auto h-4 w-40 animate-pulse rounded bg-muted" />
-      <div className="mx-auto mt-6 h-10 w-3/4 animate-pulse rounded bg-muted" />
-      <div className="mt-14 space-y-3">
-        {Array.from({ length: 14 }, (_, i) => (
-          <div
-            key={i}
-            className="h-4 animate-pulse rounded bg-muted"
-            style={{ width: i % 5 === 4 ? '60%' : '100%' }}
-          />
-        ))}
-      </div>
-    </div>
   )
 }

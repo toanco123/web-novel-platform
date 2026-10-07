@@ -18,7 +18,7 @@ import { paths } from '@/lib/routes'
 import type { HistoryItem } from '@/types/library'
 import { useClearHistory, useReadingHistory, useRemoveFromHistory } from '../hooks'
 import { resumeState } from '../resume'
-import { ListSkeleton } from './FollowingList'
+import { ListSkeleton } from './ListSkeleton'
 import { ProgressMeter } from './ProgressMeter'
 
 export function HistoryList() {

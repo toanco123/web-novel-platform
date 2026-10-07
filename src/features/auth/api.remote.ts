@@ -84,23 +84,45 @@ function authError(error: unknown): unknown {
 /** Hồ sơ lần tải trước (localStorage): mở app lúc offline vẫn nhận ra tài khoản */
 const PROFILE_KEY = 'auth-profile'
 
-async function loadProfile(userId: string): Promise<Profile> {
-  if (cachedProfile?.id === userId) return cachedProfile
-  let profile: Profile
-  try {
-    const row = unwrap(
-      await db().from('profiles').select('id, display_name, avatar_url').eq('id', userId).single(),
-    )
-    profile = { id: row.id, displayName: row.display_name, avatarUrl: row.avatar_url }
-  } catch (error) {
-    const saved = readMock<Profile | null>(PROFILE_KEY, null)
-    // Không gán cachedProfile: có mạng lại thì tải bản mới
-    if (isNetworkError(error) && saved?.id === userId) return saved
-    throw error
-  }
+/** Gọi khi hồ sơ tải lại ở nền khác bản đã lưu (onAuthStateChange đăng ký để làm mới phiên) */
+const profileListeners = new Set<() => void>()
+
+async function fetchProfile(userId: string): Promise<Profile> {
+  const row = unwrap(
+    await db().from('profiles').select('id, display_name, avatar_url').eq('id', userId).single(),
+  )
+  const profile = { id: row.id, displayName: row.display_name, avatarUrl: row.avatar_url }
   cachedProfile = profile
   writeMock(PROFILE_KEY, profile)
   return profile
+}
+
+/**
+ * Hồ sơ người đang đăng nhập. Có bản lưu trên máy thì trả ngay (giao diện không phải chờ một lượt
+ * gọi mạng mỗi lần mở web, không hiện giao diện của khách trước) rồi tải lại ở nền; bản mới khác
+ * bản lưu thì báo profileListeners. Tải ở nền lỗi do mạng thì giữ bản lưu, lần sau thử lại.
+ */
+async function loadProfile(userId: string): Promise<Profile> {
+  if (cachedProfile?.id === userId) return cachedProfile
+  const saved = readMock<Profile | null>(PROFILE_KEY, null)
+  if (saved?.id !== userId) return fetchProfile(userId)
+  cachedProfile = saved
+  fetchProfile(userId).then(
+    (fresh) => {
+      if (fresh.displayName !== saved.displayName || fresh.avatarUrl !== saved.avatarUrl) {
+        profileListeners.forEach((notify) => notify())
+      }
+    },
+    (error) => {
+      if (cachedProfile === saved) cachedProfile = null
+      // Lỗi không do mạng (vd hồ sơ không còn): bỏ bản lưu, làm mới phiên để báo lỗi như thường
+      if (!isNetworkError(error)) {
+        writeMock(PROFILE_KEY, null)
+        profileListeners.forEach((notify) => notify())
+      }
+    },
+  )
+  return saved
 }
 
 function toUser(session: Session, profile: Profile): User {
@@ -179,7 +201,12 @@ export function onAuthStateChange(onChange: () => void): () => void {
     cachedProfile = null
     setTimeout(onChange, 0)
   })
-  return () => data.subscription.unsubscribe()
+  // Hồ sơ tải lại ở nền đã khác bản lưu (đổi tên, ảnh ở máy khác): làm mới phiên
+  profileListeners.add(onChange)
+  return () => {
+    data.subscription.unsubscribe()
+    profileListeners.delete(onChange)
+  }
 }
 
 /**
@@ -304,7 +331,9 @@ export async function updateProfile(input: { displayName: string; avatarUrl: str
   if (avatarUrl !== current.avatarUrl) {
     await removeImage('avatars', imagePathFromUrl('avatars', current.avatarUrl))
   }
-  cachedProfile = null
+  // Ghi đè cả bản lưu trên máy: loadProfile trả bản lưu trước, để cũ thì tên/ảnh cũ hiện lại
+  cachedProfile = { id: current.id, displayName, avatarUrl }
+  writeMock(PROFILE_KEY, cachedProfile)
   return { ...current, displayName, avatarUrl }
 }
 

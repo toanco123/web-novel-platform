@@ -1,6 +1,13 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
+import { getChapter } from '@/features/chapters/api'
 import { renderApp } from '@/test/renderApp'
 import { useReaderSettings, READER_DEFAULTS } from './useReaderSettings'
+
+// Bọc getChapter để giữ một chương ở trạng thái đang tải
+vi.mock('@/features/chapters/api', async (importOriginal) => {
+  const api = await importOriginal<typeof import('@/features/chapters/api')>()
+  return { ...api, getChapter: vi.fn(api.getChapter) }
+})
 
 const base = '/story/truong-an-khong-tuyet' // 412 chương
 
@@ -97,4 +104,39 @@ test('mục lục mở sẵn chương đang đọc và chọn chương thì chuy
   await user.click(within(dialog).getAllByRole('link')[0])
   await expect.poll(() => router.state.location.pathname).toBe(`${base}/chapter-51`)
   await expect.poll(() => screen.queryByRole('dialog', { name: 'Mục lục' })).toBeNull()
+})
+
+test('sang chương chưa tải: thanh công cụ còn nguyên, chỉ vùng chữ hiện khung chờ', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/features/chapters/api')>('@/features/chapters/api')
+  let release = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  vi.mocked(getChapter).mockImplementation(async (s, n) => {
+    if (n === 100) await gate
+    return actual.getChapter(s, n)
+  })
+  try {
+    const { router } = renderApp(`${base}/chapter-12`)
+    await screen.findByRole('heading', { level: 1 }, { timeout: 3000 })
+    const toolbarOf = () => screen.getByRole('button', { name: 'Mục lục' }).closest('header')!
+    const toolbar = toolbarOf()
+
+    await act(() => router.navigate(`${base}/chapter-100`))
+    expect(await screen.findByLabelText('Đang tải chương')).toBeInTheDocument()
+    // Cùng một thanh công cụ (không dựng lại), đã đổi sang số chương mới
+    expect(toolbarOf()).toBe(toolbar)
+    expect(within(toolbar).getByText('Chương 100')).toBeInTheDocument()
+    // Không còn chữ của chương cũ
+    expect(document.querySelector('[data-chapter]')).toBeNull()
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+
+    release()
+    expect(
+      await screen.findByRole('link', { name: /Đọc tiếp chương 101/ }, { timeout: 3000 }),
+    ).toBeInTheDocument()
+    expect(toolbarOf()).toBe(toolbar)
+    expect(document.querySelector('[data-chapter="100"]')).not.toBeNull()
+  } finally {
+    vi.mocked(getChapter).mockImplementation(actual.getChapter)
+  }
 })

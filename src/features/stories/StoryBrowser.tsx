@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Pagination } from '@/components/common/Pagination'
 import { SectionError } from '@/components/common/SectionHeading'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { useGenres } from '@/features/genres/hooks'
 import { cn } from '@/lib/utils'
-import type { BrowseFilters } from './api'
+import { BROWSE_PER_PAGE, type BrowseFilters } from './api'
 import {
   browseSearch,
   lengthOptions,
@@ -121,7 +122,7 @@ export function StoryBrowser({
             )}
           >
             {isPending
-              ? Array.from({ length: 12 }, (_, i) => (
+              ? Array.from({ length: BROWSE_PER_PAGE }, (_, i) => (
                   <li key={i}>
                     <StoryCardSkeleton />
                   </li>
@@ -132,6 +133,14 @@ export function StoryBrowser({
                   </li>
                 ))}
           </ul>
+        )}
+        {isPending && (
+          // Giữ chỗ cho thanh phân trang (h-9) để chân trang không nhảy khi dữ liệu về
+          <div aria-hidden className="mt-10 flex justify-center gap-1">
+            {Array.from({ length: 7 }, (_, i) => (
+              <Skeleton key={i} className="size-9 rounded-full" />
+            ))}
+          </div>
         )}
         {data && (
           <Pagination

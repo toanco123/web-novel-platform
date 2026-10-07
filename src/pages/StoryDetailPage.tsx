@@ -9,7 +9,8 @@ import { useStoryProgress } from '@/features/library/hooks'
 import { SectionNav } from '@/features/stories/detail/SectionNav'
 import { SideStoryList } from '@/features/stories/detail/SideStoryList'
 import { StoryDescription } from '@/features/stories/detail/StoryDescription'
-import { StoryHero, StoryHeroSkeleton } from '@/features/stories/detail/StoryHero'
+import { StoryDetailSkeleton } from '@/features/stories/detail/StoryDetailSkeleton'
+import { StoryHero } from '@/features/stories/detail/StoryHero'
 import { useRelatedStories, useStoriesByAuthor, useStory } from '@/features/stories/hooks'
 import type { ChapterOrder } from '@/types/chapter'
 import type { Story } from '@/types/story'
@@ -27,9 +28,10 @@ const sectionClass = 'scroll-mt-36 lg:scroll-mt-48'
 
 export default function StoryDetailPage() {
   const { slug = '' } = useParams()
+  // Mở từ thẻ truyện: `story` có ngay từ cache danh sách (placeholder), phần còn lại tải sau
   const { data: story, isPending, isError } = useStory(slug)
 
-  if (isPending) return <StoryHeroSkeleton />
+  if (isPending) return <StoryDetailSkeleton slug={slug} />
   if (isError)
     return (
       <Container className="py-16">
@@ -106,12 +108,14 @@ function StoryDetail({ story }: { story: Story }) {
             title="Cùng tác giả"
             stories={byAuthor.data}
             isPending={byAuthor.isPending}
+            skeletonCount={3}
           />
           <SideStoryList
             id="related"
             title="Cùng thể loại"
             stories={related.data}
             isPending={related.isPending}
+            skeletonCount={6}
           />
         </aside>
       </Container>

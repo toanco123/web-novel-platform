@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, ListOrdered } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { usePrefetchChapterLink } from '@/features/offline/prefetch'
 import { paths } from '@/lib/routes'
 import type { ChapterContent } from '@/types/chapter'
 
@@ -18,11 +19,13 @@ const navButton = 'h-10 flex-1 rounded-full sm:flex-none sm:px-5'
 export function ChapterNav({ chapter, onOpenIndex, label, emphasizeNext = true }: Props) {
   const { story, prev, next } = chapter
   const nextVariant = emphasizeNext ? 'default' : 'outline'
+  const prefetchPrev = usePrefetchChapterLink(chapter, prev?.number)
+  const prefetchNext = usePrefetchChapterLink(chapter, next?.number)
   return (
     <nav aria-label={label} className="flex items-center justify-between gap-2">
       {prev ? (
         <Button asChild variant="outline" className={navButton}>
-          <Link to={paths.chapter(story.slug, prev.number)} rel="prev">
+          <Link to={paths.chapter(story.slug, prev.number)} rel="prev" {...prefetchPrev}>
             <ChevronLeft />
             <span>
               <span className="sm:hidden">Trước</span>
@@ -52,7 +55,7 @@ export function ChapterNav({ chapter, onOpenIndex, label, emphasizeNext = true }
 
       {next ? (
         <Button asChild variant={nextVariant} className={navButton}>
-          <Link to={paths.chapter(story.slug, next.number)} rel="next">
+          <Link to={paths.chapter(story.slug, next.number)} rel="next" {...prefetchNext}>
             <span>
               <span className="sm:hidden">Sau</span>
               <span className="hidden sm:inline">Chương sau</span>

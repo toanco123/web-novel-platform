@@ -134,14 +134,18 @@
   --sidebar-ring: #ff3d8b;
 }
 
-/* Màu nền trang đọc: ghi đè token trong vùng đọc, độc lập với giao diện sáng/tối của web */
+/* Màu nền trang đọc: ghi đè token trong vùng đọc, độc lập với giao diện sáng/tối của web. Khung
+   trang tĩnh trong index.html (.app-shell, khi mở thẳng trang đọc) dùng cùng màu */
 .reader-tone-white,
-.reader-tone-paper {
+html[data-shell-tone='white'] .app-shell,
+.reader-tone-paper,
+html[data-shell-tone='paper'] .app-shell {
   color-scheme: light;
   --primary-foreground: #ffffff;
   --destructive: #c62828;
 }
-.reader-tone-white {
+.reader-tone-white,
+html[data-shell-tone='white'] .app-shell {
   --background: #fdfbf8;
   --foreground: #2a1a22;
   --card: #ffffff;
@@ -160,7 +164,8 @@
   --ring: #b0144f;
   --rose-gold: #9a5a43;
 }
-.reader-tone-paper {
+.reader-tone-paper,
+html[data-shell-tone='paper'] .app-shell {
   --background: #f4ead3;
   --foreground: #3a2b1d;
   --card: #f9f1dd;
@@ -180,11 +185,14 @@
   --rose-gold: #8a5236;
 }
 .reader-tone-gray,
-.reader-tone-black {
+html[data-shell-tone='gray'] .app-shell,
+.reader-tone-black,
+html[data-shell-tone='black'] .app-shell {
   color-scheme: dark;
   --destructive: #ff6b6b;
 }
-.reader-tone-gray {
+.reader-tone-gray,
+html[data-shell-tone='gray'] .app-shell {
   --background: #38363a;
   --foreground: #e6e1dd;
   --card: #424044;
@@ -204,7 +212,8 @@
   --ring: #ff82ad;
   --rose-gold: #dcb29d;
 }
-.reader-tone-black {
+.reader-tone-black,
+html[data-shell-tone='black'] .app-shell {
   --background: #000000;
   --foreground: #cbc3c6;
   --card: #121012;
@@ -329,5 +338,22 @@
       color: var(--muted-foreground);
       pointer-events: none;
     }
+  }
+}
+
+/* Thanh chuyển trang (NavigationProgress): đoạn sáng chạy từ trái sang phải */
+@keyframes nav-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+/* Skeleton viết tay (animate-pulse) cũng đứng yên khi người dùng chọn giảm chuyển động */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
   }
 }

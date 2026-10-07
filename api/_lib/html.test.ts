@@ -95,7 +95,8 @@ test('injectSeo thay <title> và chèn thẻ vào head của index.html', () => 
   )
   // Thẻ nằm trong head, phần còn lại của app giữ nguyên
   expect(html.indexOf('og:title')).toBeLessThan(html.indexOf('</head>'))
-  expect(html).toContain('<div id="root"></div>')
+  expect(html).toContain('<div id="root">')
+  expect(html).toContain('class="app-shell"')
   expect(html).toContain('<script type="module"')
 })
 

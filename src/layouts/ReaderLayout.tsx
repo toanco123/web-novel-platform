@@ -3,6 +3,7 @@ import { AppScrollRestoration } from '@/components/common/AppScrollRestoration'
 import { toneClass } from '@/features/reader/readerOptions'
 import { useReaderSettings } from '@/features/reader/useReaderSettings'
 import { cn } from '@/lib/utils'
+import { NavigationProgress } from '@/components/common/NavigationProgress'
 
 /** Layout trang đọc: không header/footer của web, màu nền theo cài đặt đọc */
 export function ReaderLayout() {
@@ -15,6 +16,7 @@ export function ReaderLayout() {
       >
         Bỏ qua tới nội dung chương
       </a>
+      <NavigationProgress />
       <Outlet />
       <AppScrollRestoration />
     </div>

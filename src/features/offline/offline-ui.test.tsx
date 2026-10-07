@@ -31,6 +31,8 @@ test('mục lục khi mất mạng chỉ hiện chương đã lưu', async () =>
   const { user } = renderApp(`${base}/chapter-12`)
   await heading()
   await expect.poll(() => getSavedChapter(slug, 17), { timeout: 3000 }).not.toBeNull()
+  // Chương trước cũng được tải trước (vào cache, qua kho như mọi chương đã mở)
+  await expect.poll(() => getSavedChapter(slug, 11), { timeout: 3000 }).not.toBeNull()
   goOffline()
   await user.click(screen.getByRole('button', { name: 'Mục lục' }))
   const dialog = await screen.findByRole('dialog', { name: 'Mục lục' })
@@ -39,7 +41,7 @@ test('mục lục khi mất mạng chỉ hiện chương đã lưu', async () =>
     .getAllByRole('link')
     .map((a) => a.getAttribute('href'))
     .filter((href) => href?.includes('/chapter-'))
-  expect(chapters).toEqual([12, 13, 14, 15, 16, 17].map((n) => `${base}/chapter-${n}`))
+  expect(chapters).toEqual([11, 12, 13, 14, 15, 16, 17].map((n) => `${base}/chapter-${n}`))
 })
 
 test('mất mạng: khu bình luận báo cần mạng, nút báo lỗi bị khóa', async () => {

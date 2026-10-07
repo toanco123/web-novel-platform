@@ -2,6 +2,7 @@ import { BookOpen, Clock, Eye, EyeOff, PenLine, Star } from 'lucide-react'
 import { Link } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useSession } from '@/features/auth/hooks'
 import { FollowButton } from '@/features/library/components/FollowButton'
 import { DownloadButton } from '@/features/offline/components/DownloadButton'
@@ -9,6 +10,7 @@ import { useStoryProgress } from '@/features/library/hooks'
 import { resumeState } from '@/features/library/resume'
 import { formatCount, formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
+import { cn } from '@/lib/utils'
 import type { Story } from '@/types/story'
 import { coverPalette } from '../coverPalette'
 import { StoryCover } from '../StoryCover'
@@ -55,7 +57,7 @@ export function StoryHero({ story }: { story: Story }) {
 
         <div className="mt-6 grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-x-5 gap-y-6 sm:grid-cols-[10rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-x-12">
           <div className="overflow-hidden rounded-lg shadow-[0_24px_60px_-20px_rgb(0_0_0/0.7)] ring-1 ring-white/10 lg:row-span-2">
-            <StoryCover story={story} />
+            <StoryCover story={story} priority />
           </div>
 
           <div className="min-w-0 self-center lg:self-end">
@@ -145,8 +147,15 @@ const primaryButton =
 
 /** Đã đọc dở: "Đọc tiếp" là nút chính; chưa đọc: đọc từ chương đầu và chương mới nhất */
 function ReadButtons({ story }: { story: Story }) {
-  const { data: progress } = useStoryProgress(story.slug)
+  const { data: progress, isPending } = useStoryProgress(story.slug)
   if (story.firstChapterNumber === null) return null
+  // Chưa biết chỗ đọc dở (đang chờ phiên hoặc lịch sử): giữ chỗ, không hiện nút "Đọc từ chương" rồi đổi
+  if (isPending) {
+    const latest = story.latestChapter?.number
+    return (
+      <ReadButtonsSkeleton second={latest !== undefined && latest !== story.firstChapterNumber} />
+    )
+  }
 
   if (progress) {
     return (
@@ -185,21 +194,60 @@ function ReadButtons({ story }: { story: Story }) {
   )
 }
 
-export function StoryHeroSkeleton() {
+function ReadButtonsSkeleton({ second = true }: { second?: boolean }) {
   return (
-    <div className="border-b bg-muted/40">
+    <>
+      <OnDarkSkeleton className="h-11 rounded-full sm:w-44" />
+      {second && <OnDarkSkeleton className="h-11 rounded-full sm:w-48" />}
+    </>
+  )
+}
+
+/** Khối chờ trên nền tối cố định của phần đầu trang */
+function OnDarkSkeleton({ className }: { className?: string }) {
+  return <Skeleton className={cn('bg-white/10', className)} />
+}
+
+/** Khung chờ phần đầu trang: cùng nền màu theo truyện và cùng bố cục với StoryHero */
+export function StoryHeroSkeleton({ slug }: { slug: string }) {
+  const p = coverPalette(slug)
+  return (
+    <section aria-hidden className="relative isolate overflow-hidden border-b">
+      <div
+        className="absolute inset-0 -z-10"
+        style={{ background: `linear-gradient(115deg, ${p.to} 10%, ${p.from} 60%, ${p.to} 100%)` }}
+      />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(50%_90%_at_15%_50%,rgb(255_61_139/0.18),transparent_70%)]" />
+
       <Container className="py-6 lg:py-10">
-        <div className="h-4 w-56 animate-pulse rounded bg-muted" />
-        <div className="mt-6 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-5 sm:grid-cols-[10rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-x-12">
-          <div className="aspect-[2/3] animate-pulse rounded-lg bg-muted" />
-          <div className="space-y-3 self-center">
-            <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-            <div className="h-10 w-3/4 animate-pulse rounded bg-muted" />
-            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+        <div className="flex h-5 items-center">
+          <OnDarkSkeleton className="h-4 w-56" />
+        </div>
+
+        <div className="mt-6 grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-x-5 gap-y-6 sm:grid-cols-[10rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-x-12">
+          <OnDarkSkeleton className="aspect-[2/3] rounded-lg lg:row-span-2" />
+
+          <div className="min-w-0 self-center lg:self-end">
+            <OnDarkSkeleton className="h-4 w-32" />
+            <OnDarkSkeleton className="mt-3 h-8 w-4/5 sm:h-9 lg:h-14" />
+            <OnDarkSkeleton className="mt-3 h-5 w-40 lg:mt-4" />
+          </div>
+
+          <div className="col-span-2 space-y-6 lg:col-span-1 lg:col-start-2">
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              {['w-20', 'w-14', 'w-36', 'w-32'].map((w) => (
+                <OnDarkSkeleton key={w} className={cn('h-5', w)} />
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <ReadButtonsSkeleton />
+              <OnDarkSkeleton className="h-11 rounded-full sm:w-52" />
+              <OnDarkSkeleton className="h-11 rounded-full sm:w-48" />
+            </div>
           </div>
         </div>
       </Container>
-    </div>
+    </section>
   )
 }
 

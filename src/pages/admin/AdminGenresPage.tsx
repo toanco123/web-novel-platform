@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { ADMIN_PAGE_SIZES, adminErrorMessage } from '@/features/admin/api'
+import { TableEmpty } from '@/features/admin/components/TableEmpty'
 import { FilterSelect } from '@/features/admin/components/TableFilters'
 import { useDeleteGenre, useMergeGenres, useUpdateGenre } from '@/features/admin/hooks'
 import type { GenreWithCount } from '@/features/genres/api'
@@ -124,7 +125,11 @@ export default function AdminGenresPage() {
               onShowSizeChange: (_, size) => setPageSize(size),
             }}
             locale={{
-              emptyText: q || source ? 'Không có thể loại nào khớp' : 'Chưa có thể loại nào',
+              emptyText: (
+                <TableEmpty loading={isPending}>
+                  {q || source ? 'Không có thể loại nào khớp' : 'Chưa có thể loại nào'}
+                </TableEmpty>
+              ),
             }}
             columns={[
               {

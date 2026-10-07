@@ -16,6 +16,9 @@ interface ImportMetaEnv {
   readonly VITE_PLAY_STORE_URL?: string
 }
 
+/** Dùng dữ liệu giả thay Supabase; hằng do vite.config.ts thay vào lúc build */
+declare const __USE_MOCK__: boolean
+
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }

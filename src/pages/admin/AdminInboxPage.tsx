@@ -1,6 +1,7 @@
 import { Alert, App, Button, Card, Grid, Input, Segmented, Table, Tag, Typography } from 'antd'
 import { SITE_NAME } from '@/config/site'
 import { type AdminContactMessage, type AdminMessageStatus } from '@/features/admin/api'
+import { TableEmpty } from '@/features/admin/components/TableEmpty'
 import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
 import {
   onTableChange,
@@ -29,7 +30,7 @@ export default function AdminInboxPage() {
   const topic = contactTopics.find((t) => t.value === params.get('topic'))?.value
   const q = params.get('q') ?? ''
   const { order, pageSize } = readTableParams(params, SORTS)
-  const { data, isPending, isFetching, isError } = useAdminMessages({
+  const { data, isPending, isFetching, isError, isPlaceholderData } = useAdminMessages({
     status,
     topic,
     q,
@@ -98,12 +99,15 @@ export default function AdminInboxPage() {
             dataSource={data?.items}
             scroll={{ x: 1100 }}
             locale={{
-              emptyText:
-                q || topic
-                  ? 'Không có tin nhắn nào khớp bộ lọc'
-                  : status === 'open'
-                    ? 'Không còn tin nhắn nào cần xử lý'
-                    : 'Chưa có tin nhắn',
+              emptyText: (
+                <TableEmpty loading={isPending || isPlaceholderData}>
+                  {q || topic
+                    ? 'Không có tin nhắn nào khớp bộ lọc'
+                    : status === 'open'
+                      ? 'Không còn tin nhắn nào cần xử lý'
+                      : 'Chưa có tin nhắn'}
+                </TableEmpty>
+              ),
             }}
             pagination={tablePagination(data, page, pageSize, update)}
             onChange={onTableChange(update)}

@@ -1,5 +1,5 @@
 // Bản Supabase của phiên đăng nhập trên client giả: chỉ kiểm phần chạy trên máy (hồ sơ lần trước
-// dùng khi mở app lúc offline).
+// trả ngay rồi tải lại ở nền, dùng khi mở app lúc offline).
 import { AuthApiError } from '@supabase/supabase-js'
 import { goOffline } from '@/test/offline'
 import type * as Remote from './api.remote'
@@ -23,6 +23,7 @@ vi.mock('@/lib/supabase', () => ({
       getSession: () => fake.getSession(),
       signInWithPassword: fake.signInWithPassword,
       resetPasswordForEmail: fake.resetPasswordForEmail,
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
     },
     from: () => {
       const query: Record<string, () => unknown> = {
@@ -41,6 +42,9 @@ async function freshApi(): Promise<typeof Remote> {
   return import('./api.remote')
 }
 
+/** Nghe báo làm mới phiên (hồ sơ tải lại ở nền khác bản lưu) */
+const profileChanged = (api: typeof Remote, onChange: () => void) => api.onAuthStateChange(onChange)
+
 const offlineError = { message: 'TypeError: Failed to fetch', code: '' }
 
 beforeEach(() => {
@@ -56,16 +60,38 @@ test('mở app lúc offline: dùng hồ sơ đã tải lần trước', async ()
   expect(await (await freshApi()).getSession()).toMatchObject({ id: 'u1', displayName: 'Linh' })
 })
 
-test('chưa có hồ sơ lần trước, hoặc lỗi không do mạng: vẫn báo lỗi', async () => {
+test('chưa có hồ sơ lần trước: báo lỗi', async () => {
   fake.profile = { data: null, error: offlineError }
   await expect((await freshApi()).getSession()).rejects.toMatchObject(offlineError)
+})
 
+test('có hồ sơ đã lưu: trả ngay, tải lại ở nền; bản mới khác thì báo để làm mới phiên', async () => {
+  localStorage.setItem(
+    'auth-profile',
+    JSON.stringify({ id: 'u1', displayName: 'Linh', avatarUrl: null }),
+  )
+  fake.profile = { data: { id: 'u1', display_name: 'Linh Mới', avatar_url: null }, error: null }
+  const api = await freshApi()
+  const changed = vi.fn()
+  profileChanged(api, changed)
+  expect(await api.getSession()).toMatchObject({ displayName: 'Linh' })
+  await vi.waitFor(() => expect(changed).toHaveBeenCalled())
+  expect(await api.getSession()).toMatchObject({ displayName: 'Linh Mới' })
+})
+
+test('có hồ sơ đã lưu nhưng máy chủ báo lỗi không do mạng: bỏ bản lưu, lần sau báo lỗi', async () => {
   localStorage.setItem(
     'auth-profile',
     JSON.stringify({ id: 'u1', displayName: 'Linh', avatarUrl: null }),
   )
   fake.profile = { data: null, error: { code: 'PGRST116', message: 'No rows' } }
-  await expect((await freshApi()).getSession()).rejects.toMatchObject({ code: 'PGRST116' })
+  const api = await freshApi()
+  const changed = vi.fn()
+  profileChanged(api, changed)
+  expect(await api.getSession()).toMatchObject({ displayName: 'Linh' })
+  await vi.waitFor(() => expect(changed).toHaveBeenCalled())
+  expect(localStorage.getItem('auth-profile')).toBeNull()
+  await expect(api.getSession()).rejects.toMatchObject({ code: 'PGRST116' })
 })
 
 test('mất mạng mà supabase-js treo (làm mới phiên hết hạn): dùng phiên và hồ sơ đã lưu trên máy', async () => {

@@ -1,18 +1,22 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { useSaveReadingProgress } from '@/features/library/hooks'
-import { markRead } from '@/features/offline/store'
+import { markReadSaved } from '@/features/offline/readChapter'
 import { readResumeState } from '@/features/library/resume'
 import type { ChapterContent } from '@/types/chapter'
 import { chapterElement, progressOf, scrollToProgress } from './progress'
 
-const SAVE_EVERY_MS = 1000
+/** Lưu vị trí trên máy (IndexedDB, rẻ) tối đa mỗi giây khi đang cuộn */
+const LOCAL_SAVE_MS = 1000
+/** Gửi vị trí lên máy chủ thưa hơn; rời chương, rời trang, ẩn tab thì gửi ngay */
+const SERVER_SAVE_MS = 15_000
 /** Dưới mức này coi như mới mở đầu chương, không cần cuộn tới */
 const MIN_RESUME = 0.03
 
 /**
- * Lịch sử đọc cho trang đọc: ghi chương khi mở, lưu vị trí cuộn (tối đa mỗi giây khi đang cuộn,
- * và khi rời chương/trang), mở lại chỗ đọc dở khi tới từ link "Đọc tiếp".
+ * Lịch sử đọc cho trang đọc: ghi chương khi mở, lưu vị trí cuộn (trên máy tối đa mỗi giây, lên máy
+ * chủ tối đa mỗi 15 giây khi đang cuộn, và ngay khi rời chương/trang hoặc ẩn tab), mở lại chỗ đọc
+ * dở khi tới từ link "Đọc tiếp".
  * Trả về true nếu lần điều hướng này mở lại chỗ đọc dở.
  */
 export function useReadingTracker(chapter: ChapterContent | null | undefined) {
@@ -27,7 +31,7 @@ export function useReadingTracker(chapter: ChapterContent | null | undefined) {
   useEffect(() => {
     if (slug === undefined || number === undefined || title === undefined) return
     save({ slug, chapter: number, chapterTitle: title })
-    void markRead(slug, number).catch(() => {})
+    void markReadSaved(slug, number).catch(() => {})
   }, [save, slug, number, title])
 
   // Tới từ "Đọc tiếp": cuộn tới chỗ đã lưu, mỗi lần điều hướng một lần
@@ -52,31 +56,57 @@ export function useReadingTracker(chapter: ChapterContent | null | undefined) {
 
   useEffect(() => {
     if (slug === undefined || number === undefined || title === undefined) return
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let dirty = false
-    const flush = () => {
-      clearTimeout(timer)
-      timer = undefined
-      if (!dirty) return
-      dirty = false
+    let localTimer: ReturnType<typeof setTimeout> | undefined
+    let serverTimer: ReturnType<typeof setTimeout> | undefined
+    let localDirty = false
+    let serverDirty = false
+    // Vị trí đo lần cuộn gần nhất: khi rời chương, cleanup chạy sau khi chương đã bị gỡ khỏi trang
+    // (không đo được nữa) nên lưu bằng số này
+    let last: number | null = null
+    const position = () => {
       const el = chapterElement(number)
-      if (!el) return
-      const progress = progressOf(el)
-      save({ slug, chapter: number, chapterTitle: title, progress })
+      if (el) last = progressOf(el)
+      return last
+    }
+    const flushLocal = () => {
+      clearTimeout(localTimer)
+      localTimer = undefined
+      if (!localDirty) return
+      localDirty = false
+      const progress = position()
       // Bản lưu trên máy nhớ chỗ đọc để "Đọc tiếp" ở tab Đã lưu (cả khi offline)
-      void markRead(slug, number, progress).catch(() => {})
+      if (progress !== null) void markReadSaved(slug, number, progress).catch(() => {})
+    }
+    const flushServer = () => {
+      clearTimeout(serverTimer)
+      serverTimer = undefined
+      if (!serverDirty) return
+      serverDirty = false
+      const progress = position()
+      if (progress !== null) save({ slug, chapter: number, chapterTitle: title, progress })
+    }
+    const flush = () => {
+      flushLocal()
+      flushServer()
     }
     const onScroll = () => {
-      dirty = true
-      timer ??= setTimeout(flush, SAVE_EVERY_MS)
+      position()
+      localDirty = serverDirty = true
+      localTimer ??= setTimeout(flushLocal, LOCAL_SAVE_MS)
+      serverTimer ??= setTimeout(flushServer, SERVER_SAVE_MS)
+    }
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flush()
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHidden)
     return () => {
       // Rời chương (chuyển chương, rời trang đọc): lưu vị trí cuối cùng
       flush()
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHidden)
     }
   }, [save, slug, number, title])
 

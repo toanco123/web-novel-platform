@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { ADMIN_STORY_SORTS, type AdminStory, adminErrorMessage } from '@/features/admin/api'
+import { TableEmpty } from '@/features/admin/components/TableEmpty'
 import { ClearFilters, FilterSelect } from '@/features/admin/components/TableFilters'
 import {
   onTableChange,
@@ -53,7 +54,7 @@ export default function AdminStoriesPage() {
   const hasReports = params.get('reports') === 'open'
   const ownerId = params.get('owner') ?? undefined
   const { sort, order, pageSize } = readTableParams(params, ADMIN_STORY_SORTS)
-  const { data, isPending, isFetching, isError } = useAdminStories({
+  const { data, isPending, isFetching, isError, isPlaceholderData } = useAdminStories({
     q,
     visibility,
     status,
@@ -166,7 +167,13 @@ export default function AdminStoriesPage() {
             loading={isPending || isFetching}
             dataSource={data?.items}
             scroll={{ x: 1640 }}
-            locale={{ emptyText: 'Không có truyện nào khớp bộ lọc' }}
+            locale={{
+              emptyText: (
+                <TableEmpty loading={isPending || isPlaceholderData}>
+                  Không có truyện nào khớp bộ lọc
+                </TableEmpty>
+              ),
+            }}
             pagination={tablePagination(data, page, pageSize, update)}
             onChange={onTableChange(update)}
             columns={[

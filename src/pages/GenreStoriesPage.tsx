@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { NotFound } from '@/components/common/NotFound'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useGenres } from '@/features/genres/hooks'
 import { StoryBrowser } from '@/features/stories/StoryBrowser'
 import { paths } from '@/lib/routes'
@@ -25,17 +26,28 @@ export default function GenreStoriesPage() {
         </Link>
       </nav>
       <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-4xl font-semibold">{genre?.name ?? '…'}</h1>
-          {genre?.description && (
-            <p className="mt-2 max-w-prose text-muted-foreground">{genre.description}</p>
-          )}
-          {genre?.createdBy && (
-            <p className="mt-1 text-xs text-rose-gold">
-              Thể loại do {genre.createdBy.displayName} tạo
-            </p>
-          )}
-        </div>
+        {genres.isPending ? (
+          // Khung chờ cùng chiều cao tiêu đề (40px), mô tả (24px) và nút đăng truyện (h-10)
+          <>
+            <div aria-hidden className="max-w-prose min-w-0 flex-1 basis-60">
+              <Skeleton className="my-1 h-8 w-56" />
+              <Skeleton className="mt-2.5 mb-0.5 h-5 w-full" />
+            </div>
+            <Skeleton aria-hidden className="h-10 w-48 rounded-full" />
+          </>
+        ) : (
+          <div>
+            <h1 className="font-heading text-4xl font-semibold">{genre?.name ?? '…'}</h1>
+            {genre?.description && (
+              <p className="mt-2 max-w-prose text-muted-foreground">{genre.description}</p>
+            )}
+            {genre?.createdBy && (
+              <p className="mt-1 text-xs text-rose-gold">
+                Thể loại do {genre.createdBy.displayName} tạo
+              </p>
+            )}
+          </div>
+        )}
         {genre && (
           <Button asChild className="h-10 rounded-full px-5">
             <Link to={paths.studioNewStory(genre.slug)}>

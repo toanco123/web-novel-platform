@@ -18,7 +18,10 @@ import { ReaderSettingsPanel } from './ReaderSettingsPanel'
 export type ReaderPanel = 'index' | 'settings'
 
 type Props = {
+  /** Chương đang hiện; lúc chương mới đang tải thì là chương vừa đọc (cùng truyện) */
   chapter: ChapterContent
+  /** Số chương đang tải: thanh công cụ hiện số này và khung chờ thay cho tên chương */
+  loading?: number
   visible: boolean
   /** Bảng đang mở (mục lục / cài đặt); trang đọc giữ state để nút ở chỗ khác cũng mở được */
   open: ReaderPanel | null
@@ -29,8 +32,17 @@ type Props = {
   autoScroll: { active: boolean; onClick: () => void }
 }
 
-export function ReaderToolbar({ chapter, visible, open, setOpen, listen, autoScroll }: Props) {
+export function ReaderToolbar({
+  chapter,
+  loading,
+  visible,
+  open,
+  setOpen,
+  listen,
+  autoScroll,
+}: Props) {
   const { story } = chapter
+  const number = loading ?? chapter.number
   const wide = useMediaQuery('(min-width: 768px)')
 
   return (
@@ -56,8 +68,16 @@ export function ReaderToolbar({ chapter, visible, open, setOpen, listen, autoScr
           <div className="min-w-0 flex-1 px-1 leading-tight">
             <p className="truncate text-sm font-medium">{story.title}</p>
             <p className="truncate text-xs text-muted-foreground">
-              Chương {chapter.number}
-              <span className="hidden sm:inline">: {chapter.title}</span>
+              Chương {number}
+              {loading === undefined ? (
+                <span className="hidden sm:inline">: {chapter.title}</span>
+              ) : (
+                // Tên chương chưa có: khung chờ (span vì nằm trong <p>)
+                <span
+                  aria-hidden
+                  className="ml-2 hidden h-3 w-32 animate-pulse rounded-md bg-muted align-middle motion-reduce:animate-none sm:inline-block"
+                />
+              )}
             </p>
           </div>
 
@@ -121,7 +141,7 @@ export function ReaderToolbar({ chapter, visible, open, setOpen, listen, autoScr
             slug={story.slug}
             title={story.title}
             downloadable={story.visibility === 'published'}
-            current={chapter.number}
+            current={number}
             max={story.chapterCount}
             onNavigate={() => setOpen(null)}
           />

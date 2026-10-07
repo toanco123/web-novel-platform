@@ -9,6 +9,7 @@ import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import { AppScrollRestoration } from '@/components/common/AppScrollRestoration'
 import { NoIndex } from '@/components/common/Seo'
+import { NavigationProgress } from '@/components/common/NavigationProgress'
 
 // Vị trí 3 bìa xếp quạt: trái, phải, giữa (bìa giữa nằm trên cùng)
 const fan = [
@@ -20,6 +21,7 @@ const fan = [
 export function AuthLayout() {
   return (
     <div className="grid min-h-svh bg-background text-foreground lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <NavigationProgress />
       <NoIndex />
       <ShowcasePanel />
       <div className="flex flex-col">

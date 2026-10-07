@@ -3,7 +3,13 @@ import { Link, useSearchParams } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { SectionError } from '@/components/common/SectionHeading'
 import { SegmentedLinks } from '@/components/common/SegmentedLinks'
-import type { RankedStory, RankingCriterion, RankingPeriod } from '@/features/stories/api'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  RANKING_LIMIT,
+  type RankedStory,
+  type RankingCriterion,
+  type RankingPeriod,
+} from '@/features/stories/api'
 import { useRanking } from '@/features/stories/hooks'
 import { StoryCover } from '@/features/stories/StoryCover'
 import { formatCount } from '@/lib/format'
@@ -107,11 +113,23 @@ export default function RankingPage() {
             )}
           >
             {isPending
-              ? Array.from({ length: 8 }, (_, i) => (
-                  <li key={i} className="flex items-center gap-4 p-4">
-                    <div className="size-8 animate-pulse rounded bg-muted" />
-                    <div className="aspect-[2/3] w-12 animate-pulse rounded bg-muted" />
-                    <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
+              ? Array.from({ length: RANKING_LIMIT }, (_, i) => (
+                  // Cùng lưới với RankingRow: chiều cao dòng do bìa quyết định (w-12 / sm:w-14)
+                  <li
+                    key={i}
+                    className="grid grid-cols-[2.25rem_3rem_minmax(0,1fr)] items-center gap-3 p-3 sm:grid-cols-[3rem_3.5rem_minmax(0,1fr)_auto] sm:gap-4 sm:p-4"
+                  >
+                    <Skeleton className="mx-auto h-8 w-6" />
+                    <Skeleton className="aspect-[2/3] rounded" />
+                    <div className="min-w-0">
+                      <Skeleton className="my-1 h-4 w-2/3 sm:h-5" />
+                      <Skeleton className="my-0.5 h-4 w-1/2" />
+                      <Skeleton className="mt-1 h-4 w-24 sm:hidden" />
+                    </div>
+                    <div className="hidden w-20 sm:block">
+                      <Skeleton className="ml-auto h-6 w-16" />
+                      <Skeleton className="mt-1 ml-auto h-3 w-14" />
+                    </div>
                   </li>
                 ))
               : data.map((item, i) => (

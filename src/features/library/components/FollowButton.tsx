@@ -1,6 +1,7 @@
 import { Bookmark, BookmarkCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useSession } from '@/features/auth/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
@@ -15,7 +16,7 @@ type Props = {
 }
 
 export function FollowButton({ slug, onDark = false, className }: Props) {
-  const { data: user } = useSession()
+  const { data: user, isPending: sessionPending } = useSession()
   const { data: following = false, isPending } = useFollowStatus(slug)
   const toggle = useToggleFollow(slug)
   const navigate = useNavigate()
@@ -27,11 +28,28 @@ export function FollowButton({ slug, onDark = false, className }: Props) {
     else toggle.mutate(!following)
   }
 
+  // Chưa biết là khách hay đã đăng nhập, hoặc chưa biết đã theo dõi chưa: giữ chỗ đúng cỡ nút
+  // (chữ ẩn đo bề rộng), không hiện nút của khách rồi mới đổi nhãn
+  if (sessionPending || (user && isPending)) {
+    return (
+      <Skeleton
+        aria-hidden
+        className={cn(
+          'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full border px-5 text-sm font-medium whitespace-nowrap',
+          onDark && 'border-[#f4e7ed]/30 bg-white/10',
+          className,
+        )}
+      >
+        <Bookmark className="invisible size-4" />
+        <span className="invisible">Thêm vào tủ truyện</span>
+      </Skeleton>
+    )
+  }
+
   return (
     <Button
       variant="outline"
       aria-pressed={!!user && following}
-      disabled={!!user && isPending}
       onClick={handleClick}
       className={cn(
         'h-11 rounded-full px-5',

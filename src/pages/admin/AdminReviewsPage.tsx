@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { type AdminStory, adminErrorMessage, REVIEW_REASON_MAX } from '@/features/admin/api'
+import { TableEmpty } from '@/features/admin/components/TableEmpty'
 import { ClearFilters } from '@/features/admin/components/TableFilters'
 import {
   onTableChange,
@@ -33,7 +34,7 @@ export default function AdminReviewsPage() {
   const { sort, order, pageSize } = readTableParams(params, SORTS)
   // Mặc định: gửi trước xếp trước (hàng chờ); không ghi lên URL
   const active = sort ? { sort, order } : { sort: 'submitted' as const, order: 'asc' as const }
-  const { data, isPending, isFetching, isError } = useAdminStories({
+  const { data, isPending, isFetching, isError, isPlaceholderData } = useAdminStories({
     q,
     review: status,
     sort: active.sort,
@@ -109,10 +110,13 @@ export default function AdminReviewsPage() {
             dataSource={data?.items}
             scroll={{ x: status === 'pending' ? 1000 : 1230 }}
             locale={{
-              emptyText:
-                status === 'pending'
-                  ? 'Không có truyện nào đang chờ duyệt'
-                  : 'Chưa từ chối truyện nào',
+              emptyText: (
+                <TableEmpty loading={isPending || isPlaceholderData}>
+                  {status === 'pending'
+                    ? 'Không có truyện nào đang chờ duyệt'
+                    : 'Chưa từ chối truyện nào'}
+                </TableEmpty>
+              ),
             }}
             pagination={tablePagination(data, page, pageSize, update)}
             onChange={onTableChange(update)}

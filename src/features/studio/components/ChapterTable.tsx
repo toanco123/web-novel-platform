@@ -1,4 +1,4 @@
-import { FileUp, MoreHorizontal, PenLine, Plus } from 'lucide-react'
+import { FileUp, LoaderCircle, MoreHorizontal, PenLine, Plus } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router'
 import { SectionError } from '@/components/common/SectionHeading'
@@ -18,6 +18,7 @@ import { useDeleteChapter, useMyChapters, useSetChapterStatus } from '../hooks'
 import { countWords } from '../schemas'
 import { ConfirmDialog } from './ConfirmDialog'
 import { StatusBadge } from './StatusBadge'
+import { ChapterListSkeleton } from './StudioSkeletons'
 
 const number = new Intl.NumberFormat('vi-VN')
 
@@ -27,6 +28,8 @@ export function ChapterTable({ storyId }: { storyId: string }) {
   const remove = useDeleteChapter(storyId)
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
   const error = setStatus.error ?? remove.error
+  // Chương đang đổi trạng thái (xuất bản / về nháp): dòng đó hiện vòng quay tới khi lưu xong
+  const savingNumber = setStatus.isPending ? setStatus.variables.number : null
 
   return (
     <div className="space-y-4">
@@ -50,7 +53,7 @@ export function ChapterTable({ storyId }: { storyId: string }) {
       {chapters.isError ? (
         <SectionError />
       ) : chapters.isPending ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted" />
+        <ChapterListSkeleton />
       ) : chapters.data.length === 0 ? (
         <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
           Chưa có chương nào. Viết chương đầu tiên hoặc nhập nhiều chương từ file .txt.
@@ -61,6 +64,7 @@ export function ChapterTable({ storyId }: { storyId: string }) {
             // Số còn trống trước chương này (tác giả bỏ qua để viết trước chương sau, hoặc đã xóa)
             const gapFrom = (i === 0 ? 0 : chapters.data[i - 1].number) + 1
             const gapTo = c.number - 1
+            const saving = savingNumber === c.number
             return (
               <Fragment key={c.id}>
                 {gapFrom <= gapTo && (
@@ -94,10 +98,20 @@ export function ChapterTable({ storyId }: { storyId: string }) {
                       {formatRelativeTime(c.updatedAt)}
                     </p>
                   </div>
-                  <StatusBadge
-                    published={c.status === 'published'}
-                    className="hidden sm:inline-flex"
-                  />
+                  {saving ? (
+                    <span
+                      role="status"
+                      className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex"
+                    >
+                      <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+                      Đang lưu…
+                    </span>
+                  ) : (
+                    <StatusBadge
+                      published={c.status === 'published'}
+                      className="hidden sm:inline-flex"
+                    />
+                  )}
                   <Button asChild variant="ghost" size="sm" aria-label={`Sửa chương ${c.number}`}>
                     <Link to={paths.studioChapter(storyId, c.number)}>
                       <PenLine />
@@ -109,9 +123,10 @@ export function ChapterTable({ storyId }: { storyId: string }) {
                       <Button
                         variant="ghost"
                         size="icon-sm"
+                        aria-busy={saving}
                         aria-label={`Thao tác khác cho chương ${c.number}`}
                       >
-                        <MoreHorizontal />
+                        {saving ? <LoaderCircle className="animate-spin" /> : <MoreHorizontal />}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -119,6 +134,7 @@ export function ChapterTable({ storyId }: { storyId: string }) {
                         <StatusBadge published={c.status === 'published'} />
                       </p>
                       <DropdownMenuItem
+                        disabled={setStatus.isPending}
                         onSelect={() =>
                           setStatus.mutate({
                             number: c.number,

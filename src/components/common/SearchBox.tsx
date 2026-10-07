@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent, type SubmitEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useGenres } from '@/features/genres/hooks'
 import { useSearchSuggestions } from '@/features/stories/hooks'
 import { StoryCover } from '@/features/stories/StoryCover'
@@ -38,6 +39,10 @@ export function SearchBox({ className, onNavigate, showGenreHints = true }: Prop
   const suggesting = query.length >= MIN_QUERY
   const suggestions = useSearchSuggestions(suggesting ? debounced : '')
   const stories = suggesting ? (suggestions.data ?? []) : []
+  // Gợi ý đang hiện là của từ khóa cũ (còn chờ debounce hoặc đang tải từ khóa mới)
+  const stale = debounced !== query || suggestions.isPlaceholderData
+  // Lần đầu tải gợi ý cho từ khóa này: chưa có gì để hiện thì vẽ khung chờ
+  const loading = stories.length === 0 && (stale || suggestions.isPending)
   // Các lựa chọn: truyện gợi ý + dòng cuối "Xem tất cả kết quả"
   const options = [
     ...stories.map((s) => ({ key: s.slug, to: paths.story(s.slug) })),
@@ -114,7 +119,24 @@ export function SearchBox({ className, onNavigate, showGenreHints = true }: Prop
 
       {listOpen && (
         <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl shadow-black/20">
-          <ul id={listId} role="listbox" aria-label="Gợi ý truyện" className="p-1.5">
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label="Gợi ý truyện"
+            aria-busy={stale || suggestions.isFetching}
+            className="p-1.5"
+          >
+            {loading &&
+              Array.from({ length: 3 }, (_, i) => (
+                // Cùng khung với dòng gợi ý: bìa w-8 (cao 48px) + hai dòng chữ
+                <li key={i} role="presentation" aria-hidden className="flex items-center gap-3 p-2">
+                  <Skeleton className="aspect-[2/3] w-8 shrink-0 rounded-sm" />
+                  <div className="min-w-0 flex-1">
+                    <Skeleton className="my-0.5 h-4 w-2/3" />
+                    <Skeleton className="my-0.5 h-3 w-1/2" />
+                  </div>
+                </li>
+              ))}
             {stories.map((s, i) => (
               <li
                 key={s.slug}
@@ -125,8 +147,9 @@ export function SearchBox({ className, onNavigate, showGenreHints = true }: Prop
                 onClick={() => go(paths.story(s.slug))}
                 onMouseEnter={() => setActive(i)}
                 className={cn(
-                  'flex cursor-pointer items-center gap-3 rounded-lg p-2',
+                  'flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-opacity',
                   active === i && 'bg-muted',
+                  stale && 'opacity-60',
                 )}
               >
                 <StoryCover story={s} compact className="w-8 shrink-0 rounded-sm" />
@@ -138,7 +161,7 @@ export function SearchBox({ className, onNavigate, showGenreHints = true }: Prop
                 </span>
               </li>
             ))}
-            {suggestions.data?.length === 0 && debounced === query && (
+            {!stale && suggestions.data?.length === 0 && (
               <li role="presentation" className="px-3 py-2.5 text-sm text-muted-foreground">
                 Chưa thấy truyện nào khớp ngay. Thử tìm trong toàn bộ.
               </li>

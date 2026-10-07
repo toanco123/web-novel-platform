@@ -2,6 +2,11 @@ import { createBrowserRouter, type RouteObject } from 'react-router'
 import { PageLoader } from '@/components/common/PageLoader'
 import { RouteError } from '@/components/common/RouteError'
 import { AuthLayout } from '@/layouts/AuthLayout'
+import {
+  AuthLayoutFallback,
+  MainLayoutFallback,
+  ReaderLayoutFallback,
+} from '@/layouts/LayoutFallbacks'
 import { MainLayout } from '@/layouts/MainLayout'
 import { ReaderLayout } from '@/layouts/ReaderLayout'
 
@@ -12,7 +17,7 @@ const page = (load: () => Promise<{ default: React.ComponentType }>) => async ()
 export const routes: RouteObject[] = [
   {
     Component: MainLayout,
-    HydrateFallback: PageLoader,
+    HydrateFallback: MainLayoutFallback,
     ErrorBoundary: RouteError,
     children: [
       { index: true, lazy: page(() => import('@/pages/HomePage')) },
@@ -73,7 +78,7 @@ export const routes: RouteObject[] = [
   },
   {
     Component: ReaderLayout,
-    HydrateFallback: PageLoader,
+    HydrateFallback: ReaderLayoutFallback,
     ErrorBoundary: RouteError,
     children: [
       // Đoạn cuối có dạng "chapter-12"; trang tự tách số chương
@@ -82,7 +87,7 @@ export const routes: RouteObject[] = [
   },
   {
     Component: AuthLayout,
-    HydrateFallback: PageLoader,
+    HydrateFallback: AuthLayoutFallback,
     ErrorBoundary: RouteError,
     children: [
       { path: 'login', lazy: page(() => import('@/pages/LoginPage')) },

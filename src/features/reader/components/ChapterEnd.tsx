@@ -2,12 +2,14 @@ import { ArrowRight, BookOpen } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FollowButton } from '@/features/library/components/FollowButton'
+import { usePrefetchChapterLink } from '@/features/offline/prefetch'
 import { paths } from '@/lib/routes'
 import type { ChapterContent } from '@/types/chapter'
 
 /** Cuối chương: mời đọc chương kế, hoặc báo đã đọc tới chương mới nhất */
 export function ChapterEnd({ chapter }: { chapter: ChapterContent }) {
   const { story, next } = chapter
+  const prefetchNext = usePrefetchChapterLink(chapter, next?.number)
 
   return (
     <section aria-label="Hết chương" className="text-center">
@@ -16,6 +18,7 @@ export function ChapterEnd({ chapter }: { chapter: ChapterContent }) {
       {next ? (
         <Link
           to={paths.chapter(story.slug, next.number)}
+          {...prefetchNext}
           className="group mt-6 block rounded-2xl border bg-card px-6 py-7 text-card-foreground transition-colors outline-none hover:border-primary/50 focus-visible:ring-3 focus-visible:ring-ring/40"
         >
           <span className="text-sm text-muted-foreground">Đọc tiếp chương {next.number}</span>
