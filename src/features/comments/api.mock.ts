@@ -4,11 +4,13 @@ import {
   AuthError,
   duplicateComment,
   getProfiles,
+  getUserId,
   rateLimited,
   requireUser,
 } from '@/features/auth/api'
 import { mockDelay as delay } from '@/lib/mockStorage'
 import {
+  blockedIds,
   loadCommentReports,
   loadRatings,
   loadUserComments,
@@ -63,6 +65,12 @@ async function withProfiles(comments: Comment[]) {
   return comments.map((c) => ({ ...c, user: profiles.get(c.user.id) ?? c.user }))
 }
 
+/** Ẩn bình luận của người mà người xem đã chặn, kể cả trong số trả lời (như policy đọc comments) */
+async function visibleTo() {
+  const hidden = blockedIds(await getUserId())
+  return (c: Comment) => !hidden.has(c.user.id)
+}
+
 /**
  * Bình luận gốc của truyện (chapter = null, mặc định) hoặc của một chương, mới nhất trước; mỗi bình
  * luận kèm số trả lời
@@ -72,11 +80,12 @@ export async function getComments(
   { chapter = null, cursor = 0 }: { chapter?: number | null; cursor?: number } = {},
 ): Promise<CommentPage> {
   await delay()
-  const stored = loadUserComments()
+  const visible = await visibleTo()
+  const stored = loadUserComments().filter(visible)
   const own = stored.filter(
     (c) => c.storySlug === slug && c.chapterNumber === chapter && !c.parentId,
   )
-  const all = [...own, ...seeded(slug, chapter)].sort(
+  const all = [...own, ...seeded(slug, chapter).filter(visible)].sort(
     (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
   )
   const page = all.slice(cursor, cursor + COMMENTS_PER_PAGE)
@@ -91,8 +100,9 @@ export async function getComments(
 /** Trả lời của một bình luận, cũ nhất trước */
 export async function getReplies(commentId: string): Promise<Comment[]> {
   await delay()
+  const visible = await visibleTo()
   const replies = loadUserComments()
-    .filter((c) => c.parentId === commentId)
+    .filter((c) => c.parentId === commentId && visible(c))
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .slice(0, REPLIES_LIMIT)
   return withProfiles(replies)

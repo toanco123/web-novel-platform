@@ -24,3 +24,17 @@ test('xóa tài khoản xóa truyện của họ khỏi tủ truyện và bình 
   const others = await getComments('mong-hoa-luc')
   expect(others.items.map((c) => c.content)).not.toContain('Linh bình luận truyện khác')
 })
+
+test('xóa tài khoản xóa cả danh sách chặn của họ và dòng người khác chặn họ', async () => {
+  const { blockUser, getBlockedUsers } = await import('@/features/blocks/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  await blockUser('demo')
+  signInAs('demo')
+  await blockUser(linh)
+
+  signInAs(linh)
+  await deleteAccount({ password: 'matkhau123' })
+  signInAs('demo')
+  expect(await getBlockedUsers()).toEqual([])
+  expect(Object.keys(JSON.parse(localStorage.getItem('mock-user-blocks') ?? '{}'))).toEqual([])
+})

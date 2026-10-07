@@ -56,7 +56,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `chapter_reports` | `id`, `story_id`, `chapter_number`, `reporter_id`, `reason`, `note` (≤500, bắt buộc khi `reason='other'`), `status`, `created_at`, `resolved_at` | Unique một phần trên `(reporter_id, story_id, chapter_number, reason)` khi `status='open'`, để gộp báo lỗi trùng |
 | `chapter_views` | `story_id`, `chapter_number`, `day`, `views` | Chỉ ghi qua `record_chapter_view` |
 | `contact_messages` | `name`, `email`, `topic`, `message` (10–2000), `user_id` | Chỉ insert, không ai đọc được qua API (xem trên Dashboard) |
-| `user_blocks` | `blocker_id` (mặc định `auth.uid()`), `blocked_id` (khóa ngoại tới `profiles`, để PostgREST nhúng tên, ảnh), `created_at` | Khóa chính `(blocker_id, blocked_id)`, không tự chặn mình (`23514`). Chặn ai thì mọi bình luận, trả lời của người đó ẩn với mình (policy đọc `comments`); người bị chặn không biết. Hiện chỉ app có giao diện chặn / bỏ chặn (App Store Guideline 1.2) |
+| `user_blocks` | `blocker_id` (mặc định `auth.uid()`), `blocked_id` (khóa ngoại tới `profiles`, để PostgREST nhúng tên, ảnh), `created_at` | Khóa chính `(blocker_id, blocked_id)`, không tự chặn mình (`23514`). Chặn ai thì mọi bình luận, trả lời của người đó ẩn với mình (policy đọc `comments`); người bị chặn không biết. Giao diện chặn / bỏ chặn có ở cả app (App Store Guideline 1.2) và web (`features/blocks`: nút "Chặn" dưới bình luận, mục "Người đã chặn" ở `/account`) |
 | `push_tokens` | `token` (khóa chính, mã Expo), `user_id`, `platform` (`ios` \| `android`), `updated_at` | Ghi qua `register_push_token` (máy đổi tài khoản thì mã chuyển chủ; mỗi tài khoản tối đa 10 máy, bỏ máy cũ nhất). Xóa mã của mình khi đăng xuất |
 | `private.story_push_log` | `story_id`, `sent_at` | Lần gửi thông báo chương mới gần nhất của từng truyện (chống dội: 30 phút một lần, `private.push_cooldown()`). Không ai đọc ghi qua API |
 | `curated_stories` | `list` (`featured` \| `editor_pick`), `story_id`, `position` | Thay `featuredSlugs`/`editorPickSlugs`; quản trị viên sửa ở `/admin/featured` (RPC `admin_set_curated`) |
@@ -267,6 +267,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | comments | `reportComment` | `rpc('report_comment', { p_comment_id, p_reason, p_note })` |
 | comments | `getRatingSummary` | `story_cards` (`rating_avg`, `rating_count`, `rating_counts` → `distribution`) |
 | comments | `getMyRating`, `rateStory` | `ratings` select / `upsert({ story_id, score }, { onConflict: 'user_id,story_id' })` |
+| blocks | `blockUser`, `unblockUser` | `user_blocks.insert({ blocked_id })` (trùng `23505` coi như xong, tự chặn mình `23514`) / `delete().eq('blocker_id', uid).eq('blocked_id', id)` |
+| blocks | `getBlockedUsers` | `user_blocks.select('created_at, user:profiles!user_blocks_blocked_id_fkey(…)').order('created_at', desc)` |
 | feedback | `sendContactMessage` | `contact_messages.insert(...)` (không gọi `.select()`) |
 | feedback | `reportChapter` | `rpc('report_chapter')` |
 | admin | `getAdminOverview` | `rpc('admin_overview', { p_days })` |

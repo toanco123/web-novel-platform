@@ -1,6 +1,7 @@
 // Xóa tài khoản ở bản giả: giống xóa auth.users trên DB (khóa ngoại cascade) — tài khoản, truyện
 // và chương của người đó, cùng mọi hoạt động của họ và mọi hoạt động trên truyện của họ.
 import {
+  loadAllBlocks,
   loadAllFollows,
   loadCommentReports,
   loadRatings,
@@ -8,6 +9,7 @@ import {
   loadViews,
   removeComments,
   saveCommentReports,
+  saveBlocks,
   saveFollows,
   saveHistory,
   saveRatings,
@@ -38,6 +40,17 @@ export function purgeUser(userId: string) {
     }
   }
   saveHistory(userId, [])
+
+  // Người này chặn ai và ai chặn người này
+  for (const [id, entries] of Object.entries(loadAllBlocks())) {
+    if (id === userId) saveBlocks(id, [])
+    else if (entries.some((e) => e.userId === userId)) {
+      saveBlocks(
+        id,
+        entries.filter((e) => e.userId !== userId),
+      )
+    }
+  }
 
   const { [userId]: _mine, ...ratings } = loadRatings()
   saveRatings(ratings)
