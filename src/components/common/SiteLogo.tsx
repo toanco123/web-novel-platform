@@ -1,8 +1,8 @@
-import { useId } from 'react'
 import { Link } from 'react-router'
 import { SITE_NAME } from '@/config/site'
 import { paths } from '@/lib/routes'
 import { cn } from '@/lib/utils'
+import { MarkShapes } from './LogoMark'
 
 // Logo "Sách nở hoa" (bản gốc ở documents/logo/). Nét sách và chữ theo màu chữ (mặc định
 // text-rose-gold), cánh hoa theo token --neon, nên tự đổi màu theo theme.
@@ -22,39 +22,10 @@ export function SiteLogo({ className }: { className?: string }) {
 }
 
 function LogoSvg({ className }: { className?: string }) {
-  // Logo hiện nhiều lần trên trang (header, menu di động, footer): id mask phải khác nhau
-  const maskId = useId()
-
   return (
     <svg viewBox="-16 -22 948 222" className={className} aria-hidden focusable="false">
       <g transform="translate(-32.64 -49.94) scale(0.44)">
-        <defs>
-          <mask id={maskId}>
-            <rect x="0" y="0" width="512" height="512" fill="#fff" />
-            <circle cx="256" cy="200" r="20" fill="#000" />
-          </mask>
-        </defs>
-        <path
-          d="M256 330C210 300 150 294 100 304V398C150 388 210 392 256 422C302 392 362 388 412 398V304C362 294 302 300 256 330Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="18"
-          strokeLinejoin="round"
-        />
-        <path d="M256 330V422" stroke="currentColor" strokeWidth="18" strokeLinecap="round" />
-        <g fill="var(--neon)" mask={`url(#${maskId})`}>
-          {[0, 72, 144, 216, 288].map((deg) => (
-            <ellipse
-              key={deg}
-              cx="256"
-              cy="150"
-              rx="30"
-              ry="50"
-              transform={`rotate(${deg} 256 200)`}
-            />
-          ))}
-        </g>
-        <circle cx="256" cy="200" r="10" fill="currentColor" />
+        <MarkShapes />
       </g>
       <path transform="translate(200 122) scale(1.5)" fill="currentColor" d={WORDMARK} />
     </svg>

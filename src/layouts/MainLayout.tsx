@@ -3,6 +3,7 @@ import { Footer } from '@/components/common/Footer'
 import { Header } from '@/components/common/Header'
 import { OfflineBanner } from '@/components/common/OfflineBanner'
 import { AppScrollRestoration } from '@/components/common/AppScrollRestoration'
+import { AppBanner } from '@/features/appBanner/AppBanner'
 
 export function MainLayout() {
   return (
@@ -19,6 +20,7 @@ export function MainLayout() {
         <Outlet />
       </main>
       <Footer />
+      <AppBanner />
       <AppScrollRestoration />
     </div>
   )
