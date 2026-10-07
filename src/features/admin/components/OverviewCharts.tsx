@@ -1,6 +1,6 @@
-// Biểu đồ của trang Tổng quan (@ant-design/plots, vẽ bằng G2). Mọi biểu đồ chỉ có một chuỗi số
-// liệu, màu --chart-1; mỗi thẻ có chế độ xem bảng (đọc được số chính xác, dùng được với trình đọc
-// màn hình).
+// Biểu đồ của trang Tổng quan (@ant-design/plots, vẽ bằng G2). Biểu đồ một chuỗi số liệu dùng màu
+// --chart-1; biểu đồ so sánh hai kỳ dùng kiểu nhấn mạnh (kỳ này màu chính, kỳ trước xám nét đứt).
+// Mỗi thẻ có chế độ xem bảng (đọc được số chính xác, dùng được với trình đọc màn hình).
 import { Bar, Column, Line } from '@ant-design/plots'
 import { Card, Empty, Segmented, Table } from 'antd'
 import { type ReactNode, useState } from 'react'
@@ -10,20 +10,20 @@ import { adminColors } from './adminTheme'
 
 const number = new Intl.NumberFormat('vi-VN')
 
-export type ChartRow = { key: string; label: string; value: number }
+export type ChartRow = { key: string; label: string; values: number[] }
 
 /** Thẻ biểu đồ: tiêu đề, nút đổi Biểu đồ/Bảng, trạng thái rỗng khi mọi giá trị bằng 0 */
 export function ChartCard({
   title,
-  valueLabel,
+  valueLabels,
   rows,
   emptyText = 'Chưa có dữ liệu trong kỳ này',
   toolbar,
   children,
 }: {
   title: string
-  /** Tên cột số trong bảng và trong chú thích khi rê chuột */
-  valueLabel: string
+  /** Tên các cột số trong bảng (theo thứ tự của rows[].values) */
+  valueLabels: string[]
   rows: ChartRow[]
   emptyText?: string
   /** Nút chọn phía trên biểu đồ (vd đổi loại số liệu), hiện cả khi rỗng */
@@ -31,7 +31,7 @@ export function ChartCard({
   children: ReactNode
 }) {
   const [view, setView] = useState<'chart' | 'table'>('chart')
-  const empty = rows.every((r) => r.value === 0)
+  const empty = rows.every((r) => r.values.every((v) => v === 0))
 
   return (
     <Card
@@ -69,12 +69,12 @@ export function ChartCard({
           scroll={{ y: 260 }}
           columns={[
             { title: 'Mục', dataIndex: 'label' },
-            {
-              title: valueLabel,
-              dataIndex: 'value',
-              align: 'right',
-              render: (v: number) => number.format(v),
-            },
+            ...valueLabels.map((label, i) => ({
+              title: label,
+              key: label,
+              align: 'right' as const,
+              render: (_: unknown, row: ChartRow) => number.format(row.values[i]),
+            })),
           ]}
         />
       )}
@@ -184,6 +184,76 @@ export function CategoryBars({
         title: (d: { label: string }) => d.label,
         items: [{ channel: 'y', name, valueFormatter: (v: number) => number.format(v) }],
       }}
+    />
+  )
+}
+
+/**
+ * Kỳ này so với kỳ trước trên cùng một trục: kỳ này màu chính, kỳ trước xám nét đứt (nhấn mạnh,
+ * không phải hai chuỗi ngang hàng). Có chú giải và nhãn ở cuối mỗi đường nên không chỉ dựa vào màu.
+ */
+export function ComparisonLine({
+  data,
+  currentName,
+  previousName,
+}: {
+  /** Mỗi ngày của kỳ này kèm số của ngày tương ứng ở kỳ trước */
+  data: { day: string; prevDay: string; current: number; previous: number }[]
+  currentName: string
+  previousName: string
+}) {
+  const theme = useTheme((s) => s.theme)
+  const colors = adminColors(theme)
+  type Point = { day: string; series: string; value: number; date: string }
+  const points: Point[] = data.flatMap((d) => [
+    { day: d.day, series: previousName, value: d.previous, date: d.prevDay },
+    { day: d.day, series: currentName, value: d.current, date: d.day },
+  ])
+  const isPrevious = (rows: Point[] | Point) =>
+    (Array.isArray(rows) ? rows[0]?.series : rows.series) === previousName
+
+  return (
+    <Line
+      data={points}
+      xField="day"
+      yField="value"
+      colorField="series"
+      height={280}
+      autoFit
+      // Chừa chỗ cho nhãn "Kỳ này"/"Kỳ trước" ở cuối mỗi đường
+      paddingRight={64}
+      theme={chartTheme(theme)}
+      axis={dayAxis(data.length)}
+      scale={{
+        color: { domain: [currentName, previousName], range: [colors.series, colors.seriesMuted] },
+      }}
+      style={{
+        lineWidth: (rows: Point[]) => (isPrevious(rows) ? 1.5 : 2.5),
+        lineDash: (rows: Point[]) => (isPrevious(rows) ? [4, 4] : [0, 0]),
+      }}
+      legend={{ color: { position: 'top', layout: { justifyContent: 'flex-start' } } }}
+      labels={[
+        {
+          text: 'series',
+          selector: 'last',
+          position: 'right',
+          dx: 6,
+          fontSize: 11,
+          fill: colors.muted,
+          // Hai số cuối gần nhau thì đẩy nhãn ra, không đè lên nhau
+          transform: [{ type: 'overlapDodgeY' }],
+        },
+      ]}
+      tooltip={{
+        title: (d: Point) => formatLongDay(d.day),
+        items: [
+          {
+            channel: 'y',
+            valueFormatter: (v: number) => number.format(v),
+          },
+        ],
+      }}
+      interaction={{ tooltip: { crosshairs: true } }}
     />
   )
 }

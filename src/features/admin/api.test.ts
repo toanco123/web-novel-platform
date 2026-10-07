@@ -1,5 +1,9 @@
 import { recordChapterView } from '@/features/chapters/api'
+import { addComment } from '@/features/comments/api'
+import { followStory } from '@/features/library/api'
 import * as studio from '@/features/studio/api'
+import { dayKey, loadViews, saveViews } from '@/mocks/activity'
+import { loadUserStories, saveUserStories } from '@/mocks/userContent'
 import { pendingStory, publishStory, registerUser, signInAs, signOut } from '@/test/helpers'
 import * as admin from './api'
 
@@ -55,6 +59,47 @@ test('quản trị viên thấy người dùng mới, truyện nháp và số li
   expect(today).toMatchObject({ signups: 1, views: 2, stories: 2, chapters: 2 })
   expect(overview.totals).toMatchObject({ newUsers: 1, viewsInPeriod: 2 })
   expect(overview.totals.draftStories).toBe(1)
+})
+
+test('tổng quan: kỳ trước, bình luận, theo dõi, lịch nhiệt, thể loại, tác giả', async () => {
+  signInAs('demo')
+  const story = await publishStory('Gió Thu Qua Phố', 2) // thể loại: Ngôn tình, Hiện đại
+  saveUserStories(
+    loadUserStories().map((s) => (s.id === story.id ? { ...s, authorName: 'Hạ Vy' } : s)),
+  )
+  await registerUser('Linh', 'linh@gmail.com')
+  await followStory(story.slug)
+  await addComment(story.slug, 'Hay quá, mong chương mới!')
+  signOut()
+  await recordChapterView(story.slug, 1)
+  // 3 lượt đọc đúng 7 ngày trước: thuộc kỳ liền trước của kỳ 7 ngày
+  const views = loadViews()
+  views[story.slug].byDay[dayKey(new Date(Date.now() - 7 * 86_400_000))] = 3
+  saveViews(views)
+
+  signInAs('demo')
+  const overview = await admin.getAdminOverview(7)
+  const today = overview.days.at(-1)!
+  expect(today).toMatchObject({ views: 1, viewsPrev: 3, comments: 1, follows: 1 })
+  expect(overview.current).toMatchObject({ views: 1, comments: 1, follows: 1 })
+  expect(overview.previous).toMatchObject({ views: 3, comments: 0, follows: 0 })
+
+  const { calendar } = overview
+  expect(new Date(`${calendar[0].day}T00:00`).getDay()).toBe(1) // bắt đầu thứ Hai
+  expect(calendar.length).toBeGreaterThanOrEqual(78)
+  expect(calendar.length).toBeLessThanOrEqual(84)
+  expect(calendar.at(-1)).toEqual({ day: today.day, views: 1 })
+
+  expect(overview.genreViews).toEqual(
+    expect.arrayContaining([
+      { name: 'Ngôn tình', views: 1 },
+      { name: 'Hiện đại', views: 1 },
+    ]),
+  )
+  // Truyện có sẵn không có lượt đọc theo ngày, nên chỉ còn tác giả của truyện vừa đăng
+  expect(overview.topAuthors).toEqual([
+    expect.objectContaining({ ownerId: 'demo', name: 'Hạ Vy', stories: 1, views: 1, followers: 1 }),
+  ])
 })
 
 test('hộp thư: đọc tin nhắn liên hệ, đánh dấu đã xử lý', async () => {

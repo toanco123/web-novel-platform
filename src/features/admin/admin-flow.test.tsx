@@ -43,12 +43,25 @@ test('quản trị viên xem tổng quan, người dùng và truyện của mộ
   expect(await screen.findByText('Người dùng', { selector: '.ant-statistic-title' }, slow))
   expect(screen.getByText('+1 trong kỳ')).toBeInTheDocument()
 
-  // Xem dạng bảng của biểu đồ truyện theo thể loại
-  const genreCard = screen.getByText('Truyện công khai theo thể loại').closest('.ant-card')!
-  await user.click(within(genreCard as HTMLElement).getByText('Bảng'))
-  expect(
-    within(genreCard as HTMLElement).getByRole('columnheader', { name: 'Số truyện' }),
-  ).toBeInTheDocument()
+  // Khối "Cần xử lý": chưa có việc tồn thì ghi "Ổn"
+  const attention = screen.getByText('Cần xử lý', { selector: '.ant-card-head-title' })
+  const panel = within(attention.closest('.ant-card') as HTMLElement)
+  expect(panel.getAllByText('Ổn')).toHaveLength(4)
+  expect(panel.getByText('Không có việc tồn')).toBeInTheDocument()
+
+  // Ô chính: lượt đọc trong kỳ, so với kỳ trước
+  const hero = screen.getByText('Lượt đọc trong kỳ', { selector: 'p' }).closest('.ant-card')!
+  expect(hero).toHaveTextContent('chưa có số liệu so với 30 ngày trước')
+
+  // Thể loại: đổi sang số truyện rồi xem dạng bảng
+  const genreTitle = screen.getByText('Thể loại', { selector: '.ant-card-head-title' })
+  const genreCard = within(genreTitle.closest('.ant-card') as HTMLElement)
+  await user.click(genreCard.getByText('Số truyện'))
+  await user.click(genreCard.getByText('Bảng'))
+  expect(genreCard.getByRole('columnheader', { name: 'Số truyện' })).toBeInTheDocument()
+
+  // Lịch đọc 12 tuần cũng có dạng bảng
+  expect(screen.getByText('Lịch đọc · 12 tuần')).toBeInTheDocument()
 
   // Người dùng: tìm theo tên không dấu
   const nav = screen.getAllByRole('navigation', { name: 'Quản trị' })[0]
@@ -254,8 +267,16 @@ test('kiểm duyệt bình luận: xem báo cáo, bỏ qua, xóa bình luận vi
   signInAs('demo')
   const { router, user } = renderApp('/admin')
 
-  // Ô "Bình luận" ở Tổng quan dẫn sang trang kiểm duyệt
-  await user.click(await screen.findByRole('link', { name: /2 bị báo cáo/ }, slow))
+  // Khối "Cần xử lý" ở Tổng quan: 2 bình luận bị báo cáo, dẫn sang trang kiểm duyệt
+  const reported = await screen.findByText(
+    'Bình luận bị báo cáo',
+    { selector: '.ant-statistic-title' },
+    slow,
+  )
+  const item = within(reported.closest('li')!)
+  expect(item.getByText('2')).toBeInTheDocument()
+  expect(item.getByText('Cần xử lý')).toBeInTheDocument()
+  await user.click(item.getByRole('link', { name: /Mở kiểm duyệt/ }))
   expect(await screen.findByRole('heading', { name: 'Bình luận' }, slow)).toBeInTheDocument()
   const row = (text: string) => screen.getByText(text).closest('tr')!
   await screen.findByText('Vào web abc chấm com đọc nhanh hơn', {}, slow)
