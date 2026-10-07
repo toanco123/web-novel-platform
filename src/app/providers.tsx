@@ -14,6 +14,10 @@ const queryClient = new QueryClient({
   },
 })
 
+// Banner mời tải app (AppBanner) dính đáy màn hình: đẩy toast lên trên nó. 24px/16px là khoảng
+// mặc định của sonner cho màn lớn/điện thoại
+const aboveAppBanner = (base: string) => ({ bottom: `calc(${base} + var(--app-banner-h, 0px))` })
+
 export function Providers({
   children,
   client = queryClient,
@@ -27,7 +31,11 @@ export function Providers({
       <AuthSync />
       <OfflineSync />
       <TooltipProvider>{children}</TooltipProvider>
-      <Toaster position="bottom-center" />
+      <Toaster
+        position="bottom-center"
+        offset={aboveAppBanner('24px')}
+        mobileOffset={aboveAppBanner('16px')}
+      />
     </QueryClientProvider>
   )
 }

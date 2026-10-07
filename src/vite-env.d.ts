@@ -11,6 +11,9 @@ interface ImportMetaEnv {
   readonly VITE_TURNSTILE_SITE_KEY?: string
   /** Địa chỉ web (canonical, sitemap, ảnh xem trước); bỏ trống thì dùng DEFAULT_SITE_URL */
   readonly VITE_SITE_URL?: string
+  /** Link App Store / Google Play của app di động; bỏ trống thì không hiện banner mời tải app */
+  readonly VITE_APP_STORE_URL?: string
+  readonly VITE_PLAY_STORE_URL?: string
 }
 
 interface ImportMeta {
