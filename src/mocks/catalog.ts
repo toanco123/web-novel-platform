@@ -11,6 +11,7 @@ import {
   loadChapters,
   loadUserGenres,
   loadUserStories,
+  nextScheduled,
   storyReview,
   type StoredStory,
 } from './userContent'
@@ -25,7 +26,8 @@ export function allGenres(): Genre[] {
  */
 export function toStory(stored: StoredStory, genres = allGenres(), views = loadViews()): Story {
   const ratings = ratingsOf(stored.slug)
-  const published = loadChapters(stored.id).filter((c) => c.status === 'published')
+  const chapters = loadChapters(stored.id)
+  const published = chapters.filter((c) => c.status === 'published')
   const latest = published.at(-1)
   const lastPublish = published.reduce(
     (max, c) => (c.publishedAt && c.publishedAt > max ? c.publishedAt : max),
@@ -54,6 +56,7 @@ export function toStory(stored: StoredStory, genres = allGenres(), views = loadV
     ratingCount: ratings.length,
     firstChapterNumber: published[0]?.number ?? null,
     latestChapter: latest ? { number: latest.number, title: latest.title } : null,
+    nextChapter: nextScheduled(chapters),
     createdAt: stored.publishedAt ?? stored.createdAt,
     updatedAt: lastPublish,
     ownerId: stored.owner.id,

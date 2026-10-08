@@ -1844,6 +1844,121 @@ select pg_temp.expect_error(
   'rate_limited');
 reset role;
 
+-- ── Hẹn giờ đăng chương ─────────────────────────────────────────────────
+-- 71: tác giả, 72: bạn đọc
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000071', 'hg1@kiem-tra.local', '{"display_name": "Tác Giả Hẹn Giờ"}'),
+  ('00000000-0000-4000-8000-000000000072', 'hg2@kiem-tra.local', '{"display_name": "Bạn Đọc Chờ Chương"}');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000071", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Truyện Hẹn Giờ', 'Truyện để kiểm tra hẹn giờ đăng chương.', 'ongoing', array['bang-tin-mot'],
+  null, '{"title": "Một", "content": "Nội dung chương một."}', true);
+reset role;
+select pg_temp.approve('truyen-hen-gio');
+set local role authenticated;
+
+-- Chương 2 hẹn sau 2 giờ, chương 3 nháp chưa hẹn
+insert into public.chapters (story_id, number, title, content, status, scheduled_at) values
+  (pg_temp.story_id('truyen-hen-gio'), 2, 'Hai bí mật', 'Nội dung chương hai.', 'draft',
+    now() + interval '2 hours'),
+  (pg_temp.story_id('truyen-hen-gio'), 3, 'Ba', 'Nội dung chương ba.', 'draft', null);
+select pg_temp.expect_error(
+  $$insert into public.chapters (story_id, number, title, content, status, scheduled_at)
+    values (pg_temp.story_id('truyen-hen-gio'), 4, 'Bốn', 'Nội dung.', 'draft',
+      now() + interval '30 seconds')$$,
+  'invalid_schedule');
+select pg_temp.expect_error(
+  $$update public.chapters set scheduled_at = now() + interval '400 days'
+    where story_id = pg_temp.story_id('truyen-hen-gio') and number = 3$$,
+  'invalid_schedule');
+select pg_temp.expect_error(
+  $$update public.chapters set scheduled_at = now() + interval '1 day'
+    where story_id = pg_temp.story_id('truyen-hen-gio') and number = 1$$,
+  'invalid_schedule');
+-- Sửa nội dung chương đang hẹn (giờ hẹn không đổi) không bị kiểm tra lại
+select pg_temp.expect(
+  pg_temp.affected($$update public.chapters set content = 'Nội dung chương hai, đã sửa.'
+    where story_id = pg_temp.story_id('truyen-hen-gio') and number = 2$$) = 1,
+  'sửa nội dung chương đang hẹn giờ');
+select pg_temp.expect(
+  (select next_chapter_number = 2 and next_chapter_at > now()
+    from public.story_cards where slug = 'truyen-hen-gio'),
+  'story_cards: chương hẹn giờ sớm nhất');
+
+-- Xếp lịch: một chương không phải nháp thì cả lịch không lưu
+select pg_temp.expect_error(
+  $$select public.schedule_chapters(pg_temp.story_id('truyen-hen-gio'),
+    jsonb_build_array(
+      jsonb_build_object('number', 3, 'at', now() + interval '5 hours'),
+      jsonb_build_object('number', 1, 'at', now() + interval '6 hours')))$$,
+  'invalid_schedule');
+select pg_temp.expect(
+  (select scheduled_at is null from public.chapters
+    where story_id = pg_temp.story_id('truyen-hen-gio') and number = 3),
+  'schedule_chapters lỗi thì không lưu chương nào');
+select pg_temp.expect_error(
+  $$select public.schedule_chapters(pg_temp.story_id('truyen-hen-gio'),
+    jsonb_build_array(jsonb_build_object('number', 9, 'at', now() + interval '5 hours')))$$,
+  'not_found');
+select pg_temp.expect(
+  public.schedule_chapters(pg_temp.story_id('truyen-hen-gio'),
+    jsonb_build_array(jsonb_build_object('number', 3, 'at', now() + interval '5 hours'))) = 1,
+  'schedule_chapters xếp được chương nháp');
+
+-- Bạn đọc: thấy giờ chương sắp ra, không thấy chương hẹn giờ, không hẹn hộ được
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000072", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select next_chapter_number = 2 from public.story_cards where slug = 'truyen-hen-gio'),
+  'bạn đọc thấy số chương sắp ra');
+select pg_temp.expect(
+  not exists (select 1 from public.chapters
+    where story_id = pg_temp.story_id('truyen-hen-gio') and number in (2, 3)),
+  'bạn đọc không thấy chương hẹn giờ');
+select pg_temp.expect(
+  pg_temp.affected($$update public.chapters set scheduled_at = now() + interval '3 hours'$$) = 0,
+  'người khác không hẹn giờ được');
+select pg_temp.expect_error(
+  $$select public.schedule_chapters(pg_temp.story_id('truyen-hen-gio'),
+    jsonb_build_array(jsonb_build_object('number', 3, 'at', now() + interval '5 hours')))$$,
+  'not_found');
+select pg_temp.expect_error($$select private.publish_due_chapters()$$, '42501');
+
+-- Tới giờ (giả lập mốc 3 giờ sau): chương 2 tự ra, chương 3 (hẹn 5 giờ sau) chờ tiếp
+reset role;
+-- >= 1: DB thật có thể có chương hẹn giờ của tác giả khác trong 3 giờ tới
+select pg_temp.expect(private.publish_due_chapters(now() + interval '3 hours') >= 1,
+  'publish_due_chapters xuất bản chương tới giờ');
+select pg_temp.expect(
+  (select status = 'published' and scheduled_at is null and published_at is not null
+    from public.chapters where story_id = pg_temp.story_id('truyen-hen-gio') and number = 2)
+  and (select status = 'draft' and scheduled_at is not null
+    from public.chapters where story_id = pg_temp.story_id('truyen-hen-gio') and number = 3),
+  'chương tới giờ được xuất bản, chương chưa tới giờ giữ nguyên');
+select pg_temp.expect(
+  (select latest_chapter_number = 2 and next_chapter_number = 3
+    from public.story_cards where slug = 'truyen-hen-gio'),
+  'story_cards: chương mới nhất và chương sắp ra đổi theo');
+-- Xuất bản tay thì bỏ giờ hẹn
+update public.chapters set status = 'published'
+where story_id = pg_temp.story_id('truyen-hen-gio') and number = 3;
+select pg_temp.expect(
+  (select scheduled_at is null from public.chapters
+    where story_id = pg_temp.story_id('truyen-hen-gio') and number = 3)
+  and (select next_chapter_number is null from public.story_cards where slug = 'truyen-hen-gio'),
+  'xuất bản tay bỏ giờ hẹn, không còn chương sắp ra');
+select pg_temp.expect(
+  exists (select 1 from cron.job where jobname = 'publish-scheduled-chapters' and active)
+  and exists (select 1 from cron.job where jobname = 'cleanup-cron-logs' and active),
+  'có job cron xuất bản chương hẹn giờ và job dọn log cron');
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

@@ -30,6 +30,7 @@ type Seed = Omit<
   | 'createdAt'
   | 'updatedAt'
   | 'ownerId'
+  | 'nextChapter'
   | 'visibility'
 > & {
   latestTitle: string
@@ -270,6 +271,7 @@ export const stories: Story[] = seeds.map(
     id: String(i + 1),
     coverUrl: null,
     ownerId: null,
+    nextChapter: null,
     visibility: 'published' as const,
     firstChapterNumber: 1,
     latestChapter: { number: s.chapterCount, title: latestTitle },

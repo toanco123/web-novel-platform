@@ -38,9 +38,48 @@ export const saveUserGenres = (genres: StoredGenre[]) => writeMockStrict(GENRES_
 export const loadUserStories = () => readMock<StoredStory[]>(STORIES_KEY, [])
 export const saveUserStories = (stories: StoredStory[]) => writeMockStrict(STORIES_KEY, stories)
 
-/** Chương của một truyện, luôn xếp theo số chương tăng dần */
-export const loadChapters = (storyId: string) =>
-  readMock<Chapter[]>(chaptersKey(storyId), []).sort((a, b) => a.number - b.number)
+/**
+ * Chương của một truyện, luôn xếp theo số chương tăng dần. Chương nháp đã tới giờ hẹn thì xuất bản
+ * luôn lúc đọc (bản giả không có cron như DB): `publishedAt` lấy bằng giờ hẹn.
+ */
+export function loadChapters(storyId: string) {
+  const now = Date.now()
+  let due = false
+  const chapters = readMock<Chapter[]>(chaptersKey(storyId), [])
+    .map((c): Chapter => {
+      // Chương lưu trước khi có hẹn giờ không có scheduledAt
+      const scheduledAt = c.scheduledAt ?? null
+      if (c.status !== 'draft' || !scheduledAt || Date.parse(scheduledAt) > now) {
+        return { ...c, scheduledAt }
+      }
+      due = true
+      return {
+        ...c,
+        status: 'published',
+        publishedAt: c.publishedAt ?? scheduledAt,
+        scheduledAt: null,
+      }
+    })
+    .sort((a, b) => a.number - b.number)
+  if (due) {
+    try {
+      writeMockStrict(chaptersKey(storyId), chapters)
+    } catch {
+      // localStorage đầy: lần đọc sau xuất bản lại
+    }
+  }
+  return chapters
+}
+
+/** Chương hẹn giờ sớm nhất còn ở tương lai (như story_stats.next_chapter_*) */
+export function nextScheduled(chapters: Chapter[], now = Date.now()) {
+  const next = chapters
+    .filter((c) => c.status === 'draft' && c.scheduledAt && Date.parse(c.scheduledAt) > now)
+    .sort(
+      (a, b) => Date.parse(a.scheduledAt!) - Date.parse(b.scheduledAt!) || a.number - b.number,
+    )[0]
+  return next ? { number: next.number, at: next.scheduledAt! } : null
+}
 export const saveChapters = (storyId: string, chapters: Chapter[]) =>
   writeMockStrict(chaptersKey(storyId), chapters)
 export const removeChapters = (storyId: string) => writeMockStrict(chaptersKey(storyId), null)

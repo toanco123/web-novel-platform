@@ -364,6 +364,7 @@ function StoryPreview({
     ratingCount: 0,
     firstChapterNumber: null,
     latestChapter: null,
+    nextChapter: null,
     createdAt: time,
     updatedAt: time,
     ownerId: null,

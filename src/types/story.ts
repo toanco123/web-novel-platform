@@ -28,6 +28,9 @@ export type StoryReview = {
   reason: string | null
 }
 
+/** Chương hẹn giờ sớm nhất của truyện: người đọc chỉ thấy số chương và giờ ra */
+export type NextChapter = { number: number; at: string }
+
 /** Danh sách truyện chọn tay trên trang chủ: banner nổi bật | truyện đề cử */
 export type CuratedList = 'featured' | 'editor_pick'
 
@@ -48,6 +51,8 @@ export type Story = {
   firstChapterNumber: number | null
   /** null khi truyện chưa có chương nào được xuất bản */
   latestChapter: { number: number; title: string } | null
+  /** Chương hẹn giờ sớm nhất (null: không có) */
+  nextChapter: NextChapter | null
   /** null: truyện có sẵn của hệ thống; có giá trị: truyện do người dùng đăng */
   ownerId: string | null
   visibility: StoryVisibility

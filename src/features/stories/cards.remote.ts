@@ -52,6 +52,10 @@ export function toStory(row: StoryCardRow): Story {
       row.latest_chapter_number === null
         ? null
         : { number: row.latest_chapter_number, title: row.latest_chapter_title ?? '' },
+    nextChapter:
+      row.next_chapter_number === null || row.next_chapter_at === null
+        ? null
+        : { number: row.next_chapter_number, at: row.next_chapter_at },
     ownerId: row.owner_id,
     visibility: row.visibility!,
     createdAt: row.created_at!,

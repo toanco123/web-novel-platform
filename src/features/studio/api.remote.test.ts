@@ -533,3 +533,66 @@ test('gửi duyệt: gọi RPC rồi đọc lại truyện; trạng thái duyệ
     code: 'not_found',
   })
 })
+
+test('hẹn giờ: chỉ gửi scheduled_at khi có truyền, xếp lịch gọi RPC, map invalid_schedule', async () => {
+  const AT = '2026-10-10T13:00:00.000Z'
+  const meta = ok({ chapters: [{ id: 'c1', number: 1, status: 'published', published_at: TIME }] })
+
+  // Chương mới kèm giờ hẹn
+  fake.responses = [meta, ok([chapterRow(2, { scheduled_at: AT })])]
+  expect(await api.saveChapter(STORY_ID, chapter, { scheduledAt: AT })).toMatchObject({
+    number: 2,
+    status: 'draft',
+    scheduledAt: AT,
+  })
+  expect(lastQuery()).toContainEqual([
+    'insert',
+    { ...chapter, story_id: STORY_ID, number: 2, status: 'draft', scheduled_at: AT },
+  ])
+
+  // Xuất bản ngay: không gửi giờ hẹn (trigger bỏ giờ hẹn)
+  fake.responses = [meta, ok([chapterRow(2, { status: 'published' })])]
+  await api.saveChapter(STORY_ID, chapter, { publish: true, scheduledAt: AT })
+  expect(lastQuery()).toContainEqual([
+    'insert',
+    { ...chapter, story_id: STORY_ID, number: 2, status: 'published' },
+  ])
+
+  // Hủy hẹn một chương; hẹn chương đã xuất bản thì trigger báo invalid_schedule
+  fake.responses = [ok([chapterRow(2, { scheduled_at: null })])]
+  expect(await api.setChapterSchedule(STORY_ID, 2, null)).toMatchObject({ scheduledAt: null })
+  expect(lastQuery()).toContainEqual(['update', { scheduled_at: null }])
+  expect(lastQuery()).toContainEqual(['eq', 'number', 2])
+  fake.responses = [business('invalid_schedule')]
+  await expect(api.setChapterSchedule(STORY_ID, 1, AT)).rejects.toMatchObject({
+    code: 'invalid_schedule',
+  })
+  fake.responses = [ok([])]
+  await expect(api.setChapterSchedule(STORY_ID, 9, AT)).rejects.toMatchObject({
+    code: 'not_found',
+  })
+
+  // Xếp lịch: một lần RPC, đổi tên khóa sang { number, at }
+  fake.responses = [ok(2)]
+  expect(
+    await api.scheduleChapters(STORY_ID, [
+      { number: 2, scheduledAt: AT },
+      { number: 3, scheduledAt: AT },
+    ]),
+  ).toBe(2)
+  expect(lastQuery()[0]).toEqual([
+    'rpc',
+    'schedule_chapters',
+    {
+      p_story_id: STORY_ID,
+      p_items: [
+        { number: 2, at: AT },
+        { number: 3, at: AT },
+      ],
+    },
+  ])
+  fake.responses = [business('not_found')]
+  await expect(
+    api.scheduleChapters(STORY_ID, [{ number: 9, scheduledAt: AT }]),
+  ).rejects.toMatchObject({ code: 'not_found' })
+})

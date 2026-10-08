@@ -44,6 +44,7 @@ const story = (n: number): Story => ({
   ratingCount: 0,
   firstChapterNumber: 1,
   latestChapter: { number: 1, title: '' },
+  nextChapter: null,
   ownerId: 'u1',
   visibility: 'published',
   createdAt: '2026-01-01T00:00:00.000Z',
