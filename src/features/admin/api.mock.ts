@@ -569,6 +569,7 @@ export async function getAdminComments({
         id: c.id,
         content: c.content,
         createdAt: c.createdAt,
+        editedAt: c.editedAt,
         isReply: !!c.parentId,
         replyCount: stored.filter((r) => r.parentId === c.id).length,
         author: { id: c.user.id, displayName },
@@ -583,6 +584,7 @@ export async function getAdminComments({
             note: r.note,
             reporterName: names.get(r.reporter.id) ?? r.reporter.displayName,
             createdAt: r.createdAt,
+            contentSnapshot: r.contentSnapshot ?? null,
           })),
       },
     ]

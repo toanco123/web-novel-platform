@@ -542,3 +542,22 @@ test('xem trước truyện chưa công khai: dải báo đúng người đang x
   ).toBeInTheDocument()
   expect(screen.queryByText(/chỉ bạn thấy/)).not.toBeInTheDocument()
 })
+
+test('kiểm duyệt bình luận: bình luận đã sửa sau khi bị báo cáo hiện nội dung lúc bị báo cáo', async () => {
+  const comments = await import('@/features/comments/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const bad = await comments.addComment(story.slug, 'Lời lẽ khó nghe')
+  await registerUser('Mai', 'mai@gmail.com')
+  await comments.reportComment({ commentId: bad.id, reason: 'offensive', note: '' })
+  signInAs(linh)
+  await comments.editComment(bad.id, 'Xin lỗi, mình đã sửa')
+  signInAs('demo')
+  renderApp('/admin/comments')
+
+  const content = await screen.findByText('Xin lỗi, mình đã sửa', {}, slow)
+  const row = within(content.closest('tr')!)
+  expect(row.getByText('(đã sửa)')).toBeInTheDocument()
+  expect(row.getByText('Nội dung lúc bị báo cáo')).toBeInTheDocument()
+  expect(row.getByText('Lời lẽ khó nghe')).toBeInTheDocument()
+})

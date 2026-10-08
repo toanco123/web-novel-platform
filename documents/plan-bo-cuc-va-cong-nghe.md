@@ -187,6 +187,7 @@ Thiết kế chi tiết (bảng, luật nghiệp vụ, RLS, RPC, storage, bảng
 5j. **Tối ưu tải trang** ✅ (07/10/2026, chi tiết ở `plan-toi-uu-tai-trang.md`): khung trang tĩnh hiện ngay, skeleton đúng hình mọi trang, bớt nhấp nháy khi đăng nhập, bỏ dữ liệu giả khỏi bản production. Đợt 3 (route loader, bỏ request nối tiếp, ảnh thu nhỏ) chưa làm.
 5k. **Điểm danh và phiếu đề cử** ✅ (07/10/2026, chi tiết ở `plan-diem-danh-va-de-cu.md`; app di động làm sau): điểm danh mỗi ngày nhận phiếu đề cử (chuỗi 7 ngày được thưởng thêm), đề cử truyện, bảng xếp hạng "Đề cử" và khối "Đề cử tuần" trên trang chủ; sổ giao dịch có loại tài sản để giai đoạn 2 thêm xu.
 5l. **Theo dõi lỗi bằng Sentry** ✅ (07/10/2026, chi tiết ở `plan-theo-doi-loi.md`; app di động chờ build EAS): gửi lỗi bất thường của web (lỗi JS, lỗi trang, query/mutation lỗi) lên Sentry, lọc lỗi nghiệp vụ và lỗi mất mạng, ẩn token trong URL, tải source map lúc build; app di động làm sau.
+5m. **Thích, sửa bình luận và chủ truyện xóa bình luận** ✅ (08/10/2026, chi tiết ở `plan-thich-sua-xoa-binh-luan.md`; app di động làm sau): nút tim và sắp xếp Mới nhất / Nổi bật, sửa bình luận tại chỗ (báo cáo giữ nội dung lúc bị báo cáo), chủ truyện xóa bình luận trong truyện của mình, nhãn "Tác giả".
 6. Hoàn thiện: skeleton loading, trạng thái lỗi/trống, responsive, meta SEO, deploy ✅ (25/09/2026: Vercel nối repo GitHub, push `main` tự deploy lên https://web-novel-platform-gules.vercel.app).
 
 ---

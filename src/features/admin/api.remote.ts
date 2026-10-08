@@ -304,6 +304,7 @@ export async function getAdminComments({
       id: r.id,
       content: r.content,
       createdAt: r.created_at,
+      editedAt: r.edited_at ?? null,
       isReply: r.is_reply,
       replyCount: r.reply_count,
       author: { id: r.user_id, displayName: r.user_name },

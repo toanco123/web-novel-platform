@@ -1,15 +1,17 @@
 import { AuthError } from '@/features/auth/api'
 import { stories } from '@/mocks/stories'
-import { registerUser, signInAs } from '@/test/helpers'
+import { publishStory, registerUser, signInAs, signOut } from '@/test/helpers'
 import {
   addComment,
   deleteComment,
+  editComment,
   getComments,
   getMyRating,
   getRatingSummary,
   getReplies,
   rateStory,
   reportComment,
+  setCommentLike,
 } from './api'
 
 const story = stories.find((s) => s.slug === 'mong-hoa-luc')!
@@ -186,6 +188,10 @@ test('báo cáo bình luận: tối đa 10 / giờ mỗi người', async () => 
       createdAt: new Date().toISOString(),
       parentId: null,
       replyCount: 0,
+      likeCount: 0,
+      likedByMe: false,
+      editedAt: null,
+      isAuthor: false,
     })),
   )
   await registerUser('Linh', 'linh@gmail.com')
@@ -195,4 +201,144 @@ test('báo cáo bình luận: tối đa 10 / giờ mỗi người', async () => 
   await expect(reportComment({ commentId: 'c10', reason: 'spam', note: '' })).rejects.toMatchObject(
     { code: 'rate_limited' },
   )
+})
+
+// ── Thích, sắp xếp Nổi bật, sửa, chủ truyện xóa ─────────────────────────
+
+test('thích và bỏ thích bình luận; bấm lặp lại không lỗi', async () => {
+  signIn()
+  const root = await addComment(story.slug, 'Bình luận của demo')
+  await registerUser('Linh', 'linh@gmail.com')
+  await setCommentLike(root.id, true)
+  await setCommentLike(root.id, true)
+  expect((await getComments(story.slug)).items[0]).toMatchObject({
+    id: root.id,
+    likeCount: 1,
+    likedByMe: true,
+  })
+  await setCommentLike(root.id, false)
+  await setCommentLike(root.id, false)
+  expect((await getComments(story.slug)).items[0]).toMatchObject({ likeCount: 0, likedByMe: false })
+})
+
+test('thích trả lời; khách thấy số nhưng không thích được', async () => {
+  signIn()
+  const root = await addComment(story.slug, 'Gốc')
+  const reply = await addComment(story.slug, 'Trả lời', null, root.id)
+  await registerUser('Linh', 'linh@gmail.com')
+  await setCommentLike(reply.id, true)
+  expect((await getReplies(root.id))[0]).toMatchObject({ likeCount: 1, likedByMe: true })
+
+  signOut()
+  await expect(setCommentLike(reply.id, true)).rejects.toMatchObject({ code: 'unauthenticated' })
+  expect((await getReplies(root.id))[0]).toMatchObject({ likeCount: 1, likedByMe: false })
+})
+
+test('không tự thích bình luận của mình, không thích bình luận đã xóa', async () => {
+  signIn()
+  const mine = await addComment(story.slug, 'Của demo')
+  await expect(setCommentLike(mine.id, true)).rejects.toMatchObject({
+    message: 'Bạn không thể tự thích bình luận của mình.',
+  })
+  await deleteComment(mine.id)
+  await registerUser('Linh', 'linh@gmail.com')
+  await expect(setCommentLike(mine.id, true)).rejects.toMatchObject({
+    message: 'Bình luận này không còn nữa.',
+  })
+})
+
+test('thích được bình luận mẫu (có sẵn lượt thích gốc)', async () => {
+  signIn()
+  const seed = (await getComments(story.slug)).items[0]
+  await setCommentLike(seed.id, true)
+  const after = (await getComments(story.slug)).items[0]
+  expect(after).toMatchObject({ id: seed.id, likeCount: seed.likeCount + 1, likedByMe: true })
+})
+
+test('thích: tối đa 300 lượt mới / giờ mỗi người', async () => {
+  const { saveCommentLikes } = await import('@/mocks/activity')
+  signIn()
+  const target = await addComment(story.slug, 'Bình luận để thích')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const now = new Date().toISOString()
+  saveCommentLikes(
+    Array.from({ length: 300 }, (_, i) => ({ commentId: `x${i}`, userId: linh, createdAt: now })),
+  )
+  await expect(setCommentLike(target.id, true)).rejects.toMatchObject({ code: 'rate_limited' })
+})
+
+test('sắp xếp Nổi bật: nhiều lượt thích lên đầu, bằng nhau thì mới hơn trước', async () => {
+  await registerUser('Tác Giả', 'tacgia@gmail.com')
+  const mine = await publishStory('Truyện Của Tôi', 1)
+  const a = await addComment(mine.slug, 'Bình luận A')
+  const b = await addComment(mine.slug, 'Bình luận B')
+  const c = await addComment(mine.slug, 'Bình luận C')
+  await registerUser('Linh', 'linh@gmail.com')
+  await setCommentLike(a.id, true)
+  await setCommentLike(b.id, true)
+  await registerUser('Hoa', 'hoa@gmail.com')
+  await setCommentLike(a.id, true)
+
+  const ids = async (sort?: 'top') =>
+    (await getComments(mine.slug, { sort })).items.map((x) => x.id)
+  expect(await ids('top')).toEqual([a.id, b.id, c.id])
+  expect(await ids()).toEqual([c.id, b.id, a.id])
+})
+
+test('sửa bình luận: bỏ khoảng trắng, đặt editedAt; người khác không sửa được', async () => {
+  signIn()
+  const root = await addComment(story.slug, 'Bản đầu')
+  expect(root.editedAt).toBeNull()
+  const edited = await editComment(root.id, '  Bản đã sửa  ')
+  expect(edited).toMatchObject({ id: root.id, content: 'Bản đã sửa' })
+  expect(edited.editedAt).not.toBeNull()
+  expect((await getComments(story.slug)).items[0]).toMatchObject({
+    content: 'Bản đã sửa',
+    editedAt: edited.editedAt,
+  })
+
+  await registerUser('Linh', 'linh@gmail.com')
+  await expect(editComment(root.id, 'Linh sửa')).rejects.toMatchObject({
+    message: 'Bình luận này không còn nữa.',
+  })
+  expect((await getComments(story.slug)).items[0].content).toBe('Bản đã sửa')
+})
+
+test('chủ truyện xóa được bình luận và trả lời của người khác; lượt thích mất theo', async () => {
+  const { loadCommentLikes } = await import('@/mocks/activity')
+  const owner = await registerUser('Tác Giả', 'tacgia@gmail.com')
+  const mine = await publishStory('Truyện Của Tôi', 2)
+  await registerUser('Linh', 'linh@gmail.com')
+  const root = await addComment(mine.slug, 'Bình luận của Linh')
+  const reply = await addComment(mine.slug, 'Linh tự trả lời', null, root.id)
+  const other = await addComment(mine.slug, 'Bình luận chương', 1)
+  await registerUser('Hoa', 'hoa@gmail.com')
+  await setCommentLike(root.id, true)
+  // Người lạ không xóa được
+  await deleteComment(other.id)
+  expect((await getComments(mine.slug, { chapter: 1 })).total).toBe(1)
+
+  signInAs(owner)
+  await deleteComment(other.id)
+  expect((await getComments(mine.slug, { chapter: 1 })).total).toBe(0)
+  await deleteComment(root.id)
+  expect((await getComments(mine.slug)).total).toBe(0)
+  expect(await getReplies(root.id)).toEqual([])
+  expect(loadCommentLikes().filter((l) => [root.id, reply.id].includes(l.commentId))).toEqual([])
+})
+
+test('nhãn Tác giả: bình luận của chủ truyện, trừ truyện có bút danh', async () => {
+  const { loadUserStories, saveUserStories } = await import('@/mocks/userContent')
+  await registerUser('Tác Giả', 'tacgia@gmail.com')
+  const mine = await publishStory('Truyện Của Tôi', 2)
+  const own = await addComment(mine.slug, 'Cảm ơn mọi người đã đọc')
+  await registerUser('Linh', 'linh@gmail.com')
+  const reader = await addComment(mine.slug, 'Hóng chương mới', null, own.id)
+  expect((await getComments(mine.slug)).items[0]).toMatchObject({ id: own.id, isAuthor: true })
+  expect((await getReplies(own.id))[0]).toMatchObject({ id: reader.id, isAuthor: false })
+
+  saveUserStories(
+    loadUserStories().map((s) => (s.slug === mine.slug ? { ...s, authorName: 'Bút Danh' } : s)),
+  )
+  expect((await getComments(mine.slug)).items[0].isAuthor).toBe(false)
 })

@@ -13,6 +13,8 @@ export const {
   getComments,
   getReplies,
   addComment,
+  editComment,
+  setCommentLike,
   deleteComment,
   reportComment,
   getRatingSummary,

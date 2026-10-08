@@ -12,7 +12,17 @@ export type Comment = {
   parentId: string | null
   /** Số trả lời của bình luận gốc (trả lời thì luôn 0) */
   replyCount: number
+  likeCount: number
+  /** Người xem đã thích bình luận này chưa (khách: luôn false) */
+  likedByMe: boolean
+  /** Lần sửa nội dung gần nhất; null: chưa sửa */
+  editedAt: string | null
+  /** Người viết là chủ truyện (truyện không có bút danh): hiện nhãn "Tác giả" */
+  isAuthor: boolean
 }
+
+/** Thứ tự bình luận gốc: mới nhất trước | nhiều lượt thích trước */
+export type CommentSort = 'newest' | 'top'
 
 /** Lý do báo cáo một bình luận vi phạm */
 export type CommentReportReason = 'spam' | 'offensive' | 'spoiler' | 'other'

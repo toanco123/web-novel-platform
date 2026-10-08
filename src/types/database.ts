@@ -152,12 +152,47 @@ export type Database = {
           },
         ]
       }
+      comment_likes: {
+        Row: {
+          comment_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          user_id?: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comments: {
         Row: {
           chapter_number: number | null
           content: string
           created_at: string
+          edited_at: string | null
           id: string
+          like_count: number
           parent_id: string | null
           story_id: string
           user_id: string
@@ -166,7 +201,9 @@ export type Database = {
           chapter_number?: number | null
           content: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          like_count?: number
           parent_id?: string | null
           story_id: string
           user_id?: string
@@ -175,7 +212,9 @@ export type Database = {
           chapter_number?: number | null
           content?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          like_count?: number
           parent_id?: string | null
           story_id?: string
           user_id?: string
@@ -1058,6 +1097,7 @@ export type Database = {
           chapter_number: number
           content: string
           created_at: string
+          edited_at: string
           id: string
           is_reply: boolean
           last_reported_at: string
@@ -1188,6 +1228,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["publication_status"]
         }[]
       }
+      admin_tts_usage: { Args: never; Returns: Json }
       admin_update_genre: {
         Args: { p_description: string; p_name: string; p_slug: string }
         Returns: Json
@@ -1217,7 +1258,11 @@ export type Database = {
           content: string
           created_at: string
           display_name: string
+          edited_at: string
           id: string
+          is_author: boolean
+          like_count: number
+          liked_by_me: boolean
           reply_count: number
           user_id: string
         }[]
@@ -1374,6 +1419,28 @@ export type Database = {
       submit_story_for_review: {
         Args: { p_story_id: string }
         Returns: undefined
+      }
+      tts_commit: {
+        Args: {
+          p_clips: Json
+          p_refund: number
+          p_user: string
+          p_voice: string
+        }
+        Returns: undefined
+      }
+      tts_lookup: {
+        Args: { p_hashes: string[]; p_voice: string }
+        Returns: string[]
+      }
+      tts_reserve: {
+        Args: {
+          p_chars: number
+          p_day_cap: number
+          p_month_cap: number
+          p_user: string
+        }
+        Returns: Json
       }
       update_story: {
         Args: {

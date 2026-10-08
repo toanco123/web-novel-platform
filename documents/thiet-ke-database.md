@@ -27,6 +27,7 @@ stories 1─n chapters                    (unique story_id + number)
 chapters(story_id, number) 1─n comments         (chapter_number null = bình luận cả truyện)
 comments 1─n comments                          (parent_id: trả lời, chỉ một cấp)
 comments 1─n private.comment_reports           (báo cáo bình luận vi phạm)
+comments 1─n comment_likes                     (lượt thích, mỗi người một lượt)
 auth.users × profiles: user_blocks             (người chặn → người bị chặn, ẩn bình luận)
 profiles 1─n push_tokens                       (mã thông báo đẩy của máy, app di động)
                            1─n chapter_reports
@@ -53,8 +54,9 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `follows` | `user_id`, `story_id`, `followed_at`, `seen_chapter` | Số chương mới = số chương đã xuất bản có `number > seen_chapter`. Index `followed_at` cho đếm theo ngày ở trang Tổng quan |
 | `reading_history` | `user_id`, `story_id`, `chapter_number`, `chapter_title`, `progress` (0–1), `read_at` | Không có khóa ngoại tới chương, để lịch sử vẫn còn khi chương bị ẩn |
 | `ratings` | `user_id`, `story_id`, `score` (1–5) | |
-| `comments` | `id`, `story_id`, `chapter_number` (có thể null), `user_id`, `content` (1–1000), `created_at`, `parent_id` (null: bình luận gốc) | Tên và ảnh người viết lấy từ `profiles` theo hồ sơ hiện tại. Trả lời chỉ một cấp, cùng truyện và cùng chương với bình luận gốc (trigger `comments_check_parent`); xóa bình luận gốc thì trả lời mất theo. Index `created_at` cho đếm theo ngày ở trang Tổng quan |
-| `private.comment_reports` | `id`, `comment_id`, `reporter_id`, `reason` (`spam` \| `offensive` \| `spoiler` \| `other`), `note` (≤500, bắt buộc khi `reason='other'`), `status`, `created_at`, `resolved_at` | Unique một phần trên `(reporter_id, comment_id)` khi `status = 'open'`. Không ai đọc ghi qua API; chỉ qua `report_comment` và các RPC admin |
+| `comments` | `id`, `story_id`, `chapter_number` (có thể null), `user_id`, `content` (1–1000), `created_at`, `parent_id` (null: bình luận gốc), `like_count` (trigger ghi), `edited_at` (null: chưa sửa) | Tên và ảnh người viết lấy từ `profiles` theo hồ sơ hiện tại. Trả lời chỉ một cấp, cùng truyện và cùng chương với bình luận gốc (trigger `comments_check_parent`); xóa bình luận gốc thì trả lời mất theo. Index `created_at` cho đếm theo ngày ở trang Tổng quan. Sửa nội dung thì trigger `comments_set_edited_at` đặt `edited_at` (plan `plan-thich-sua-xoa-binh-luan.md`) |
+| `comment_likes` | `user_id`, `comment_id`, `created_at` | Khóa chính `(user_id, comment_id)`. Trigger `comment_likes_guard` (không tự thích, giới hạn tần suất) và `comment_likes_count` (cập nhật `comments.like_count`). Xóa bình luận hoặc tài khoản thì lượt thích mất theo |
+| `private.comment_reports` | `id`, `comment_id`, `reporter_id`, `reason` (`spam` \| `offensive` \| `spoiler` \| `other`), `note` (≤500, bắt buộc khi `reason='other'`), `status`, `created_at`, `resolved_at`, `content_snapshot` (nội dung bình luận lúc báo cáo; null ở báo cáo cũ) | Unique một phần trên `(reporter_id, comment_id)` khi `status = 'open'`. Không ai đọc ghi qua API; chỉ qua `report_comment` và các RPC admin |
 | `chapter_reports` | `id`, `story_id`, `chapter_number`, `reporter_id`, `reason`, `note` (≤500, bắt buộc khi `reason='other'`), `status`, `created_at`, `resolved_at` | Unique một phần trên `(reporter_id, story_id, chapter_number, reason)` khi `status='open'`, để gộp báo lỗi trùng |
 | `chapter_views` | `story_id`, `chapter_number`, `day`, `views` | Chỉ ghi qua `record_chapter_view` |
 | `contact_messages` | `name`, `email`, `topic`, `message` (10–2000), `user_id` | Chỉ insert, không ai đọc được qua API (xem trên Dashboard) |
@@ -91,6 +93,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `duplicate_comment` | Gửi lại đúng bình luận vừa gửi (cùng truyện/chương, trong 10 phút) | `AuthError('rate_limited')` "Bạn vừa gửi bình luận này rồi." |
 | `parent_not_found`, `invalid_parent` | Trả lời một bình luận đã bị xóa / trả lời vào một câu trả lời hoặc vào bình luận của truyện, chương khác | `AuthError` (`parentDeleted()`, `invalidParent()` ở `features/comments/shared.ts`); lỗi khóa ngoại `23503` cũng coi là bình luận gốc đã xóa |
 | `own_comment` | Báo cáo bình luận của chính mình | `AuthError` (`ownCommentReport()`) |
+| `own_comment_like` | Thích bình luận của chính mình | `AuthError` (`ownCommentLike()`); thích bình luận không còn (`not_found`, `23503`) hay của truyện không công khai (`42501`) là `commentGone()` |
 | `forbidden` | Gọi RPC quản trị (`admin_*`) mà không phải quản trị viên | `AdminError` |
 | `cannot_ban_self`, `cannot_ban_admin` | Admin tự khóa mình / khóa admin khác | `AdminError` |
 | `genre_exists`, `same_genre` | Đổi tên thể loại trùng thể loại khác / gộp thể loại vào chính nó | `AdminError` |
@@ -121,6 +124,7 @@ Lỗi nghiệp vụ nằm trong `error.message` (mã `P0001`). Các luật tự 
 |---|---|
 | Lượt đọc | 1 lượt / người / chương / ngày. Người đăng nhập tính theo id, khách theo hash IP (`private.chapter_view_log`, tự dọn sau 2 ngày) |
 | Bình luận | 3 / phút và 30 / giờ mỗi người (tính cả trả lời); không gửi lại nội dung vừa gửi trong 10 phút |
+| Thích bình luận | 300 lượt thích mới / giờ mỗi người (bỏ thích không tính; trigger `comment_likes_guard`) |
 | Tin nhắn liên hệ | 3 / giờ mỗi email, 5 / giờ mỗi IP |
 | Báo lỗi chương | 10 / giờ mỗi người |
 | Báo cáo bình luận | 10 báo cáo mới / giờ mỗi người (kiểm tra trong `report_comment`; báo lại bình luận đã báo thì không tính) |
@@ -153,7 +157,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `story_genres`, `story_stats`, `chapter_views`, `curated_stories` | ai thấy truyện thì thấy | `story_genres`: chủ truyện. Ba bảng còn lại: không ai ghi từ client |
 | `chapters` | chương đã xuất bản của truyện công khai (quản trị viên: cả của truyện chờ duyệt); chủ truyện thấy cả nháp | chủ truyện. Insert được: `story_id, number, title, content, status`. Update được: `number, title, content, status` |
 | `follows`, `reading_history`, `ratings` | chỉ chủ | chỉ chủ |
-| `comments` | ai thấy truyện thì thấy, trừ bình luận của người mình đã chặn (`private.my_blocked_ids()`, definer để khách cũng gọi được) | viết: người đã đăng nhập, vào truyện công khai hoặc chương đã xuất bản (cột `parent_id` được cấp quyền insert). Xóa: chính người viết; quản trị viên xóa qua `admin_delete_comment` |
+| `comments` | ai thấy truyện thì thấy, trừ bình luận của người mình đã chặn (`private.my_blocked_ids()`, definer để khách cũng gọi được) | viết: người đã đăng nhập, vào truyện công khai hoặc chương đã xuất bản (cột `parent_id` được cấp quyền insert). Sửa (`content`): chính người viết, khi truyện còn công khai và chương còn xuất bản. Xóa: chính người viết hoặc chủ truyện; quản trị viên xóa qua `admin_delete_comment` |
+| `comment_likes` | chỉ lượt thích của mình (`anon` có quyền select để `comment_threads` chạy được, nhưng không có policy nên không thấy dòng nào) | người đã đăng nhập: insert (`comment_id`) vào bình luận của truyện công khai, không phải của mình; xóa lượt thích của mình |
 | `chapter_reports` | người gửi và chủ truyện | gửi: người đã đăng nhập, cho chương đã xuất bản. Đổi trạng thái: chủ truyện. Sửa ghi chú (khi báo lại): người gửi |
 | `contact_messages` | không ai | `anon` và `authenticated` insert |
 | `user_blocks` | chỉ người chặn | người chặn: insert (`blocked_id`), delete |
@@ -192,8 +197,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `merge_guest_history(entries)` | đã đăng nhập | Gộp lịch sử lúc còn là khách. `entries` giống mảng `ReadingProgress` |
 | `get_library()`, `library_update_count()` | đã đăng nhập | Truyện đang theo dõi kèm số chương mới, và số truyện có chương mới |
 | `report_chapter(slug, chapter, reason, note)` | đã đăng nhập | Báo lỗi chương; báo lại cùng lý do thì chỉ cập nhật ghi chú |
-| `comment_threads(story_id, chapter?)` | mọi người | Bình luận gốc của truyện (`chapter` null) hoặc của một chương, kèm tên, ảnh người viết và `reply_count`. INVOKER nên RLS áp dụng; client thêm `order` và `range` |
-| `report_comment(comment_id, reason, note)` | đã đăng nhập | Báo cáo bình luận của người khác trong truyện đang công khai; đã có báo cáo đang mở thì cập nhật lý do và ghi chú |
+| `comment_threads(story_id, chapter?)` | mọi người | Bình luận gốc của truyện (`chapter` null) hoặc của một chương, kèm tên, ảnh người viết, `reply_count`, `like_count`, `liked_by_me` (khách: false), `edited_at`, `is_author` (người viết là chủ truyện và truyện không có bút danh). INVOKER nên RLS áp dụng; client thêm `order` và `range` |
+| `report_comment(comment_id, reason, note)` | đã đăng nhập | Báo cáo bình luận của người khác trong truyện đang công khai; đã có báo cáo đang mở thì cập nhật lý do và ghi chú. Lưu nội dung bình luận lúc báo cáo vào `content_snapshot` |
 | `search_stories(q)` | mọi người | `(story_id, score, view_count)`, chấm điểm như `matchScore` |
 | `story_ranking(by, period, limit)` | mọi người | `(story_id, value)`. `by`: `views` \| `votes` \| `rating` \| `follows`; `period`: `week` \| `month` \| `all`. `votes` theo kỳ đếm qua `private.vote_ranking` (DEFINER, chỉ trả tổng) |
 | `related_stories(slug, limit)` | mọi người | `(story_id, overlap)` |
@@ -211,7 +216,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `admin_set_user_banned(user_id, banned)` | quản trị viên | `auth.users.banned_until = 'infinity'` / `null`; khóa thì xóa `auth.sessions` |
 | `admin_set_story_takedown(story_id, reason)` | quản trị viên | Gỡ truyện: về nháp + `taken_down_at`, `takedown_reason`, xóa trạng thái duyệt; `reason` rỗng là khôi phục (tác giả gửi duyệt lại) |
 | `admin_update_genre(slug, name, description)`, `admin_delete_genre(slug)`, `admin_merge_genres(from, into)` | quản trị viên | Sửa (slug đổi theo tên), xóa, gộp thể loại |
-| `admin_comments(query, reported)`, `admin_delete_comment(id)`, `admin_dismiss_comment_reports(comment_id)` | quản trị viên | Danh sách bình luận kèm các báo cáo đang mở (`reported = true`: chỉ bình luận bị báo cáo, báo cáo mới nhất trước); xóa bình luận bất kỳ (trả lời và báo cáo mất theo); đóng các báo cáo đang mở |
+| `admin_comments(query, reported)`, `admin_delete_comment(id)`, `admin_dismiss_comment_reports(comment_id)` | quản trị viên | Danh sách bình luận (kèm `edited_at`) và các báo cáo đang mở (mỗi báo cáo có `contentSnapshot`; `reported = true`: chỉ bình luận bị báo cáo, báo cáo mới nhất trước); xóa bình luận bất kỳ (trả lời và báo cáo mất theo); đóng các báo cáo đang mở |
 | `admin_curated(list)`, `admin_set_curated(list, story_ids[])` | quản trị viên | Đọc danh sách truyện chọn tay (kể cả truyện đang ẩn) và thay cả danh sách theo thứ tự đưa vào. Tối đa 8 truyện nổi bật, 12 truyện đề cử |
 
 **Thông báo đẩy chương mới (app di động):** trigger `chapters_notify_insert` / `chapters_notify_update` (mỗi câu lệnh, transition table) gọi `private.send_chapter_push`: chương xuất bản lần đầu ở truyện công khai thì gửi một tin mỗi truyện (chương mới nhất trong câu lệnh) tới mọi máy của người theo dõi, trừ tác giả, bằng `pg_net` (`net.http_post` tới `https://exp.host/--/api/v2/push/send`, tối đa 100 tin mỗi lần gọi). `data.url` = `/story/<slug>/chapter-<n>` để app mở đúng chương. Chưa xử lý biên nhận của Expo (mã hết hạn `DeviceNotRegistered` chưa tự bị xóa).
@@ -277,9 +282,11 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | library | `saveReadingProgress` | Đã đăng nhập: `rpc('save_reading_progress')`. Khách: localStorage |
 | library | gộp lịch sử khách | Lần gọi đầu có session (`getLibrary`, `getLibraryUpdateCount`, các hàm lịch sử): `rpc('merge_guest_history', { p_entries })` một lần, xong thì xóa bản local |
 | library | `removeFromHistory`, `clearHistory` | `reading_history.delete()` luôn kèm `.eq('user_id', uid)` (Supabase chặn delete không có điều kiện) |
-| comments | `getComments` | `rpc('comment_threads', { p_story_id, p_chapter }, { count: 'exact' }).order('created_at', desc).order('id', desc).range()`: chỉ bình luận gốc, kèm `replyCount` |
-| comments | `getReplies` | `comments.select('…, story:stories!inner(slug), user:profiles!comments_user_id_fkey(…)').eq('parent_id', id).order('created_at').limit(200)` |
-| comments | `addComment`, `deleteComment` | insert `{ story_id, chapter_number, content, parent_id }` / delete |
+| comments | `getComments` | `rpc('comment_threads', { p_story_id, p_chapter }, { count: 'exact' })`, `sort: 'top'` thì thêm `.order('like_count', desc)` trước, rồi `.order('created_at', desc).order('id', desc).range()`: chỉ bình luận gốc, kèm `replyCount`, lượt thích, nhãn Tác giả |
+| comments | `setCommentLike` | `comment_likes.insert({ comment_id })` (trùng khóa `23505` = đã thích, bỏ qua) / `delete().eq('comment_id').eq('user_id')` |
+| comments | `editComment` | `comments.update({ content }).eq('id').select(…).maybeSingle()`: không có dòng (của người khác, truyện đã ẩn) thì `commentGone()` |
+| comments | `getReplies` | `comments.select('…, like_count, edited_at, story:stories!inner(slug, owner_id, author_name), user:profiles!comments_user_id_fkey(…), my_like:comment_likes(user_id)').eq('parent_id', id).order('created_at').limit(200)`: `my_like` chỉ có lượt thích của mình (RLS) |
+| comments | `addComment`, `deleteComment` | insert `{ story_id, chapter_number, content, parent_id }` / `delete().eq('id')` (không lọc `user_id`: RLS cho người viết hoặc chủ truyện xóa) |
 | comments | `reportComment` | `rpc('report_comment', { p_comment_id, p_reason, p_note })` |
 | comments | `getRatingSummary` | `story_cards` (`rating_avg`, `rating_count`, `rating_counts` → `distribution`) |
 | comments | `getMyRating`, `rateStory` | `ratings` select / `upsert({ story_id, score }, { onConflict: 'user_id,story_id' })` |

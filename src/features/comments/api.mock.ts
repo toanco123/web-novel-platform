@@ -11,11 +11,13 @@ import {
 import { mockDelay as delay } from '@/lib/mockStorage'
 import {
   blockedIds,
+  loadCommentLikes,
   loadCommentReports,
   loadRatings,
   loadUserComments,
   ratingsOf,
   removeComments,
+  saveCommentLikes,
   saveCommentReports,
   saveRatings,
   saveUserComments,
@@ -23,12 +25,15 @@ import {
 import { findStory } from '@/mocks/catalog'
 import { countSince, HOUR, MINUTE } from '@/mocks/rateLimit'
 import { seedChapterComments, seedComments } from '@/mocks/comments'
-import type { Comment, RatingSummary, Score } from '@/types/comment'
+import { loadUserStories } from '@/mocks/userContent'
+import type { Comment, CommentSort, RatingSummary, Score } from '@/types/comment'
 import {
   commentGone,
   COMMENTS_PER_PAGE,
   type CommentPage,
   invalidParent,
+  LIKES_PER_HOUR,
+  ownCommentLike,
   ownCommentReport,
   parentDeleted,
   REPLIES_LIMIT,
@@ -71,13 +76,62 @@ async function visibleTo() {
   return (c: Comment) => !hidden.has(c.user.id)
 }
 
+/** Chủ truyện người dùng đăng và truyện có bút danh không (truyện mẫu: null) */
+function storyOwner(slug: string) {
+  const story = loadUserStories().find((s) => s.slug === slug)
+  return story ? { id: story.owner.id, penName: !!story.authorName } : null
+}
+
+/** Bình luận mẫu theo id (`seed-<slug>-<i>` hoặc `seed-<slug>-c<chương>-<i>`) */
+function findSeed(id: string) {
+  const match = /^seed-(.+?)-(?:c(\d+)-)?\d+$/.exec(id)
+  if (!match) return undefined
+  const chapter = match[2] ? Number(match[2]) : null
+  return seeded(match[1], chapter).find((c) => c.id === id)
+}
+
+/** Số lượt thích: lượt gốc (chỉ bình luận mẫu có) cộng lượt thích thật */
+function likeCounter() {
+  const counts = new Map<string, number>()
+  for (const like of loadCommentLikes()) {
+    counts.set(like.commentId, (counts.get(like.commentId) ?? 0) + 1)
+  }
+  return (c: Comment) => c.likeCount + (counts.get(c.id) ?? 0)
+}
+
 /**
- * Bình luận gốc của truyện (chapter = null, mặc định) hoặc của một chương, mới nhất trước; mỗi bình
- * luận kèm số trả lời
+ * Điền các trường tính khi đọc: tên, ảnh theo hồ sơ, số trả lời (đếm trong `stored`, đã lọc người
+ * bị chặn), lượt thích, nhãn Tác giả
+ */
+async function present(comments: Comment[], stored: Comment[]) {
+  const viewerId = await getUserId()
+  const likes = loadCommentLikes()
+  const countLikes = likeCounter()
+  return (await withProfiles(comments)).map((c) => {
+    const owner = storyOwner(c.storySlug)
+    return {
+      ...c,
+      replyCount: c.parentId ? 0 : stored.filter((r) => r.parentId === c.id).length,
+      likeCount: countLikes(c),
+      likedByMe: !!viewerId && likes.some((l) => l.commentId === c.id && l.userId === viewerId),
+      isAuthor: !!owner && !owner.penName && owner.id === c.user.id,
+    }
+  })
+}
+
+const newestFirst = (a: Comment, b: Comment) => Date.parse(b.createdAt) - Date.parse(a.createdAt)
+
+/**
+ * Bình luận gốc của truyện (chapter = null, mặc định) hoặc của một chương; mỗi bình luận kèm số
+ * trả lời. sort: mới nhất trước (mặc định) | nhiều lượt thích trước
  */
 export async function getComments(
   slug: string,
-  { chapter = null, cursor = 0 }: { chapter?: number | null; cursor?: number } = {},
+  {
+    chapter = null,
+    cursor = 0,
+    sort = 'newest',
+  }: { chapter?: number | null; cursor?: number; sort?: CommentSort } = {},
 ): Promise<CommentPage> {
   await delay()
   const visible = await visibleTo()
@@ -85,14 +139,11 @@ export async function getComments(
   const own = stored.filter(
     (c) => c.storySlug === slug && c.chapterNumber === chapter && !c.parentId,
   )
+  const countLikes = likeCounter()
   const all = [...own, ...seeded(slug, chapter).filter(visible)].sort(
-    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    sort === 'top' ? (a, b) => countLikes(b) - countLikes(a) || newestFirst(a, b) : newestFirst,
   )
-  const page = all.slice(cursor, cursor + COMMENTS_PER_PAGE)
-  const items = (await withProfiles(page)).map((c) => ({
-    ...c,
-    replyCount: stored.filter((r) => r.parentId === c.id).length,
-  }))
+  const items = await present(all.slice(cursor, cursor + COMMENTS_PER_PAGE), stored)
   const next = cursor + items.length
   return { items, total: all.length, nextCursor: next < all.length ? next : null }
 }
@@ -105,7 +156,7 @@ export async function getReplies(commentId: string): Promise<Comment[]> {
     .filter((c) => c.parentId === commentId && visible(c))
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .slice(0, REPLIES_LIMIT)
-  return withProfiles(replies)
+  return present(replies, [])
 }
 
 /** parentId có giá trị: trả lời bình luận gốc đó (cùng truyện, cùng chương) */
@@ -151,16 +202,73 @@ export async function addComment(
     createdAt: new Date().toISOString(),
     parentId,
     replyCount: 0,
+    likeCount: 0,
+    likedByMe: false,
+    editedAt: null,
+    isAuthor: false,
   }
   saveUserComments([comment, ...all])
-  return comment
+  return (await present([comment], []))[0]
 }
 
-/** Chỉ xóa được bình luận của chính mình; trả lời của bình luận đó bị xóa theo */
+/**
+ * Sửa bình luận của chính mình khi truyện còn công khai. Nội dung đổi thì đặt editedAt; không có
+ * bình luận đó (hoặc của người khác) thì báo bình luận không còn
+ */
+export async function editComment(commentId: string, content: string): Promise<Comment> {
+  await delay(300)
+  const user = await requireUser()
+  const all = loadUserComments()
+  const target = all.find((c) => c.id === commentId && c.user.id === user.id)
+  if (!target || !findStory(target.storySlug)) throw commentGone()
+  const text = content.trim()
+  const updated =
+    text === target.content
+      ? target
+      : { ...target, content: text, editedAt: new Date().toISOString() }
+  saveUserComments(all.map((c) => (c.id === commentId ? updated : c)))
+  return (await present([updated], all))[0]
+}
+
+/**
+ * Thích (liked = true) hoặc bỏ thích bình luận của người khác trong truyện đang công khai. Thích
+ * lại khi đã thích, hay bỏ thích khi chưa thích, không làm gì. Tối đa 300 lượt thích mới / giờ.
+ */
+export async function setCommentLike(commentId: string, liked: boolean) {
+  await delay(150)
+  const user = await requireUser()
+  const likes = loadCommentLikes()
+  const mine = likes.filter((l) => l.userId === user.id)
+  const has = mine.some((l) => l.commentId === commentId)
+  if (!liked) {
+    if (has)
+      saveCommentLikes(likes.filter((l) => l.userId !== user.id || l.commentId !== commentId))
+    return
+  }
+  if (has) return
+  const comment = loadUserComments().find((c) => c.id === commentId) ?? findSeed(commentId)
+  if (!comment || !findStory(comment.storySlug)) throw commentGone()
+  if (comment.user.id === user.id) throw ownCommentLike()
+  if (
+    countSince(
+      mine.map((l) => l.createdAt),
+      HOUR,
+    ) >= LIKES_PER_HOUR
+  )
+    throw rateLimited()
+  saveCommentLikes([...likes, { commentId, userId: user.id, createdAt: new Date().toISOString() }])
+}
+
+/**
+ * Xóa bình luận của chính mình, hoặc bất kỳ bình luận nào trong truyện mình là chủ; trả lời của
+ * bình luận đó bị xóa theo. Không có quyền thì bỏ qua (như RLS)
+ */
 export async function deleteComment(id: string) {
   await delay(300)
   const user = await requireUser()
-  removeComments((c) => c.id === id && c.user.id === user.id)
+  removeComments(
+    (c) => c.id === id && (c.user.id === user.id || storyOwner(c.storySlug)?.id === user.id),
+  )
 }
 
 /**
@@ -182,7 +290,13 @@ export async function reportComment({ commentId, reason, note }: ReportCommentIn
   const existing = mine.find((r) => r.commentId === commentId && r.status === 'open')
   const now = new Date().toISOString()
   if (existing) {
-    const updated = { ...existing, reason, note: note.trim(), createdAt: now }
+    const updated = {
+      ...existing,
+      reason,
+      note: note.trim(),
+      createdAt: now,
+      contentSnapshot: comment.content,
+    }
     saveCommentReports(reports.map((r) => (r === existing ? updated : r)))
     return
   }
@@ -202,6 +316,7 @@ export async function reportComment({ commentId, reason, note }: ReportCommentIn
       note: note.trim(),
       status: 'open',
       createdAt: now,
+      contentSnapshot: comment.content,
     },
     ...reports,
   ])

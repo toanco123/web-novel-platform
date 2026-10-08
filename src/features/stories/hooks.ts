@@ -35,12 +35,13 @@ export const useNewReleases = () =>
  * hạng...), cùng kiểu `Story` với trang chi tiết (đều dựng từ story_cards): dùng làm placeholder để
  * hiện ngay phần đầu trang, phần còn lại tải sau
  */
-export function useStory(slug: string) {
+export function useStory(slug: string, { enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient()
   return useQuery({
     queryKey: storyKeys.detail(slug),
     queryFn: () => api.getStory(slug),
     placeholderData: () => storyFromLists(queryClient, slug),
+    enabled,
   })
 }
 

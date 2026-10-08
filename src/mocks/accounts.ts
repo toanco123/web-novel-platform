@@ -3,11 +3,13 @@
 import {
   loadAllBlocks,
   loadAllFollows,
+  loadCommentLikes,
   loadCommentReports,
   loadRatings,
   loadReports,
   loadViews,
   removeComments,
+  saveCommentLikes,
   saveCommentReports,
   saveBlocks,
   saveFollows,
@@ -29,6 +31,7 @@ export function purgeUser(userId: string) {
   removeComments((c) => c.user.id === userId || slugs.has(c.storySlug))
   saveReports(loadReports().filter((r) => r.reporter.id !== userId && !slugs.has(r.storySlug)))
   saveCommentReports(loadCommentReports().filter((r) => r.reporter.id !== userId))
+  saveCommentLikes(loadCommentLikes().filter((l) => l.userId !== userId))
 
   for (const [id, entries] of Object.entries(loadAllFollows())) {
     if (id === userId) saveFollows(id, [])

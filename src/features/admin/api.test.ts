@@ -572,3 +572,22 @@ test('gỡ truyện đang chờ duyệt thì rời hàng chờ; người thườ
     code: 'not_pending',
   })
 })
+
+test('bình luận đã sửa sau khi bị báo cáo: giữ nội dung lúc bị báo cáo', async () => {
+  const comments = await import('@/features/comments/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const bad = await comments.addComment(story.slug, 'Lời lẽ khó nghe')
+  await registerUser('Mai', 'mai@gmail.com')
+  await comments.reportComment({ commentId: bad.id, reason: 'offensive', note: '' })
+  signInAs(linh)
+  await comments.editComment(bad.id, 'Xin lỗi, mình đã sửa')
+
+  signInAs('demo')
+  const [item] = (await admin.getAdminComments({ view: 'reported', page: 1 })).items
+  expect(item.content).toBe('Xin lỗi, mình đã sửa')
+  expect(item.editedAt).not.toBeNull()
+  expect(item.reports).toEqual([
+    expect.objectContaining({ reporterName: 'Mai', contentSnapshot: 'Lời lẽ khó nghe' }),
+  ])
+})

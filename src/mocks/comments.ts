@@ -45,6 +45,12 @@ const chapterTexts = [
 
 const HOUR = 3600 * 1000
 
+/**
+ * Lượt thích gốc của một bình luận mẫu (0–40, đa số ít), api cộng thêm lượt thích thật. Dùng dãy
+ * ngẫu nhiên riêng để không làm đổi nội dung và thời gian của bình luận mẫu
+ */
+const seedLikes = (id: string) => Math.floor(seededRandom(`likes:${id}`)() ** 3 * 40)
+
 /** Bình luận mẫu cố định theo slug (3–18 bình luận mỗi truyện) */
 export function seedComments(story: Story): Comment[] {
   const rand = seededRandom(`comments:${story.slug}`)
@@ -62,6 +68,10 @@ export function seedComments(story: Story): Comment[] {
       createdAt: new Date(Date.now() - hoursAgo * HOUR).toISOString(),
       parentId: null,
       replyCount: 0,
+      likeCount: seedLikes(`seed-${story.slug}-${i}`),
+      likedByMe: false,
+      editedAt: null,
+      isAuthor: false,
     }
   })
 }
@@ -85,6 +95,10 @@ export function seedChapterComments(story: Story, number: number): Comment[] {
       createdAt: new Date(Date.now() - hoursAgo * HOUR).toISOString(),
       parentId: null,
       replyCount: 0,
+      likeCount: seedLikes(`seed-${story.slug}-c${number}-${i}`),
+      likedByMe: false,
+      editedAt: null,
+      isAuthor: false,
     }
   })
 }
