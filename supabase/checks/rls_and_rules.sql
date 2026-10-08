@@ -360,11 +360,17 @@ select pg_temp.expect(
   (select count(*) = 1 from public.search_stories('tac gia a') s where s.score = 1),
   'tìm theo tên tác giả');
 select pg_temp.expect(
-  (select count(*) = 1 from public.story_ranking('views', 'week')), 'xếp hạng lượt đọc tuần');
+  (select count(*) = 1 from public.story_ranking('views', 'week')
+    where story_id not in (select id from existing_stories)),
+  'xếp hạng lượt đọc tuần');
 select pg_temp.expect(
-  (select value = 3 from public.story_ranking('rating', 'all')), 'xếp hạng điểm trả điểm thật');
+  (select value = 3 from public.story_ranking('rating', 'all')
+    where story_id not in (select id from existing_stories)),
+  'xếp hạng điểm trả điểm thật');
 select pg_temp.expect(
-  (select count(*) = 1 from public.story_ranking('follows', 'all')), 'xếp hạng theo dõi');
+  (select count(*) = 1 from public.story_ranking('follows', 'all')
+    where story_id not in (select id from existing_stories)),
+  'xếp hạng theo dõi');
 select pg_temp.expect_error($$select * from public.story_ranking('abc', 'week')$$, 'invalid_ranking');
 select pg_temp.expect(
   (select story_id = pg_temp.story_id('hoa-no-nam-ay')
@@ -1634,6 +1640,209 @@ select pg_temp.expect(
   and not exists (select 1 from public.story_votes
     where user_id in ('00000000-0000-4000-8000-000000000052', '00000000-0000-4000-8000-000000000053')),
   'xóa truyện: dòng sổ còn (story_id null), lượt đề cử mất theo');
+
+-- ── Thích, sửa bình luận, chủ truyện xóa bình luận ──────────────────────
+-- 61: tác giả, 62: bạn đọc viết bình luận, 63: bạn đọc thích bình luận, 64: quản trị viên
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000061', 'tbl1@kiem-tra.local', '{"display_name": "Tác Giả Thích"}'),
+  ('00000000-0000-4000-8000-000000000062', 'tbl2@kiem-tra.local', '{"display_name": "Bạn Đọc Viết"}'),
+  ('00000000-0000-4000-8000-000000000063', 'tbl3@kiem-tra.local', '{"display_name": "Bạn Đọc Thích"}'),
+  ('00000000-0000-4000-8000-000000000064', 'tbl4@kiem-tra.local', '{"display_name": "Quản Trị Thích"}');
+
+create function pg_temp.like_comment(p_content text)
+returns uuid
+language sql
+as $$
+  select id from public.comments
+  where story_id in (pg_temp.story_id('truyen-thich-binh-luan'), pg_temp.story_id('truyen-se-an'))
+    and content = p_content
+$$;
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000061", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Truyện Thích Bình Luận', 'Truyện để kiểm tra thích và sửa bình luận.', 'ongoing',
+  array['bang-tin-mot'], null, '{"title": "Một", "content": "Nội dung chương một."}', true);
+select * from public.create_story(
+  'Truyện Sẽ Ẩn', 'Truyện công khai rồi bị ẩn.', 'ongoing', array['bang-tin-mot'], null,
+  '{"title": "Một", "content": "Nội dung chương một."}', true);
+reset role;
+select pg_temp.approve('truyen-thich-binh-luan');
+select pg_temp.approve('truyen-se-an');
+set local role authenticated;
+insert into public.comments (story_id, content) values
+  (pg_temp.story_id('truyen-thich-binh-luan'), 'Cảm ơn bạn đọc');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000062", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.comments (story_id, content) values
+  (pg_temp.story_id('truyen-thich-binh-luan'), 'Bình luận của B'),
+  (pg_temp.story_id('truyen-se-an'), 'Bình luận ở truyện sẽ ẩn');
+insert into public.comments (story_id, chapter_number, content) values
+  (pg_temp.story_id('truyen-thich-binh-luan'), 1, 'Bình luận chương của B');
+
+-- Không tự thích; thích bình luận của tác giả không làm đổi lúc sửa
+select pg_temp.expect_error(
+  $$insert into public.comment_likes (comment_id) values (pg_temp.like_comment('Bình luận của B'))$$,
+  'own_comment_like');
+insert into public.comment_likes (comment_id) values (pg_temp.like_comment('Cảm ơn bạn đọc'));
+select pg_temp.expect_error(
+  $$insert into public.comment_likes (comment_id) values (gen_random_uuid())$$, 'not_found');
+
+-- C thích bình luận của B; thích lại thì trùng khóa; không ghi thẳng like_count, không thích hộ
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000063", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.comment_likes (comment_id) values (pg_temp.like_comment('Bình luận của B'));
+select pg_temp.expect_error(
+  $$insert into public.comment_likes (comment_id) values (pg_temp.like_comment('Bình luận của B'))$$,
+  '23505');
+select pg_temp.expect_error($$update public.comments set like_count = 99$$, '42501');
+select pg_temp.expect_error(
+  $$insert into public.comment_likes (user_id, comment_id)
+    values ('00000000-0000-4000-8000-000000000062', pg_temp.like_comment('Cảm ơn bạn đọc'))$$,
+  '42501');
+select pg_temp.expect(
+  (select count(*) = 1 from public.comment_likes
+    where comment_id in (pg_temp.like_comment('Bình luận của B'), pg_temp.like_comment('Cảm ơn bạn đọc'))),
+  'comment_likes: chỉ thấy lượt thích của mình');
+select pg_temp.expect(
+  (select t.like_count = 1 and t.liked_by_me and not t.is_author and t.edited_at is null
+    from public.comment_threads(pg_temp.story_id('truyen-thich-binh-luan')) t
+    where t.content = 'Bình luận của B')
+  and (select t.like_count = 1 and not t.liked_by_me and t.is_author and t.edited_at is null
+    from public.comment_threads(pg_temp.story_id('truyen-thich-binh-luan')) t
+    where t.content = 'Cảm ơn bạn đọc'),
+  'comment_threads: like_count, liked_by_me, is_author; lượt thích không đặt edited_at');
+
+-- Bỏ thích
+select pg_temp.expect(
+  pg_temp.affected($$delete from public.comment_likes
+    where comment_id = pg_temp.like_comment('Bình luận của B')$$) = 1,
+  'bỏ thích được');
+select pg_temp.expect(
+  (select like_count = 0 from public.comments where id = pg_temp.like_comment('Bình luận của B')),
+  'bỏ thích: like_count giảm');
+insert into public.comment_likes (comment_id) values (pg_temp.like_comment('Bình luận của B'));
+
+-- Người không có bình luận nào không sửa, không xóa được bình luận của người khác
+select pg_temp.expect(
+  pg_temp.affected($$update public.comments set content = 'C sửa hộ'$$) = 0,
+  'người khác không sửa được bình luận');
+select pg_temp.expect(
+  pg_temp.affected($$delete from public.comments$$) = 0,
+  'người không phải chủ truyện không xóa được bình luận của người khác');
+
+-- Khách: liked_by_me luôn false
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect(
+  (select t.like_count = 1 and not t.liked_by_me
+    from public.comment_threads(pg_temp.story_id('truyen-thich-binh-luan')) t
+    where t.content = 'Bình luận của B'),
+  'comment_threads: khách thấy số lượt thích, liked_by_me = false');
+select pg_temp.expect_error(
+  $$insert into public.comment_likes (comment_id) values (pg_temp.like_comment('Bình luận của B'))$$,
+  '42501');
+
+-- C báo cáo bình luận của B; B sửa: edited_at được đặt, báo cáo giữ nội dung cũ
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000063", "role": "authenticated"}', true);
+set local role authenticated;
+select public.report_comment(pg_temp.like_comment('Bình luận của B'), 'offensive');
+
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000062", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected($$update public.comments set content = 'Bình luận của B (đã sửa)'
+    where id = pg_temp.like_comment('Bình luận của B')$$) = 1,
+  'người viết sửa được bình luận');
+select pg_temp.expect(
+  (select edited_at is not null and like_count = 1 from public.comments
+    where id = pg_temp.like_comment('Bình luận của B (đã sửa)')),
+  'sửa nội dung: đặt edited_at, giữ like_count');
+select pg_temp.expect_error($$update public.comments set edited_at = null$$, '42501');
+select pg_temp.expect_error(
+  $$update public.comments set content = ''
+    where id = pg_temp.like_comment('Bình luận của B (đã sửa)')$$, '23514');
+
+-- Quản trị viên thấy nội dung lúc bị báo cáo và lúc sửa
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000064", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select a.edited_at is not null
+      and a.reports -> 0 ->> 'contentSnapshot' = 'Bình luận của B'
+    from public.admin_comments('Bình luận của B (đã sửa)', true) a),
+  'admin_comments: edited_at và contentSnapshot lúc bị báo cáo');
+
+-- Truyện bị ẩn: không sửa, không thích được bình luận của truyện đó
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000061", "role": "authenticated"}', true);
+set local role authenticated;
+update public.stories set visibility = 'draft' where slug = 'truyen-se-an';
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000062", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected($$update public.comments set content = 'Sửa khi truyện đã ẩn'
+    where story_id = pg_temp.story_id('truyen-se-an')$$) = 0,
+  'truyện đã ẩn: không sửa được bình luận');
+-- Lấy id bằng quyền chủ phiên (người đọc không còn thấy bình luận này)
+reset role;
+select set_config('kiem_tra.binh_luan_an', pg_temp.like_comment('Bình luận ở truyện sẽ ẩn')::text, true);
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000063", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$insert into public.comment_likes (comment_id)
+    values (current_setting('kiem_tra.binh_luan_an')::uuid)$$, '42501');
+reset role;
+
+-- Chủ truyện xóa bình luận của người khác (lượt thích mất theo)
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000061", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected($$delete from public.comments
+    where id = pg_temp.like_comment('Bình luận của B (đã sửa)')$$) = 1,
+  'chủ truyện xóa được bình luận của người khác');
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from public.comment_likes
+    where user_id = '00000000-0000-4000-8000-000000000063'),
+  'xóa bình luận: lượt thích mất theo');
+
+-- Tối đa 300 lượt thích mới / giờ: C có 300 lượt thích trong giờ qua
+insert into public.comments (story_id, user_id, content, created_at)
+select pg_temp.story_id('truyen-thich-binh-luan'), '00000000-0000-4000-8000-000000000062',
+  'Bình luận số ' || g, now() - interval '2 hours'
+from generate_series(1, 300) g;
+insert into public.comment_likes (user_id, comment_id, created_at)
+select '00000000-0000-4000-8000-000000000063', c.id, now() - interval '30 minutes'
+from public.comments c
+where c.story_id = pg_temp.story_id('truyen-thich-binh-luan') and c.content like 'Bình luận số %';
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000063", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$insert into public.comment_likes (comment_id) values (pg_temp.like_comment('Cảm ơn bạn đọc'))$$,
+  'rate_limited');
+reset role;
 
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 

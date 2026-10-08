@@ -1,7 +1,7 @@
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { publishStory, registerUser, signInAs, signOut } from '@/test/helpers'
 import { renderApp } from '@/test/renderApp'
-import { addComment, COMMENTS_PER_PAGE, getComments } from './api'
+import { addComment, COMMENTS_PER_PAGE, getComments, setCommentLike } from './api'
 
 const slow = { timeout: 3000 }
 // Truyện mẫu có hơn một trang bình luận
@@ -116,4 +116,116 @@ test('báo cáo bình luận: chọn lý do, lý do khác phải có ghi chú', 
       reports: [expect.objectContaining({ reason: 'spam', reporterName: 'Mai' })],
     }),
   ])
+})
+
+// ── Thích, sắp xếp, sửa, chủ truyện xóa ─────────────────────────────────
+
+test('bấm tim thì số lượt thích tăng ngay, bấm lại thì bỏ thích', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  await addComment(story.slug, 'Truyện hay quá')
+  signInAs('demo')
+  const { user } = renderApp(`/story/${story.slug}`)
+
+  const list = await screen.findByRole('list', { name: 'Danh sách bình luận' }, slow)
+  const like = within(list).getByRole('button', { name: 'Thích bình luận của Linh' })
+  expect(like).toHaveAttribute('aria-pressed', 'false')
+  await user.click(like)
+  const liked = await within(list).findByRole(
+    'button',
+    { name: 'Bỏ thích bình luận của Linh' },
+    slow,
+  )
+  expect(liked).toHaveAttribute('aria-pressed', 'true')
+  expect(liked).toHaveTextContent('1')
+  await expect.poll(async () => (await getComments(story.slug)).items[0].likeCount, slow).toBe(1)
+
+  await user.click(liked)
+  await expect.poll(async () => (await getComments(story.slug)).items[0].likeCount, slow).toBe(0)
+  expect(
+    within(list).getByRole('button', { name: 'Thích bình luận của Linh' }),
+  ).not.toHaveTextContent('1')
+})
+
+test('không có nút thích ở bình luận của mình; khách bấm tim thì sang trang đăng nhập', async () => {
+  signInAs('demo')
+  await addComment(SLUG, 'Bình luận của demo')
+  renderApp(`/story/${SLUG}`)
+  const list = await screen.findByRole('list', { name: 'Danh sách bình luận' }, slow)
+  const mine = within(list).getAllByRole('listitem')[0]
+  expect(within(mine).getByText('Bình luận của demo')).toBeInTheDocument()
+  expect(within(mine).queryByRole('button', { name: /thích/i })).not.toBeInTheDocument()
+
+  cleanup()
+  signOut()
+  const guest = renderApp(`/story/${SLUG}`)
+  const guestList = await screen.findByRole('list', { name: 'Danh sách bình luận' }, slow)
+  await guest.user.click(within(guestList).getAllByRole('button', { name: /^Thích bình luận/ })[0])
+  await expect.poll(() => guest.router.state.location.pathname, slow).toBe('/login')
+})
+
+test('sửa bình luận tại chỗ: Esc hủy, lưu xong hiện "đã sửa"', async () => {
+  signInAs('demo')
+  await addComment(SLUG, 'Bản đầu tiên')
+  const { user } = renderApp(`/story/${SLUG}`)
+  const list = await screen.findByRole('list', { name: 'Danh sách bình luận' }, slow)
+  const mine = within(list).getAllByRole('listitem')[0]
+
+  await user.click(within(mine).getByRole('button', { name: 'Sửa' }))
+  const box = within(mine).getByLabelText('Sửa bình luận')
+  expect(box).toHaveValue('Bản đầu tiên')
+  // Chưa đổi gì thì không lưu được
+  expect(within(mine).getByRole('button', { name: 'Lưu' })).toBeDisabled()
+  await user.keyboard('{Escape}')
+  expect(within(mine).queryByLabelText('Sửa bình luận')).not.toBeInTheDocument()
+
+  await user.click(within(mine).getByRole('button', { name: 'Sửa' }))
+  await user.clear(within(mine).getByLabelText('Sửa bình luận'))
+  await user.type(within(mine).getByLabelText('Sửa bình luận'), 'Bản đã sửa')
+  await user.click(within(mine).getByRole('button', { name: 'Lưu' }))
+
+  expect(await within(mine).findByText('Bản đã sửa', {}, slow)).toBeInTheDocument()
+  expect(within(mine).getByText('· đã sửa')).toBeInTheDocument()
+  expect(within(mine).queryByLabelText('Sửa bình luận')).not.toBeInTheDocument()
+})
+
+test('chủ truyện thấy nút Xóa dưới bình luận của người khác và có nhãn Tác giả', async () => {
+  const owner = await registerUser('Tác Giả', 'tacgia@gmail.com')
+  const story = await publishStory('Truyện Của Tôi', 1)
+  await addComment(story.slug, 'Cảm ơn mọi người')
+  await registerUser('Linh', 'linh@gmail.com')
+  await addComment(story.slug, 'Bình luận spam của Linh')
+  signInAs(owner)
+  const { user } = renderApp(`/story/${story.slug}`)
+
+  const list = await screen.findByRole('list', { name: 'Danh sách bình luận' }, slow)
+  const spam = (await within(list).findByText('Bình luận spam của Linh', {}, slow)).closest('li')!
+  const own = within(list).getByText('Cảm ơn mọi người').closest('li')!
+  expect(within(own).getByText('Tác giả')).toBeInTheDocument()
+  expect(within(spam).queryByText('Tác giả')).not.toBeInTheDocument()
+
+  await user.click(await within(spam).findByRole('button', { name: 'Xóa' }, slow))
+  const dialog = await screen.findByRole('dialog', { name: 'Xóa bình luận của Linh?' }, slow)
+  await user.click(within(dialog).getByRole('button', { name: 'Xóa bình luận' }))
+  await expect.poll(() => screen.queryByText('Bình luận spam của Linh'), slow).toBeNull()
+})
+
+test('đổi sang Nổi bật thì bình luận nhiều lượt thích lên đầu', async () => {
+  await registerUser('Tác Giả', 'tacgia@gmail.com')
+  const story = await publishStory('Truyện Của Tôi', 1)
+  const popular = await addComment(story.slug, 'Bình luận được thích')
+  await addComment(story.slug, 'Bình luận mới hơn')
+  await registerUser('Linh', 'linh@gmail.com')
+  await setCommentLike(popular.id, true)
+  const { user } = renderApp(`/story/${story.slug}`)
+
+  const list = await screen.findByRole('list', { name: 'Danh sách bình luận' }, slow)
+  const first = () => within(list).getAllByRole('listitem')[0]
+  expect(within(first()).getByText('Bình luận mới hơn')).toBeInTheDocument()
+  expect(screen.getByRole('radio', { name: 'Mới nhất' })).toHaveAttribute('aria-checked', 'true')
+
+  await user.click(screen.getByRole('radio', { name: 'Nổi bật' }))
+  await expect
+    .poll(() => within(list).getAllByRole('listitem')[0].textContent, slow)
+    .toContain('Bình luận được thích')
 })

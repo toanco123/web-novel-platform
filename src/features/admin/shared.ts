@@ -315,6 +315,8 @@ export type AdminComment = {
   id: string
   content: string
   createdAt: string
+  /** Lần sửa nội dung gần nhất; null: chưa sửa */
+  editedAt: string | null
   /** Là trả lời của một bình luận khác */
   isReply: boolean
   /** Số trả lời sẽ bị xóa theo nếu xóa bình luận này */
@@ -327,7 +329,14 @@ export type AdminComment = {
   /** null: bình luận của cả truyện */
   chapterNumber: number | null
   /** Các báo cáo chưa xử lý, mới nhất trước */
-  reports: { reason: CommentReportReason; note: string; reporterName: string; createdAt: string }[]
+  reports: {
+    reason: CommentReportReason
+    note: string
+    reporterName: string
+    createdAt: string
+    /** Nội dung bình luận lúc bị báo cáo; null: báo cáo cũ, chưa lưu */
+    contentSnapshot: string | null
+  }[]
 }
 
 export const ADMIN_COMMENT_SORTS = ['created', 'reported'] as const

@@ -10,6 +10,9 @@ export type CommentPage = { items: Comment[]; total: number; nextCursor: number 
 /** Số trả lời tối đa tải về cho một bình luận */
 export const REPLIES_LIMIT = 200
 
+/** Số lượt thích mới tối đa mỗi giờ của một người (như trigger comment_likes_guard) */
+export const LIKES_PER_HOUR = 300
+
 // Dùng AuthError để form hiện được lời báo (authErrorMessage chỉ hiện lời của AuthError)
 /** Bình luận gốc đã bị xóa trong lúc người dùng đang viết trả lời */
 export const parentDeleted = () =>
@@ -24,3 +27,6 @@ export const ownCommentReport = () =>
   new AuthError('unknown', 'Bạn không thể báo cáo bình luận của chính mình.')
 /** Bình luận đã bị xóa, hoặc truyện không còn công khai */
 export const commentGone = () => new AuthError('unknown', 'Bình luận này không còn nữa.')
+
+export const ownCommentLike = () =>
+  new AuthError('unknown', 'Bạn không thể tự thích bình luận của mình.')

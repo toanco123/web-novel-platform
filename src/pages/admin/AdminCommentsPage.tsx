@@ -143,6 +143,14 @@ export default function AdminCommentsPage() {
                 render: (_, c) => (
                   <div className="min-w-0">
                     <p className="break-words whitespace-pre-line">{c.content}</p>
+                    {c.editedAt && (
+                      <p
+                        className="mt-1 text-xs text-muted-foreground"
+                        title={`Sửa lúc ${formatDate(c.editedAt)}`}
+                      >
+                        (đã sửa)
+                      </p>
+                    )}
                     {(c.isReply || c.replyCount > 0) && (
                       <p className="mt-1 text-xs text-muted-foreground">
                         {c.isReply ? 'Là một trả lời' : `${number.format(c.replyCount)} trả lời`}
@@ -217,6 +225,13 @@ export default function AdminCommentsPage() {
                           <p className="text-xs text-muted-foreground">
                             {r.reporterName} · {formatRelativeTime(r.createdAt)}
                           </p>
+                          {/* Bình luận đã sửa sau khi bị báo cáo: cho xem bản bị báo cáo */}
+                          {r.contentSnapshot !== null && r.contentSnapshot !== c.content && (
+                            <div className="mt-1.5 border-l-2 pl-2 text-xs text-muted-foreground">
+                              <p className="font-medium">Nội dung lúc bị báo cáo</p>
+                              <p className="break-words whitespace-pre-line">{r.contentSnapshot}</p>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>

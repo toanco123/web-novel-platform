@@ -8,8 +8,9 @@ import { FormAlert } from '@/features/auth/components/FormAlert'
 import { UserAvatar } from '@/features/auth/components/UserAvatar'
 import { authErrorMessage } from '@/features/auth/hooks'
 import { cn } from '@/lib/utils'
+import type { Comment } from '@/types/comment'
 import type { User } from '@/types/user'
-import { useAddComment } from '../hooks'
+import { useAddComment, useEditComment } from '../hooks'
 import { COMMENT_MAX, commentSchema, type CommentValues } from '../schemas'
 
 type Props = {
@@ -21,6 +22,8 @@ type Props = {
   parentId?: string | null
   /** Nội dung điền sẵn (trả lời một câu trả lời: "@Tên ") */
   initialContent?: string
+  /** Có giá trị: sửa bình luận này tại chỗ (không có ảnh đại diện, nút "Lưu") */
+  editing?: Comment
   /** Gửi xong */
   onDone?: () => void
   /** Có thì hiện nút "Hủy" */
@@ -33,16 +36,21 @@ export function CommentForm({
   chapter = null,
   parentId = null,
   initialContent = '',
+  editing,
   onDone,
   onCancel,
 }: Props) {
   const add = useAddComment(slug, chapter, parentId)
+  const edit = useEditComment(slug)
+  const mutation = editing ? edit : add
   const isReply = parentId !== null
-  const id = isReply
-    ? `reply-content-${parentId}`
-    : chapter === null
-      ? 'comment-content'
-      : `comment-content-${chapter}`
+  const id = editing
+    ? `edit-content-${editing.id}`
+    : isReply
+      ? `reply-content-${parentId}`
+      : chapter === null
+        ? 'comment-content'
+        : `comment-content-${chapter}`
   const {
     register,
     control,
@@ -51,36 +59,46 @@ export function CommentForm({
     formState: { errors },
   } = useForm<CommentValues>({
     resolver: zodResolver(commentSchema),
-    defaultValues: { content: initialContent },
+    defaultValues: { content: editing?.content ?? initialContent },
   })
-  const length = useWatch({ control, name: 'content' }).length
+  const content = useWatch({ control, name: 'content' })
+  const length = content.length
+  // Sửa mà nội dung chưa đổi thì không có gì để lưu
+  const unchanged = !!editing && content.trim() === editing.content
   const field = register('content')
   const textarea = useRef<HTMLTextAreaElement | null>(null)
 
-  // Ô trả lời vừa mở: đưa con trỏ vào cuối phần điền sẵn để viết tiếp ngay
+  // Ô trả lời / ô sửa vừa mở: đưa con trỏ vào cuối nội dung điền sẵn để viết tiếp ngay
+  const focusOnOpen = isReply || !!editing
   useEffect(() => {
     const el = textarea.current
-    if (!isReply || !el) return
+    if (!focusOnOpen || !el) return
     el.focus()
     el.setSelectionRange(el.value.length, el.value.length)
-  }, [isReply])
+  }, [focusOnOpen])
 
-  const onSubmit = handleSubmit(({ content }) =>
+  const onSubmit = handleSubmit(({ content }) => {
+    if (editing) {
+      edit.mutate({ id: editing.id, content }, { onSuccess: () => onDone?.() })
+      return
+    }
     add.mutate(content, {
       onSuccess: () => {
         reset({ content: '' })
         onDone?.()
       },
-    }),
-  )
+    })
+  })
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex gap-3">
-      <UserAvatar user={user} className={cn('shrink-0', isReply ? 'size-7' : 'size-9')} />
+      {!editing && (
+        <UserAvatar user={user} className={cn('shrink-0', isReply ? 'size-7' : 'size-9')} />
+      )}
       <div className="min-w-0 flex-1 space-y-2">
-        {add.isError && <FormAlert>{authErrorMessage(add.error)}</FormAlert>}
+        {mutation.isError && <FormAlert>{authErrorMessage(mutation.error)}</FormAlert>}
         <label htmlFor={id} className="sr-only">
-          {isReply ? 'Viết trả lời' : 'Viết bình luận'}
+          {editing ? 'Sửa bình luận' : isReply ? 'Viết trả lời' : 'Viết bình luận'}
         </label>
         <Textarea
           id={id}
@@ -89,7 +107,10 @@ export function CommentForm({
             field.ref(el)
             textarea.current = el
           }}
-          rows={isReply ? 2 : 3}
+          rows={isReply || editing ? 2 : 3}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && onCancel && !mutation.isPending) onCancel()
+          }}
           placeholder={
             isReply
               ? 'Viết trả lời…'
@@ -99,7 +120,10 @@ export function CommentForm({
           }
           aria-invalid={!!errors.content}
           aria-describedby={`${id}-hint`}
-          className={cn('resize-y rounded-lg px-3.5 py-3', isReply ? 'min-h-16' : 'min-h-24')}
+          className={cn(
+            'resize-y rounded-lg px-3.5 py-3',
+            isReply || editing ? 'min-h-16' : 'min-h-24',
+          )}
         />
         <div className="flex items-center justify-between gap-3">
           <p
@@ -117,15 +141,27 @@ export function CommentForm({
                 type="button"
                 variant="ghost"
                 onClick={onCancel}
-                disabled={add.isPending}
+                disabled={mutation.isPending}
                 className="h-9 rounded-full px-4"
               >
                 Hủy
               </Button>
             )}
-            <Button type="submit" disabled={add.isPending} className="h-9 rounded-full px-5">
-              {add.isPending && <LoaderCircle className="animate-spin" aria-hidden />}
-              {add.isPending ? 'Đang gửi…' : isReply ? 'Gửi trả lời' : 'Gửi bình luận'}
+            <Button
+              type="submit"
+              disabled={mutation.isPending || unchanged}
+              className="h-9 rounded-full px-5"
+            >
+              {mutation.isPending && <LoaderCircle className="animate-spin" aria-hidden />}
+              {editing
+                ? mutation.isPending
+                  ? 'Đang lưu…'
+                  : 'Lưu'
+                : mutation.isPending
+                  ? 'Đang gửi…'
+                  : isReply
+                    ? 'Gửi trả lời'
+                    : 'Gửi bình luận'}
             </Button>
           </div>
         </div>

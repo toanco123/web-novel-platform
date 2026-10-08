@@ -2,27 +2,31 @@
 // sơ hiện tại (profiles). Điểm của truyện đọc từ story_cards: trigger của ratings cập nhật
 // story_stats ngay khi chấm. RLS chỉ cho viết vào truyện công khai và chương đã xuất bản.
 // Bình luận gốc đọc qua RPC comment_threads (kèm số trả lời); trả lời đọc thẳng bảng comments.
+// Lượt thích: bảng comment_likes (RLS chỉ trả lượt thích của mình), số đếm comments.like_count do
+// trigger ghi. Chủ truyện xóa được mọi bình luận trong truyện của mình (policy xóa).
 import type { PostgrestError } from '@supabase/supabase-js'
 import { AuthError, limitError, requireUser, unauthenticated } from '@/features/auth/api'
 import { storyIdBySlug } from '@/features/stories/cards.remote'
-import { businessCode, unwrap } from '@/lib/dbError'
+import { businessCode, isUniqueViolation, unwrap } from '@/lib/dbError'
 import { db } from '@/lib/supabase'
 import { isUuid } from '@/lib/uuid'
-import type { Comment, RatingSummary, Score } from '@/types/comment'
+import type { Comment, CommentSort, RatingSummary, Score } from '@/types/comment'
 import type { Database } from '@/types/database'
 import {
   commentGone,
   COMMENTS_PER_PAGE,
   type CommentPage,
   invalidParent,
+  ownCommentLike,
   ownCommentReport,
   parentDeleted,
   REPLIES_LIMIT,
   type ReportCommentInput,
 } from './shared'
 
+// my_like: lượt thích của chính người xem (RLS của comment_likes), khách: mảng rỗng
 const COMMENT_COLUMNS =
-  'id, chapter_number, content, created_at, parent_id, story:stories!inner(slug), user:profiles!comments_user_id_fkey(id, display_name, avatar_url)'
+  'id, chapter_number, content, created_at, parent_id, like_count, edited_at, story:stories!inner(slug, owner_id, author_name), user:profiles!comments_user_id_fkey(id, display_name, avatar_url), my_like:comment_likes(user_id)'
 
 type CommentRow = {
   id: string
@@ -30,15 +34,18 @@ type CommentRow = {
   content: string
   created_at: string
   parent_id: string | null
-  story: { slug: string }
+  like_count: number
+  edited_at: string | null
+  story: { slug: string; owner_id: string; author_name: string | null }
   user: { id: string; display_name: string; avatar_url: string | null }
+  my_like: { user_id: string }[]
 }
 
 type ThreadRow = Database['public']['Functions']['comment_threads']['Returns'][number]
 
 /** PostgREST báo .range() bắt đầu quá cuối danh sách (HTTP 416) */
 const RANGE_NOT_SATISFIABLE = 'PGRST103'
-/** Vi phạm khóa ngoại: bình luận gốc bị xóa đúng lúc đang gửi trả lời */
+/** Vi phạm khóa ngoại: bình luận gốc bị xóa đúng lúc đang gửi trả lời (hoặc lúc đang thích) */
 const FOREIGN_KEY_VIOLATION = '23503'
 
 // Truyện không còn thấy được, hoặc RLS chặn ghi vì truyện/chương chưa công khai. Dùng AuthError để
@@ -55,7 +62,7 @@ const ratingClosed = () =>
 const whenBlocked = (closed: () => Error) => (error: PostgrestError) =>
   error.code === '42501' ? closed() : null
 
-/** Một trả lời, hoặc bình luận vừa gửi (chưa có trả lời nào) */
+/** Một trả lời, hoặc bình luận vừa gửi / vừa sửa (replyCount luôn 0: không dùng ở hai chỗ đó) */
 function toComment(row: CommentRow): Comment {
   return {
     id: row.id,
@@ -66,6 +73,11 @@ function toComment(row: CommentRow): Comment {
     createdAt: row.created_at,
     parentId: row.parent_id,
     replyCount: 0,
+    likeCount: row.like_count,
+    likedByMe: row.my_like.length > 0,
+    editedAt: row.edited_at,
+    // Như is_author của comment_threads: truyện có bút danh thì không gắn nhãn
+    isAuthor: row.user.id === row.story.owner_id && !row.story.author_name,
   }
 }
 
@@ -80,6 +92,10 @@ function threadToComment(row: ThreadRow, slug: string): Comment {
     createdAt: row.created_at,
     parentId: null,
     replyCount: row.reply_count,
+    likeCount: row.like_count,
+    likedByMe: row.liked_by_me,
+    editedAt: row.edited_at ?? null,
+    isAuthor: row.is_author,
   }
 }
 
@@ -92,16 +108,22 @@ const threadsOf = (storyId: string, chapter: number | null, head = false) =>
   )
 
 /**
- * Bình luận gốc của truyện (chapter = null, mặc định) hoặc của một chương, mới nhất trước; mỗi bình
- * luận kèm số trả lời
+ * Bình luận gốc của truyện (chapter = null, mặc định) hoặc của một chương; mỗi bình luận kèm số
+ * trả lời. sort: mới nhất trước (mặc định) | nhiều lượt thích trước
  */
 export async function getComments(
   slug: string,
-  { chapter = null, cursor = 0 }: { chapter?: number | null; cursor?: number } = {},
+  {
+    chapter = null,
+    cursor = 0,
+    sort = 'newest',
+  }: { chapter?: number | null; cursor?: number; sort?: CommentSort } = {},
 ): Promise<CommentPage> {
   const storyId = await storyIdBySlug(slug)
   if (!storyId) return { items: [], total: 0, nextCursor: null }
-  const result = await threadsOf(storyId, chapter)
+  let query = threadsOf(storyId, chapter)
+  if (sort === 'top') query = query.order('like_count', { ascending: false })
+  const result = await query
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .range(cursor, cursor + COMMENTS_PER_PAGE - 1)
@@ -169,12 +191,60 @@ export async function addComment(
 }
 
 /**
- * Chỉ xóa được bình luận của chính mình; không có bình luận đó thì bỏ qua. Trả lời của bình luận
- * đó mất theo (khóa ngoại cascade).
+ * Sửa bình luận của chính mình khi truyện còn công khai; DB đặt edited_at khi nội dung đổi. Không
+ * có bình luận đó, của người khác, hay truyện đã ẩn thì báo bình luận không còn
+ */
+export async function editComment(commentId: string, content: string): Promise<Comment> {
+  await requireUser()
+  if (!isUuid(commentId)) throw commentGone()
+  const row = unwrap(
+    await db()
+      .from('comments')
+      .update({ content: content.trim() })
+      .eq('id', commentId)
+      .select(COMMENT_COLUMNS)
+      .maybeSingle(),
+    whenBlocked(commentGone),
+  )
+  if (!row) throw commentGone()
+  return toComment(row)
+}
+
+/** Mã lỗi khi thích (trigger comment_likes_guard); 42501: truyện không còn công khai */
+function likeError(error: PostgrestError) {
+  const code = businessCode(error)
+  if (code === 'own_comment_like') return ownCommentLike()
+  if (code === 'not_found' || error.code === FOREIGN_KEY_VIOLATION) return commentGone()
+  return limitError(code) ?? whenBlocked(commentGone)(error)
+}
+
+/**
+ * Thích (liked = true) hoặc bỏ thích bình luận của người khác trong truyện đang công khai. Thích
+ * lại khi đã thích, hay bỏ thích khi chưa thích, không làm gì. Tối đa 300 lượt thích mới / giờ.
+ */
+export async function setCommentLike(commentId: string, liked: boolean) {
+  const user = await requireUser()
+  if (!isUuid(commentId)) throw commentGone()
+  if (!liked) {
+    unwrap(
+      await db().from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', user.id),
+    )
+    return
+  }
+  // user_id do DB đặt (auth.uid()); chỉ gửi cột được cấp quyền ghi
+  const { error } = await db().from('comment_likes').insert({ comment_id: commentId })
+  // Trùng khóa: đã thích rồi (bấm hai lần liên tiếp)
+  if (error && !isUniqueViolation(error)) throw likeError(error) ?? error
+}
+
+/**
+ * Xóa bình luận của chính mình, hoặc bất kỳ bình luận nào trong truyện mình là chủ (RLS quyết
+ * định); không có quyền hay không có bình luận đó thì bỏ qua. Trả lời mất theo (khóa ngoại cascade).
  */
 export async function deleteComment(id: string) {
-  const user = await requireUser()
-  unwrap(await db().from('comments').delete().eq('id', id).eq('user_id', user.id))
+  await requireUser()
+  if (!isUuid(id)) return
+  unwrap(await db().from('comments').delete().eq('id', id))
 }
 
 /** Mã lỗi của report_comment (mục 4 documents/thiet-ke-database.md); lỗi khác giữ nguyên */

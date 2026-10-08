@@ -1,12 +1,14 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router'
 import { SectionError } from '@/components/common/SectionHeading'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSession } from '@/features/auth/hooks'
+import { useStory } from '@/features/stories/hooks'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
-import type { Comment } from '@/types/comment'
+import { cn } from '@/lib/utils'
+import type { Comment, CommentSort } from '@/types/comment'
 import { useComments, useMyRating, useRateStory, useRatingSummary } from '../hooks'
 import { CommentForm } from './CommentForm'
 import { CommentItem, CommentSkeleton } from './CommentItem'
@@ -23,8 +25,14 @@ export function CommentsSection({ slug, chapter = null }: Props) {
   // Phiên chưa rõ thì giữ chỗ, không hiện lời mời đăng nhập rồi mới đổi sang ô viết bình luận
   const { data: user, isPending: sessionPending } = useSession()
   const current = useCurrentPath()
-  const comments = useComments(slug, chapter)
+  const [sort, setSort] = useState<CommentSort>('newest')
+  const comments = useComments(slug, chapter, sort)
   const items = uniqueById(comments.data?.pages.flatMap((p) => p.items) ?? [])
+  const total = comments.data?.pages[0]?.total ?? 0
+  // Chủ truyện xóa được bình luận của người khác. Chỉ tải truyện khi đã đăng nhập (trang chi tiết
+  // truyện đã có sẵn trong cache)
+  const story = useStory(slug, { enabled: !!user })
+  const canModerate = !!user && story.data?.ownerId === user.id
 
   const loginLink = (text: string) => (
     <Link
@@ -69,13 +77,14 @@ export function CommentsSection({ slug, chapter = null }: Props) {
         </p>
       ) : (
         <div>
+          {total >= 2 && <SortToggle value={sort} onChange={setSort} />}
           <ul
             className="divide-y"
             aria-label={chapter === null ? 'Danh sách bình luận' : `Bình luận chương ${chapter}`}
           >
             {items.map((c) => (
               <li key={c.id}>
-                <CommentItem comment={c} viewer={user ?? null} />
+                <CommentItem comment={c} viewer={user ?? null} canModerate={canModerate} />
               </li>
             ))}
           </ul>
@@ -91,6 +100,48 @@ export function CommentsSection({ slug, chapter = null }: Props) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+const SORTS: { value: CommentSort; label: string }[] = [
+  { value: 'newest', label: 'Mới nhất' },
+  { value: 'top', label: 'Nổi bật' },
+]
+
+/** Hai nút chọn thứ tự bình luận gốc (trả lời luôn cũ nhất trước) */
+function SortToggle({
+  value,
+  onChange,
+}: {
+  value: CommentSort
+  onChange: (sort: CommentSort) => void
+}) {
+  return (
+    <div className="flex justify-end">
+      <div
+        role="radiogroup"
+        aria-label="Sắp xếp bình luận"
+        className="inline-flex rounded-full border p-0.5 text-xs"
+      >
+        {SORTS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={value === option.value}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              'rounded-full px-3 py-1 font-medium transition-colors',
+              value === option.value
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

@@ -14,6 +14,7 @@ const VIEWS_KEY = 'mock-views'
 const RATINGS_KEY = 'mock-ratings'
 const COMMENTS_KEY = 'mock-comments'
 const COMMENT_REPORTS_KEY = 'mock-comment-reports'
+const COMMENT_LIKES_KEY = 'mock-comment-likes'
 const REPORTS_KEY = 'mock-reports'
 const CONTACT_KEY = 'mock-contact-messages'
 const BLOCKS_KEY = 'mock-user-blocks'
@@ -114,13 +115,18 @@ export const ratingsOf = (slug: string) =>
 // ── Bình luận ───────────────────────────────────────────────────────────
 
 // Bình luận lưu trước khi có bình luận theo chương không có chapterNumber, trước khi có trả lời
-// không có parentId. replyCount không lưu: api đếm lại khi đọc
-export const loadUserComments = () =>
+// không có parentId, trước khi sửa được không có editedAt. replyCount, likeCount, likedByMe,
+// isAuthor không lưu: api tính lại khi đọc
+export const loadUserComments = (): Comment[] =>
   readMock<Comment[]>(COMMENTS_KEY, []).map((c) => ({
     ...c,
     chapterNumber: c.chapterNumber ?? null,
     parentId: c.parentId ?? null,
+    editedAt: c.editedAt ?? null,
     replyCount: 0,
+    likeCount: 0,
+    likedByMe: false,
+    isAuthor: false,
   }))
 export const saveUserComments = (comments: Comment[]) => writeMock(COMMENTS_KEY, comments)
 
@@ -133,6 +139,8 @@ export type StoredCommentReport = {
   note: string
   status: ReportStatus
   createdAt: string
+  /** Nội dung bình luận lúc báo cáo (báo cáo lưu trước khi có cột này: không có) */
+  contentSnapshot?: string | null
 }
 
 export const loadCommentReports = () => readMock<StoredCommentReport[]>(COMMENT_REPORTS_KEY, [])
@@ -150,8 +158,15 @@ export function removeComments(match: (comment: Comment) => boolean) {
   for (const c of all) if (c.parentId && removed.has(c.parentId)) removed.add(c.id)
   saveUserComments(all.filter((c) => !removed.has(c.id)))
   saveCommentReports(loadCommentReports().filter((r) => !removed.has(r.commentId)))
+  saveCommentLikes(loadCommentLikes().filter((l) => !removed.has(l.commentId)))
   return matched.length
 }
+
+/** Một lượt thích bình luận (như một dòng comment_likes) */
+export type CommentLike = { commentId: string; userId: string; createdAt: string }
+
+export const loadCommentLikes = () => readMock<CommentLike[]>(COMMENT_LIKES_KEY, [])
+export const saveCommentLikes = (likes: CommentLike[]) => writeMock(COMMENT_LIKES_KEY, likes)
 
 // ── Chặn người dùng ─────────────────────────────────────────────────────
 

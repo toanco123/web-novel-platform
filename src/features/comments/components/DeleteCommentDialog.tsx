@@ -15,9 +15,11 @@ type Props = {
   onConfirm: () => void
   /** Số trả lời sẽ bị xóa theo bình luận này */
   replyCount?: number
+  /** Có giá trị: chủ truyện xóa bình luận của người này */
+  authorName?: string
 }
 
-export function DeleteCommentDialog({ pending, onConfirm, replyCount = 0 }: Props) {
+export function DeleteCommentDialog({ pending, onConfirm, replyCount = 0, authorName }: Props) {
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -30,7 +32,9 @@ export function DeleteCommentDialog({ pending, onConfirm, replyCount = 0 }: Prop
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Xóa bình luận này?</DialogTitle>
+          <DialogTitle>
+            {authorName ? `Xóa bình luận của ${authorName}?` : 'Xóa bình luận này?'}
+          </DialogTitle>
           <DialogDescription>
             Bình luận sẽ bị xóa vĩnh viễn và không khôi phục được.
             {replyCount > 0 && ` ${replyCount} trả lời bên dưới cũng sẽ bị xóa.`}
