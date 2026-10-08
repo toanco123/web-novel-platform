@@ -51,6 +51,14 @@ function htmlHints(supabaseUrl: string | undefined): Plugin {
 }
 
 // https://vite.dev/config/
+/** [tên chunk, module] của các vendor chunk (plan-toi-uu-tai-trang-dot-3.md mục 3) */
+const vendorGroups: [string, RegExp][] = [
+  ['vendor-react', /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/],
+  ['vendor-router', /[\\/]node_modules[\\/]react-router[\\/]/],
+  ['vendor-query', /[\\/]node_modules[\\/]@tanstack[\\/]/],
+  ['vendor-supabase', /[\\/]node_modules[\\/]@supabase[\\/]/],
+]
+
 export default defineConfig(({ mode }) => {
   // Prefix '' để đọc cả biến không có VITE_ (PORT, HOST chỉ dùng cho dev server, không lộ ra client)
   const env = loadEnv(mode, process.cwd(), '')
@@ -110,6 +118,14 @@ export default defineConfig(({ mode }) => {
           // Dữ liệu giả (src/mocks, api.mock.ts) chỉ khai báo hàm/hằng: báo không có hiệu ứng phụ để
           // bản build dùng Supabase (USE_MOCK = false) loại hẳn, không tải về máy người dùng
           moduleSideEffects: (id: string) => !/[\\/]src[\\/]mocks[\\/]|\.mock\.ts$/.test(id),
+        },
+        // Thư viện ít đổi mà trang nào cũng tải từ đầu: tách chunk riêng để deploy code app không đổi
+        // tên file của chúng, người quay lại dùng lại bản trình duyệt đã lưu. Thư viện chỉ khu Quản
+        // trị, Sáng tác dùng (Ant Design, Tiptap) giữ trong chunk riêng của khu đó.
+        output: {
+          codeSplitting: {
+            groups: vendorGroups.map(([name, test]) => ({ name, test, priority: 10 })),
+          },
         },
       },
     },

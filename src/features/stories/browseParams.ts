@@ -48,3 +48,22 @@ export function browseSearch(filters: BrowseFilters) {
   const s = params.toString()
   return s ? `?${s}` : ''
 }
+
+/** Bộ lọc cố định của trang: trạng thái (/list/:type) hoặc thể loại (/genres/:slug) */
+export type FixedFilters = Pick<BrowseFilters, 'status' | 'genre'>
+
+/** Danh sách /list/:type và bộ lọc cố định của từng danh sách (dùng chung với route loader) */
+export const LIST_FILTERS: Record<string, FixedFilters> = {
+  latest: {},
+  ongoing: { status: 'ongoing' },
+  completed: { status: 'completed' },
+}
+
+const definedOnly = <T extends object>(obj: T) =>
+  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>
+
+/** Bộ lọc thật của danh sách: lựa chọn trên URL, bộ lọc cố định của trang đè lên */
+export const browseFilters = (params: URLSearchParams, fixed: FixedFilters): BrowseFilters => ({
+  ...parseBrowseParams(params),
+  ...definedOnly(fixed),
+})

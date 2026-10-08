@@ -41,8 +41,20 @@ export type SearchResult = Page<Story> & { genres: Genre[] }
 
 // ── Bảng xếp hạng ───────────────────────────────────────────────────────
 
-export type RankingCriterion = 'views' | 'votes' | 'rating' | 'follows'
-export type RankingPeriod = 'week' | 'month' | 'all'
+export const RANKING_CRITERIA = ['views', 'votes', 'rating', 'follows'] as const
+export const RANKING_PERIODS = ['week', 'month', 'all'] as const
+export type RankingCriterion = (typeof RANKING_CRITERIA)[number]
+export type RankingPeriod = (typeof RANKING_PERIODS)[number]
+
+/** Tiêu chí và kỳ của /ranking từ `?by`, `?period` (sai hoặc thiếu: lượt đọc, tuần) */
+export function parseRankingParams(params: URLSearchParams) {
+  const by = params.get('by')
+  const period = params.get('period')
+  return {
+    by: RANKING_CRITERIA.find((c) => c === by) ?? 'views',
+    period: RANKING_PERIODS.find((p) => p === period) ?? 'week',
+  }
+}
 export type RankedStory = { story: Story; value: number }
 
 export const RANKING_LIMIT = 50

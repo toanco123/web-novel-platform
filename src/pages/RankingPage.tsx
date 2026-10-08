@@ -5,6 +5,7 @@ import { SectionError } from '@/components/common/SectionHeading'
 import { SegmentedLinks } from '@/components/common/SegmentedLinks'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  parseRankingParams,
   RANKING_LIMIT,
   type RankedStory,
   type RankingCriterion,
@@ -55,8 +56,10 @@ const rankColor = ['text-neon', 'text-rose-gold', 'text-rose-gold/80']
 
 export default function RankingPage() {
   const [params] = useSearchParams()
-  const criterion = criteria.find((c) => c.param === params.get('by')) ?? criteria[0]
-  const period = periods.find((p) => p.param === params.get('period')) ?? periods[0]
+  // Cùng cách đọc tham số với route loader (tải trước đúng bảng xếp hạng này)
+  const parsed = parseRankingParams(params)
+  const criterion = criteria.find((c) => c.value === parsed.by)!
+  const period = periods.find((p) => p.value === parsed.period)!
   const { data, isPending, isError, isPlaceholderData } = useRanking(criterion.value, period.value)
 
   const search = (by: string, period?: string) => {
