@@ -22,6 +22,8 @@ export const {
   getMyChapter,
   saveChapter,
   setChapterStatus,
+  setChapterSchedule,
+  scheduleChapters,
   deleteChapter,
   importChapters,
   getStoryStats,

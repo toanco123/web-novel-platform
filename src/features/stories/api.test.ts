@@ -1,6 +1,6 @@
 import { stories } from '@/mocks/stories'
 import { publishStory, signInAs, signOut } from '@/test/helpers'
-import { browseStories, getRanking, matchScore, searchStories } from './api'
+import { browseStories, getRanking, matchScore, searchStories, upcomingChapter } from './api'
 
 beforeEach(() => localStorage.clear())
 
@@ -73,4 +73,12 @@ describe('bảng xếp hạng', () => {
     expect(ranked[0].story.ratingCount).toBeGreaterThan(100)
     expect(ranked[0].value).toBe(ranked[0].story.ratingAvg)
   })
+})
+
+test('upcomingChapter: chỉ trả chương hẹn giờ khi giờ chưa qua', () => {
+  const now = Date.parse('2026-10-07T10:00:00Z')
+  const next = { number: 12, at: '2026-10-07T13:00:00Z' }
+  expect(upcomingChapter(next, now)).toEqual(next)
+  expect(upcomingChapter({ ...next, at: '2026-10-07T09:59:00Z' }, now)).toBeNull()
+  expect(upcomingChapter(null, now)).toBeNull()
 })

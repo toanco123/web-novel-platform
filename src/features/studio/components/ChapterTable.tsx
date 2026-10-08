@@ -1,4 +1,4 @@
-import { FileUp, LoaderCircle, MoreHorizontal, PenLine, Plus } from 'lucide-react'
+import { CalendarClock, FileUp, LoaderCircle, MoreHorizontal, PenLine, Plus } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router'
 import { SectionError } from '@/components/common/SectionHeading'
@@ -14,9 +14,18 @@ import { FormAlert } from '@/features/auth/components/FormAlert'
 import { formatRelativeTime } from '@/lib/format'
 import { paths } from '@/lib/routes'
 import { studioErrorMessage } from '../errors'
-import { useDeleteChapter, useMyChapters, useSetChapterStatus } from '../hooks'
+import type { Chapter } from '@/types/chapter'
+import {
+  useDeleteChapter,
+  useMyChapters,
+  useSetChapterSchedule,
+  useSetChapterStatus,
+} from '../hooks'
 import { countWords } from '../schemas'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ResponsiveDialog } from './ResponsiveDialog'
+import { ScheduleChaptersDialog } from './ScheduleChaptersDialog'
+import { ScheduleForm } from './ScheduleForm'
 import { StatusBadge } from './StatusBadge'
 import { ChapterListSkeleton } from './StudioSkeletons'
 
@@ -26,10 +35,20 @@ export function ChapterTable({ storyId }: { storyId: string }) {
   const chapters = useMyChapters(storyId)
   const setStatus = useSetChapterStatus(storyId)
   const remove = useDeleteChapter(storyId)
+  const schedule = useSetChapterSchedule(storyId)
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
-  const error = setStatus.error ?? remove.error
-  // Chương đang đổi trạng thái (xuất bản / về nháp): dòng đó hiện vòng quay tới khi lưu xong
-  const savingNumber = setStatus.isPending ? setStatus.variables.number : null
+  // Chương đang mở hộp hẹn giờ; xếp lịch nhiều chương
+  const [scheduling, setScheduling] = useState<Chapter | null>(null)
+  const [planning, setPlanning] = useState(false)
+  // Lỗi hẹn giờ hiện trong hộp hẹn giờ; hủy hẹn từ menu thì hiện ở đây
+  const error = setStatus.error ?? remove.error ?? (scheduling ? null : schedule.error)
+  // Chương đang đổi trạng thái hoặc giờ hẹn: dòng đó hiện vòng quay tới khi lưu xong
+  const savingNumber = setStatus.isPending
+    ? setStatus.variables.number
+    : schedule.isPending
+      ? schedule.variables.number
+      : null
+  const drafts = chapters.data?.filter((c) => c.status === 'draft') ?? []
 
   return (
     <div className="space-y-4">
@@ -46,6 +65,16 @@ export function ChapterTable({ storyId }: { storyId: string }) {
             Nhập từ file .txt
           </Link>
         </Button>
+        {drafts.length >= 2 && (
+          <Button
+            variant="outline"
+            className="h-10 rounded-full px-5"
+            onClick={() => setPlanning(true)}
+          >
+            <CalendarClock />
+            Xếp lịch
+          </Button>
+        )}
       </div>
 
       {error && <FormAlert>{studioErrorMessage(error)}</FormAlert>}
@@ -109,6 +138,7 @@ export function ChapterTable({ storyId }: { storyId: string }) {
                   ) : (
                     <StatusBadge
                       published={c.status === 'published'}
+                      scheduledAt={c.scheduledAt}
                       className="hidden sm:inline-flex"
                     />
                   )}
@@ -131,7 +161,10 @@ export function ChapterTable({ storyId }: { storyId: string }) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <p className="px-2 py-1.5 sm:hidden">
-                        <StatusBadge published={c.status === 'published'} />
+                        <StatusBadge
+                          published={c.status === 'published'}
+                          scheduledAt={c.scheduledAt}
+                        />
                       </p>
                       <DropdownMenuItem
                         disabled={setStatus.isPending}
@@ -144,6 +177,19 @@ export function ChapterTable({ storyId }: { storyId: string }) {
                       >
                         {c.status === 'published' ? 'Chuyển về nháp' : 'Xuất bản chương'}
                       </DropdownMenuItem>
+                      {c.status === 'draft' && (
+                        <DropdownMenuItem onSelect={() => setScheduling(c)}>
+                          {c.scheduledAt ? 'Đổi giờ hẹn…' : 'Hẹn giờ đăng…'}
+                        </DropdownMenuItem>
+                      )}
+                      {c.scheduledAt && (
+                        <DropdownMenuItem
+                          disabled={schedule.isPending}
+                          onSelect={() => schedule.mutate({ number: c.number, scheduledAt: null })}
+                        >
+                          Hủy hẹn giờ
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         variant="destructive"
@@ -159,6 +205,40 @@ export function ChapterTable({ storyId }: { storyId: string }) {
           })}
         </ul>
       )}
+
+      <ResponsiveDialog
+        open={scheduling !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setScheduling(null)
+            schedule.reset()
+          }
+        }}
+        title={scheduling ? `Hẹn giờ đăng chương ${scheduling.number}` : ''}
+        description="Tới giờ, chương tự xuất bản. Bạn vẫn sửa chương được trước giờ đó."
+      >
+        {scheduling && (
+          <ScheduleForm
+            initial={scheduling.scheduledAt}
+            submitLabel="Lưu giờ hẹn"
+            pending={schedule.isPending}
+            error={schedule.error}
+            onSubmit={(scheduledAt) =>
+              schedule.mutate(
+                { number: scheduling.number, scheduledAt },
+                { onSuccess: () => setScheduling(null) },
+              )
+            }
+          />
+        )}
+      </ResponsiveDialog>
+
+      <ScheduleChaptersDialog
+        storyId={storyId}
+        drafts={drafts}
+        open={planning}
+        onOpenChange={setPlanning}
+      />
 
       <ConfirmDialog
         open={confirmDelete !== null}

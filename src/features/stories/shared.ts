@@ -1,7 +1,7 @@
 // Phần dùng chung của hai backend truyện (api.mock.ts, api.remote.ts)
 import { slugify } from '@/lib/slugify'
 import type { Page } from '@/types/page'
-import type { Genre, Story, StoryStatus } from '@/types/story'
+import type { Genre, NextChapter, Story, StoryStatus } from '@/types/story'
 
 // ── Danh sách có bộ lọc (/list/:type, /genres/:slug) ──────────────
 
@@ -46,3 +46,11 @@ export type RankingPeriod = 'week' | 'month' | 'all'
 export type RankedStory = { story: Story; value: number }
 
 export const RANKING_LIMIT = 50
+
+/**
+ * Chương hẹn giờ sắp ra để báo người đọc; giờ đã qua (cron chưa kịp xuất bản) thì null. Chương
+ * lưu offline từ trước khi có hẹn giờ không có `nextChapter` (undefined)
+ */
+export function upcomingChapter(next: NextChapter | null | undefined, now = Date.now()) {
+  return next && new Date(next.at).getTime() > now ? next : null
+}

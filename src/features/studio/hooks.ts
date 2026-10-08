@@ -102,9 +102,34 @@ export function useSaveChapter(storyId: string) {
   return useMutation({
     mutationFn: ({
       publish,
+      scheduledAt,
       ...input
-    }: api.ChapterInput & { number?: number; newNumber?: number; publish: boolean }) =>
-      api.saveChapter(storyId, input, { publish }),
+    }: api.ChapterInput & {
+      number?: number
+      newNumber?: number
+      publish: boolean
+      /** Đặt / đổi giờ hẹn (null: bỏ hẹn); không truyền thì giữ nguyên */
+      scheduledAt?: string | null
+    }) => api.saveChapter(storyId, input, { publish, scheduledAt }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Đặt / đổi / hủy (null) giờ hẹn của một chương nháp */
+export function useSetChapterSchedule(storyId: string) {
+  const invalidate = useInvalidateAll()
+  return useMutation({
+    mutationFn: ({ number, scheduledAt }: { number: number; scheduledAt: string | null }) =>
+      api.setChapterSchedule(storyId, number, scheduledAt),
+    onSuccess: invalidate,
+  })
+}
+
+/** Xếp lịch nhiều chương nháp một lần */
+export function useScheduleChapters(storyId: string) {
+  const invalidate = useInvalidateAll()
+  return useMutation({
+    mutationFn: (items: api.ScheduledChapter[]) => api.scheduleChapters(storyId, items),
     onSuccess: invalidate,
   })
 }

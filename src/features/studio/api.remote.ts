@@ -19,6 +19,7 @@ import {
   isStudioErrorCode,
   type MyStory,
   normalizeStoryInput,
+  type ScheduledChapter,
   type StoryInput,
   type StoryStats,
   StudioError,
@@ -88,6 +89,7 @@ function toChapter(row: ChapterRow): Chapter {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     publishedAt: row.published_at,
+    scheduledAt: row.scheduled_at,
   }
 }
 
@@ -336,14 +338,16 @@ async function chapterMeta(storyId: string) {
  * `newNumber`: số chương muốn lưu, được bỏ trống số ở giữa (có chương 1 thì viết luôn chương 3).
  * Chương mới mặc định lấy số tiếp theo. Chỉ đổi số được với chương chưa xuất bản lần nào,
  * vì link, lịch sử đọc và bình luận của người đọc đều theo số chương.
- * publish = true thì xuất bản; false thì giữ nguyên trạng thái hiện tại (chương mới là nháp).
+ * publish = true thì xuất bản (trigger bỏ giờ hẹn); false thì giữ nguyên trạng thái hiện tại
+ * (chương mới là nháp). scheduledAt: đặt / đổi giờ hẹn (chỉ chương nháp), null bỏ hẹn, không
+ * truyền thì giữ nguyên; giờ sai thì trigger báo invalid_schedule.
  * Kiểm tra trước như bản giả để báo đúng lỗi; DB vẫn chặn lần nữa (unique, trigger) khi hai nơi
  * cùng sửa.
  */
 export async function saveChapter(
   storyId: string,
   input: ChapterInput & { number?: number; newNumber?: number },
-  { publish = false } = {},
+  { publish = false, scheduledAt }: { publish?: boolean; scheduledAt?: string | null } = {},
 ): Promise<Chapter> {
   const chapters = await chapterMeta(storyId)
   const existing =
@@ -359,6 +363,8 @@ export async function saveChapter(
 
   const title = input.title.trim()
   const content = input.content.trim()
+  // Chỉ gửi cột scheduled_at khi có truyền (cột có quyền ghi riêng)
+  const schedule = !publish && scheduledAt !== undefined ? { scheduled_at: scheduledAt } : {}
   // published_at (lần đầu xuất bản) và updated_at của chương, của truyện do trigger ghi
   const result = existing
     ? await db()
@@ -367,6 +373,7 @@ export async function saveChapter(
           number,
           title,
           content,
+          ...schedule,
           ...(publish && existing.status === 'draft' ? { status: 'published' as const } : {}),
         })
         .eq('id', existing.id)
@@ -379,6 +386,7 @@ export async function saveChapter(
           title,
           content,
           status: publish ? 'published' : 'draft',
+          ...schedule,
         })
         .select('*')
   const rows = unwrap(result, chapterError)
@@ -406,6 +414,43 @@ export async function setChapterStatus(
   // RLS bỏ qua chương của truyện người khác: không dòng nào được sửa
   if (!rows.length) throw notFound()
   return toChapter(rows[0])
+}
+
+/** Đặt / đổi giờ hẹn của một chương nháp; null: hủy hẹn. Giờ sai: trigger báo invalid_schedule */
+export async function setChapterSchedule(
+  storyId: string,
+  number: number,
+  scheduledAt: string | null,
+): Promise<Chapter> {
+  await requireUserFor(storyId)
+  if (!isChapterNumber(number)) throw notFound()
+  const rows = unwrap(
+    await db()
+      .from('chapters')
+      .update({ scheduled_at: scheduledAt })
+      .eq('story_id', storyId)
+      .eq('number', number)
+      .select('*'),
+    studioError,
+  )
+  // RLS bỏ qua chương của truyện người khác: không dòng nào được sửa
+  if (!rows.length) throw notFound()
+  return toChapter(rows[0])
+}
+
+/**
+ * Xếp giờ hẹn cho nhiều chương nháp một lần (RPC schedule_chapters, một transaction): chương không
+ * có thì not_found, không phải nháp hay giờ sai thì invalid_schedule, và không lưu chương nào
+ */
+export async function scheduleChapters(storyId: string, items: ScheduledChapter[]) {
+  await requireUserFor(storyId)
+  return unwrap(
+    await db().rpc('schedule_chapters', {
+      p_story_id: storyId,
+      p_items: items.map((i) => ({ number: i.number, at: i.scheduledAt })),
+    }),
+    studioError,
+  )
 }
 
 /** Bình luận, báo lỗi và lượt đọc của chương xóa theo (khóa ngoại on delete cascade) */

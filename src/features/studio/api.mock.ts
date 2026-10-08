@@ -38,6 +38,8 @@ import {
   type FirstChapterInput,
   type MyStory,
   normalizeStoryInput as normalize,
+  type ScheduledChapter,
+  scheduleProblem,
   STATS_DAYS,
   type StoryInput,
   type StoryStats,
@@ -247,6 +249,7 @@ function newChapter(
   number: number,
   input: ChapterInput,
   publish: boolean,
+  scheduledAt: string | null = null,
 ): Chapter {
   const time = now()
   return {
@@ -259,6 +262,15 @@ function newChapter(
     createdAt: time,
     updatedAt: time,
     publishedAt: publish ? time : null,
+    scheduledAt: publish ? null : scheduledAt,
+  }
+}
+
+/** Giờ hẹn hợp lệ cho chương này (như trigger chapters_before_change của DB), không thì báo lỗi */
+function checkSchedule(chapter: Pick<Chapter, 'status'>, scheduledAt: string | null) {
+  if (scheduledAt === null) return
+  if (chapter.status !== 'draft' || scheduleProblem(scheduledAt)) {
+    throw new StudioError('invalid_schedule')
   }
 }
 
@@ -267,12 +279,13 @@ function newChapter(
  * `newNumber`: số chương muốn lưu, được bỏ trống số ở giữa (có chương 1 thì viết luôn chương 3).
  * Chương mới mặc định lấy số tiếp theo. Chỉ đổi số được với chương chưa xuất bản lần nào,
  * vì link, lịch sử đọc và bình luận của người đọc đều theo số chương.
- * publish = true thì xuất bản; false thì giữ nguyên trạng thái hiện tại (chương mới là nháp).
+ * publish = true thì xuất bản (bỏ giờ hẹn); false thì giữ nguyên trạng thái hiện tại (chương mới là
+ * nháp). scheduledAt: đặt / đổi giờ hẹn (chỉ chương nháp), null bỏ hẹn, không truyền thì giữ nguyên.
  */
 export async function saveChapter(
   storyId: string,
   input: ChapterInput & { number?: number; newNumber?: number },
-  { publish = false } = {},
+  { publish = false, scheduledAt }: { publish?: boolean; scheduledAt?: string | null } = {},
 ): Promise<Chapter> {
   await delay(400)
   const { user, story, stories } = await ownStory(storyId)
@@ -287,6 +300,8 @@ export async function saveChapter(
   if (existing && number !== existing.number && existing.publishedAt) {
     throw new StudioError('chapter_number_locked')
   }
+  if (!publish && scheduledAt !== undefined)
+    checkSchedule(existing ?? { status: 'draft' }, scheduledAt)
   if (!existing) chargeAuthor(user, { chapters: 1, bytes: contentBytes(input.content) })
   else if (input.content.trim() !== existing.content) {
     chargeAuthor(user, { bytes: contentBytes(input.content) })
@@ -300,16 +315,18 @@ export async function saveChapter(
       title: input.title.trim(),
       content: input.content.trim(),
       updatedAt: now(),
+      ...(scheduledAt !== undefined ? { scheduledAt } : {}),
       ...(publish && existing.status === 'draft'
         ? { status: 'published' as const, publishedAt: existing.publishedAt ?? now() }
         : {}),
+      ...(publish ? { scheduledAt: null } : {}),
     }
     saveChapters(
       storyId,
       chapters.map((c) => (c.id === existing.id ? saved : c)),
     )
   } else {
-    saved = newChapter(storyId, number, input, publish)
+    saved = newChapter(storyId, number, input, publish, scheduledAt ?? null)
     saveChapters(storyId, [...chapters, saved])
   }
   touch(stories, story)
@@ -336,6 +353,8 @@ export async function setChapterStatus(storyId: string, number: number, status: 
     ...chapter,
     status,
     publishedAt: status === 'published' ? (chapter.publishedAt ?? now()) : chapter.publishedAt,
+    // Xuất bản thì bỏ giờ hẹn
+    scheduledAt: status === 'published' ? null : chapter.scheduledAt,
     updatedAt: now(),
   }
   saveChapters(
@@ -344,6 +363,52 @@ export async function setChapterStatus(storyId: string, number: number, status: 
   )
   touch(stories, story)
   return updated
+}
+
+/** Đặt / đổi giờ hẹn của một chương nháp; null: hủy hẹn (chương vẫn là nháp) */
+export async function setChapterSchedule(
+  storyId: string,
+  number: number,
+  scheduledAt: string | null,
+): Promise<Chapter> {
+  await delay(300)
+  const { story, stories } = await ownStory(storyId)
+  const chapters = loadChapters(storyId)
+  const chapter = chapters.find((c) => c.number === number)
+  if (!chapter) throw new StudioError('not_found')
+  checkSchedule(chapter, scheduledAt)
+  const updated: Chapter = { ...chapter, scheduledAt, updatedAt: now() }
+  saveChapters(
+    storyId,
+    chapters.map((c) => (c.id === chapter.id ? updated : c)),
+  )
+  touch(stories, story)
+  return updated
+}
+
+/**
+ * Xếp giờ hẹn cho nhiều chương nháp một lần (như RPC schedule_chapters): một chương không có thì
+ * not_found, không phải nháp hay giờ sai thì invalid_schedule; khi đó không lưu chương nào
+ */
+export async function scheduleChapters(storyId: string, items: ScheduledChapter[]) {
+  await delay(400)
+  const { story, stories } = await ownStory(storyId)
+  const chapters = loadChapters(storyId)
+  const times = new Map(items.map((i) => [i.number, i.scheduledAt]))
+  for (const item of items) {
+    const chapter = chapters.find((c) => c.number === item.number)
+    if (!chapter) throw new StudioError('not_found')
+    checkSchedule(chapter, item.scheduledAt)
+  }
+  const time = now()
+  saveChapters(
+    storyId,
+    chapters.map((c) =>
+      times.has(c.number) ? { ...c, scheduledAt: times.get(c.number)!, updatedAt: time } : c,
+    ),
+  )
+  touch(stories, story)
+  return items.length
 }
 
 export async function deleteChapter(storyId: string, number: number) {

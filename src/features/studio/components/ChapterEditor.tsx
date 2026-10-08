@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { History } from 'lucide-react'
+import { CalendarClock, History } from 'lucide-react'
 import { useState } from 'react'
 import { useController, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
@@ -15,6 +15,8 @@ import { useEditorAutosave } from '../useEditorAutosave'
 import { useUnsavedChangesPrompt } from '../useUnsavedChangesPrompt'
 import { ChapterFields, ChapterNumberField } from './ChapterFields'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ResponsiveDialog } from './ResponsiveDialog'
+import { ScheduleForm } from './ScheduleForm'
 import { StatusBadge } from './StatusBadge'
 
 const clock = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' })
@@ -58,6 +60,7 @@ function skippedMessage({ prev, from, to }: Skipped, number: number) {
 export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props) {
   const navigate = useNavigate()
   const save = useSaveChapter(story.id)
+  const [scheduling, setScheduling] = useState(false)
   const [schema] = useState(() =>
     chapterFormSchema(chapters.filter((c) => c.id !== chapter?.id).map((c) => c.number)),
   )
@@ -101,25 +104,29 @@ export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props
       : null
   const title = chapter ? `Chương ${chapter.number}` : 'Chương mới'
 
-  const submit = (publish: boolean) =>
-    handleSubmit(({ number, ...v }) =>
-      save.mutate(
-        { ...v, number: chapter?.number, newNumber: number, publish },
-        {
-          onSuccess: () => {
-            autosave.clear()
-            leave.allowNextNavigation()
-            navigate(paths.studioStory(story.id))
+  /** scheduledAt: lưu nháp kèm giờ hẹn (null: bỏ hẹn); không truyền thì giữ giờ hẹn cũ */
+  const submit = (publish: boolean, scheduledAt?: string | null) =>
+    handleSubmit(
+      ({ number, ...v }) =>
+        save.mutate(
+          { ...v, number: chapter?.number, newNumber: number, publish, scheduledAt },
+          {
+            onSuccess: () => {
+              autosave.clear()
+              leave.allowNextNavigation()
+              navigate(paths.studioStory(story.id))
+            },
           },
-        },
-      ),
+        ),
+      // Form còn lỗi (vd thiếu tên chương): đóng hộp hẹn giờ để thấy lỗi
+      () => setScheduling(false),
     )
 
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate className="pb-28">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="font-heading text-4xl font-semibold">{title}</h1>
-        {chapter && <StatusBadge published={isPublished} />}
+        {chapter && <StatusBadge published={isPublished} scheduledAt={chapter.scheduledAt} />}
       </div>
       <p className="mt-1 mb-6 text-muted-foreground">{story.title}</p>
 
@@ -170,8 +177,12 @@ export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props
 
       {/* Thanh thao tác dính dưới đáy màn hình */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-3 md:px-6">
-          <p className="mr-auto text-xs text-muted-foreground" role="status">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-end gap-1 px-4 py-3 sm:gap-2 md:px-6">
+          {/* Rỗng thì ẩn; điện thoại: có chữ thì chiếm một dòng riêng để các nút vừa một dòng */}
+          <p
+            className="mr-auto text-xs text-muted-foreground empty:hidden max-sm:w-full"
+            role="status"
+          >
             {save.isPending
               ? 'Đang lưu…'
               : autosave.savedAt
@@ -197,6 +208,19 @@ export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props
               >
                 Lưu nháp
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={save.isPending}
+                onClick={() => setScheduling(true)}
+                // Điện thoại: chỉ biểu tượng để bốn nút vừa một dòng
+                aria-label={chapter?.scheduledAt ? 'Đổi giờ hẹn' : 'Hẹn giờ'}
+              >
+                <CalendarClock />
+                <span className="hidden sm:inline">
+                  {chapter?.scheduledAt ? 'Đổi giờ hẹn' : 'Hẹn giờ'}
+                </span>
+              </Button>
               <Button type="button" disabled={save.isPending} onClick={submit(true)}>
                 Xuất bản chương
               </Button>
@@ -204,6 +228,22 @@ export function ChapterEditor({ story, chapter, chapters, defaultNumber }: Props
           )}
         </div>
       </div>
+
+      <ResponsiveDialog
+        open={scheduling}
+        onOpenChange={setScheduling}
+        title={chapter?.scheduledAt ? 'Đổi giờ hẹn' : 'Hẹn giờ đăng chương'}
+        description="Tới giờ, chương tự xuất bản. Bạn vẫn sửa chương được trước giờ đó."
+      >
+        <ScheduleForm
+          initial={chapter?.scheduledAt ?? null}
+          submitLabel="Lưu và hẹn giờ"
+          pending={save.isPending}
+          error={save.error}
+          onSubmit={(at) => void submit(false, at)()}
+          onUnschedule={chapter?.scheduledAt ? () => void submit(false, null)() : undefined}
+        />
+      </ResponsiveDialog>
 
       <ConfirmDialog
         open={leave.blocker.state === 'blocked'}

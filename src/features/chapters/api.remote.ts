@@ -83,6 +83,7 @@ const readerStory = (story: Story): ChapterContent['story'] => ({
   chapterCount: story.chapterCount,
   coverUrl: story.coverUrl,
   visibility: story.visibility,
+  nextChapter: story.nextChapter,
 })
 
 /** Một chương để đọc, kèm chương trước/sau; null khi không có truyện hoặc chương */

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FollowButton } from '@/features/library/components/FollowButton'
 import { usePrefetchChapterLink } from '@/features/offline/prefetch'
+import { UpcomingChapter } from '@/features/stories/UpcomingChapter'
 import { paths } from '@/lib/routes'
 import type { ChapterContent } from '@/types/chapter'
 
@@ -37,6 +38,12 @@ export function ChapterEnd({ chapter }: { chapter: ChapterContent }) {
               ? 'Bạn đã đọc hết truyện'
               : 'Bạn đã đọc tới chương mới nhất'}
           </p>
+          {story.status !== 'completed' && (
+            <UpcomingChapter
+              next={story.nextChapter}
+              className="mt-3 justify-center font-medium text-rose-gold"
+            />
+          )}
           <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
             {story.status === 'completed'
               ? `Cảm ơn bạn đã đồng hành cùng ${story.title}. Hãy để lại đánh giá cho tác giả nhé.`

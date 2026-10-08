@@ -46,6 +46,7 @@ function toChapterContent(
       chapterCount: all.length,
       coverUrl: story.coverUrl,
       visibility: story.visibility,
+      nextChapter: story.nextChapter,
     },
     number: all[index].number,
     title: all[index].title,

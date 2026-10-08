@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import type { Story } from '@/types/story'
 import { coverPalette } from '../coverPalette'
 import { StoryCover } from '../StoryCover'
+import { UpcomingChapter } from '../UpcomingChapter'
 import { Breadcrumb } from './Breadcrumb'
 
 const onDarkOutline =
@@ -121,6 +122,8 @@ export function StoryHero({ story }: { story: Story }) {
                 </dd>
               </div>
             </dl>
+
+            <UpcomingChapter next={story.nextChapter} className="-mt-3 text-[#d9a68f]" />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <ReadButtons story={story} />

@@ -15,6 +15,7 @@ export type StudioErrorCode =
   | 'already_approved'
   | 'story_limit'
   | 'chapter_limit'
+  | 'invalid_schedule'
 
 /** Hạn mức mỗi ngày của tác giả (trigger charge_author của DB; quản trị viên không bị giới hạn) */
 export const STORIES_PER_DAY = 10
@@ -38,6 +39,8 @@ const messages: Record<StudioErrorCode, string> = {
   already_approved: 'Truyện đã được duyệt, bạn tự xuất bản được.',
   story_limit: `Mỗi ngày chỉ tạo được tối đa ${STORIES_PER_DAY} truyện mới. Thử lại vào ngày mai nhé.`,
   chapter_limit: `Hôm nay bạn đã đăng hoặc sửa quá nhiều chương (tối đa ${CHAPTERS_PER_DAY} chương mới và khoảng ${CONTENT_BYTES_PER_DAY / 1_000_000} MB nội dung mỗi ngày). Thử lại vào ngày mai nhé.`,
+  invalid_schedule:
+    'Giờ hẹn phải sau ít nhất 1 phút và trong vòng 365 ngày, và chỉ hẹn được chương chưa xuất bản.',
   report_already_open:
     'Bạn đọc này đã gửi lại đúng báo lỗi này và báo lỗi mới vẫn chưa xử lý, nên không mở lại báo lỗi cũ được.',
 }
@@ -131,4 +134,85 @@ export function normalizeStoryInput(input: StoryInput) {
     coverUrl: input.coverUrl,
     authorName: input.authorName?.trim().replace(/\s+/g, ' ') || null,
   }
+}
+
+// ── Hẹn giờ đăng chương ─────────────────────────────────────────────────
+
+/** Giờ hẹn phải sau hiện tại ít nhất chừng này (như trigger chapters_before_change của DB) */
+export const SCHEDULE_MIN_LEAD_MS = 60_000
+/** Hẹn xa nhất 365 ngày */
+export const SCHEDULE_MAX_AHEAD_MS = 365 * 24 * 60 * 60_000
+
+/** Giờ hẹn hợp lệ thì null; quá gần (hoặc đã qua) / quá xa */
+export function scheduleProblem(scheduledAt: string, now = Date.now()) {
+  const time = new Date(scheduledAt).getTime()
+  if (!(time >= now + SCHEDULE_MIN_LEAD_MS)) return 'too_soon' as const
+  if (time > now + SCHEDULE_MAX_AHEAD_MS) return 'too_late' as const
+  return null
+}
+
+/** Lời báo cho người dùng theo kết quả của scheduleProblem (missing: chưa chọn đủ ngày giờ) */
+export const scheduleProblemMessage = {
+  missing: 'Chọn ngày và giờ đăng.',
+  too_soon: 'Chọn giờ sau hiện tại ít nhất 1 phút.',
+  too_late: 'Chỉ hẹn được trong vòng 365 ngày.',
+} as const
+
+/** Nhịp của công cụ Xếp lịch */
+export type ScheduleRule = {
+  /** Ngày bắt đầu, `YYYY-MM-DD` (giờ của máy) */
+  start: string
+  /** Giờ đăng, `HH:mm` */
+  time: string
+  /** Các thứ được đăng: 0 = Chủ nhật, 1 = thứ Hai … 6 = thứ Bảy */
+  weekdays: number[]
+  /** Số chương mỗi lần đăng (1–3) */
+  perSlot: number
+}
+
+export type ScheduledChapter = { number: number; scheduledAt: string }
+
+/**
+ * Xếp giờ hẹn cho các chương `numbers` (theo đúng thứ tự truyền vào): lần đăng đầu là ngày ≥
+ * `start` đúng thứ đã chọn, lúc `time`; giờ đó đã qua (hoặc chưa đủ 1 phút) thì sang lần kế tiếp.
+ * Mỗi lần đăng `perSlot` chương, cùng một giờ. Không chọn thứ nào thì trả mảng rỗng.
+ */
+export function planSchedule(
+  numbers: number[],
+  { start, time, weekdays, perSlot }: ScheduleRule,
+  now = Date.now(),
+): ScheduledChapter[] {
+  const [year, month, day] = start.split('-').map(Number)
+  const [hour, minute] = time.split(':').map(Number)
+  const plan: ScheduledChapter[] = []
+  if (!weekdays.length || perSlot < 1) return plan
+  // Tối đa ~2 năm ngày để không lặp vô hạn khi dữ liệu lạ
+  for (let offset = 0; plan.length < numbers.length && offset < 800; offset++) {
+    // Dựng lại theo ngày (không cộng mili giây) để đúng giờ cả khi đổi giờ mùa hè
+    const slot = new Date(year, month - 1, day + offset, hour, minute)
+    if (!weekdays.includes(slot.getDay()) || slot.getTime() < now + SCHEDULE_MIN_LEAD_MS) continue
+    for (let i = 0; i < perSlot && plan.length < numbers.length; i++) {
+      plan.push({ number: numbers[plan.length], scheduledAt: slot.toISOString() })
+    }
+  }
+  return plan
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** ISO → giá trị ô `type="date"` và `type="time"` (giờ của máy) */
+export function toLocalInputs(iso: string) {
+  const d = new Date(iso)
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  }
+}
+
+/** Ô ngày + ô giờ (giờ của máy) → ISO; thiếu ô nào thì null */
+export function fromLocalInputs(date: string, time: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
+  const [year, month, day] = date.split('-').map(Number)
+  const [hour, minute] = time.split(':').map(Number)
+  return new Date(year, month - 1, day, hour, minute).toISOString()
 }

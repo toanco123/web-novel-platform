@@ -49,8 +49,8 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `genres` | `slug` (khóa chính), `name` (2–30), `description` (≤200), `created_by` | `slug` luôn = `slugify(name)` do trigger đặt, nên tạo trùng là lỗi `23505` |
 | `stories` | `id`, `owner_id`, `slug` (unique, không đổi), `title` (2–120), `description` (≤3000), `status`, `visibility`, `cover_path`, `search_title` (tự sinh), `created_at`, `updated_at`, `published_at`, `review_status`, `review_submitted_at`, `reviewed_at`, `review_reason` (1–500, chỉ có khi `rejected`) | `updated_at` = lần sửa gần nhất của tác giả, kể cả sửa chương (sắp xếp khu Sáng tác). `published_at` = lần đầu công khai. `review_status` null = chưa gửi duyệt (hoặc bị gỡ); chỉ truyện `approved` mới công khai được (quản trị viên miễn duyệt, plan `plan-duyet-truyen.md`) |
 | `story_genres` | `story_id`, `genre_slug`, `position` | Tối đa 5 thể loại (`too_many_genres`) |
-| `chapters` | `id`, `story_id`, `number` (1–99999), `title` (≤120), `content` (1–200 000), `status`, `created_at`, `updated_at`, `published_at` | `published_at` = lần đầu xuất bản, ẩn rồi xuất bản lại vẫn giữ mốc cũ. `content` là HTML rút gọn của trình soạn hoặc văn bản thuần kiểu cũ; client giới hạn 100 000 ký tự chữ nhìn thấy, DB cho tới 200 000 vì có thẻ định dạng (`documents/plan-trinh-soan-dinh-dang.md`) |
-| `story_stats` | `chapter_count`, `first_chapter_number`, `latest_chapter_number`, `latest_chapter_title`, `last_chapter_at`, `view_count`, `follower_count`, `rating_counts int[5]`, `rating_count`, `rating_sum`, `rating_avg` | Các cột về chương chỉ tính chương đã xuất bản. `rating_*` tự sinh từ `rating_counts`; `rating_avg` = 0 khi chưa có lượt chấm |
+| `chapters` | `id`, `story_id`, `number` (1–99999), `title` (≤120), `content` (1–200 000), `status`, `created_at`, `updated_at`, `published_at`, `scheduled_at` (giờ hẹn tự xuất bản, chỉ chương nháp) | `published_at` = lần đầu xuất bản, ẩn rồi xuất bản lại vẫn giữ mốc cũ. Hẹn giờ: plan `plan-hen-gio-dang-chuong.md`; xuất bản (tay hoặc tự động) thì `scheduled_at` về null. `content` là HTML rút gọn của trình soạn hoặc văn bản thuần kiểu cũ; client giới hạn 100 000 ký tự chữ nhìn thấy, DB cho tới 200 000 vì có thẻ định dạng (`documents/plan-trinh-soan-dinh-dang.md`) |
+| `story_stats` | `chapter_count`, `first_chapter_number`, `latest_chapter_number`, `latest_chapter_title`, `last_chapter_at`, `view_count`, `follower_count`, `rating_counts int[5]`, `rating_count`, `rating_sum`, `rating_avg`, `next_chapter_number`, `next_chapter_at` | Các cột về chương chỉ tính chương đã xuất bản; `next_chapter_*` là chương nháp có giờ hẹn sớm nhất (trigger `chapters_after_change`). `rating_*` tự sinh từ `rating_counts`; `rating_avg` = 0 khi chưa có lượt chấm |
 | `follows` | `user_id`, `story_id`, `followed_at`, `seen_chapter` | Số chương mới = số chương đã xuất bản có `number > seen_chapter`. Index `followed_at` cho đếm theo ngày ở trang Tổng quan |
 | `reading_history` | `user_id`, `story_id`, `chapter_number`, `chapter_title`, `progress` (0–1), `read_at` | Không có khóa ngoại tới chương, để lịch sử vẫn còn khi chương bị ẩn |
 | `ratings` | `user_id`, `story_id`, `score` (1–5) | |
@@ -101,6 +101,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `story_taken_down` | Tác giả công khai lại (hoặc gửi duyệt) truyện đang bị admin gỡ | `StudioError('story_taken_down')` |
 | `story_not_approved` | Người không phải quản trị viên công khai truyện chưa được duyệt (trigger `stories_require_review`) | `StudioError('story_not_approved')` |
 | `already_pending`, `already_approved` | Gửi duyệt truyện đang chờ duyệt / đã được duyệt | `StudioError` |
+| `invalid_schedule` | Giờ hẹn chương không sau hiện tại ít nhất 1 phút hoặc quá 365 ngày (chỉ kiểm tra khi giờ hẹn được đặt / đổi), hoặc hẹn giờ chương không phải nháp | `StudioError('invalid_schedule')` |
 | `not_pending`, `reason_required` | Admin duyệt/từ chối truyện không còn chờ duyệt / từ chối không ghi lý do | `AdminError` |
 | `story_limit`, `chapter_limit` | Vượt hạn mức tác giả mỗi ngày (bảng dưới) | `StudioError('story_limit' / 'chapter_limit')` |
 | `already_checked_in` | Điểm danh lần hai trong ngày (giờ Việt Nam) | `RewardError` |
@@ -155,7 +156,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `genres` | mọi người | người đã đăng nhập thêm mới (`name`, `description`) |
 | `stories` | truyện công khai, cộng truyện nháp của chính mình; quản trị viên thấy thêm truyện chờ duyệt | chủ truyện. Insert được: `slug, title, description, status, cover_path`. Update được: `title, description, status, visibility, cover_path` (công khai chỉ khi đã duyệt; cột duyệt chỉ ghi qua RPC) |
 | `story_genres`, `story_stats`, `chapter_views`, `curated_stories` | ai thấy truyện thì thấy | `story_genres`: chủ truyện. Ba bảng còn lại: không ai ghi từ client |
-| `chapters` | chương đã xuất bản của truyện công khai (quản trị viên: cả của truyện chờ duyệt); chủ truyện thấy cả nháp | chủ truyện. Insert được: `story_id, number, title, content, status`. Update được: `number, title, content, status` |
+| `chapters` | chương đã xuất bản của truyện công khai (quản trị viên: cả của truyện chờ duyệt); chủ truyện thấy cả nháp | chủ truyện. Insert được: `story_id, number, title, content, status, scheduled_at`. Update được: `number, title, content, status, scheduled_at` |
 | `follows`, `reading_history`, `ratings` | chỉ chủ | chỉ chủ |
 | `comments` | ai thấy truyện thì thấy, trừ bình luận của người mình đã chặn (`private.my_blocked_ids()`, definer để khách cũng gọi được) | viết: người đã đăng nhập, vào truyện công khai hoặc chương đã xuất bản (cột `parent_id` được cấp quyền insert). Sửa (`content`): chính người viết, khi truyện còn công khai và chương còn xuất bản. Xóa: chính người viết hoặc chủ truyện; quản trị viên xóa qua `admin_delete_comment` |
 | `comment_likes` | chỉ lượt thích của mình (`anon` có quyền select để `comment_threads` chạy được, nhưng không có policy nên không thấy dòng nào) | người đã đăng nhập: insert (`comment_id`) vào bình luận của truyện công khai, không phải của mình; xóa lượt thích của mình |
@@ -178,7 +179,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 ## 6. View và RPC
 
 **View** (`security_invoker`, nên RLS của bảng gốc vẫn áp dụng):
-- **`story_cards`**: map ra kiểu `Story`. `created_at` = lần đầu công khai, `updated_at` = lần xuất bản chương gần nhất.
+- **`story_cards`**: map ra kiểu `Story`. `created_at` = lần đầu công khai, `updated_at` = lần xuất bản chương gần nhất. `next_chapter_number`, `next_chapter_at` (từ `story_stats`) → `Story.nextChapter`: người đọc chỉ thấy số chương và giờ ra của chương hẹn giờ sớm nhất.
   - Danh sách công khai phải lọc thêm `visibility = 'published'` và `chapter_count > 0`, vì chủ truyện còn thấy cả truyện nháp của mình.
 - **`studio_stories`**: map ra kiểu `MyStory`, chỉ gồm truyện của người đang đăng nhập.
 - **`genre_cards`**: thể loại kèm `story_count` (số truyện công khai).
@@ -188,6 +189,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | Hàm | Ai gọi được | Việc |
 |---|---|---|
 | `create_story(title, description, status, genres[], cover_path?, first_chapter?, publish?)` | đã đăng nhập | Tạo truyện, thể loại và chương đầu trong một transaction; trả về dòng `studio_stories`. `first_chapter` = `{"number"?, "title", "content"}`. Slug trùng thì thêm `-2`, `-3`… `publish`: xuất bản chương đầu, rồi tác giả thì gửi duyệt, quản trị viên thì công khai |
+| `schedule_chapters(story_id, items)` | chủ truyện | Xếp giờ hẹn cho nhiều chương nháp một lần (`items` = `[{"number", "at"}]`, INVOKER, một transaction). Lỗi: `not_found` (truyện không phải của mình, chương không có), `invalid_schedule` (chương không phải nháp, giờ sai) |
 | `submit_story_for_review(story_id)` | chủ truyện | Gửi duyệt / gửi lại sau khi bị từ chối (`pending`). Lỗi: `not_found`, `story_taken_down`, `already_pending`, `already_approved`, `no_published_chapters` |
 | `update_story(id, title, description, status, genres[], cover_path?)` | đã đăng nhập | Sửa truyện và thay thể loại cùng lúc |
 | `studio_story_stats(story_id)` | chủ truyện | jsonb giống kiểu `StoryStats` (có `votes: {total, week}`) |
@@ -218,6 +220,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `admin_update_genre(slug, name, description)`, `admin_delete_genre(slug)`, `admin_merge_genres(from, into)` | quản trị viên | Sửa (slug đổi theo tên), xóa, gộp thể loại |
 | `admin_comments(query, reported)`, `admin_delete_comment(id)`, `admin_dismiss_comment_reports(comment_id)` | quản trị viên | Danh sách bình luận (kèm `edited_at`) và các báo cáo đang mở (mỗi báo cáo có `contentSnapshot`; `reported = true`: chỉ bình luận bị báo cáo, báo cáo mới nhất trước); xóa bình luận bất kỳ (trả lời và báo cáo mất theo); đóng các báo cáo đang mở |
 | `admin_curated(list)`, `admin_set_curated(list, story_ids[])` | quản trị viên | Đọc danh sách truyện chọn tay (kể cả truyện đang ẩn) và thay cả danh sách theo thứ tự đưa vào. Tối đa 8 truyện nổi bật, 12 truyện đề cử |
+
+**Hẹn giờ đăng chương (`pg_cron`):** job `publish-scheduled-chapters` chạy mỗi phút, gọi `private.publish_due_chapters(p_now default now())` (DEFINER): xuất bản từng chương nháp có `scheduled_at <= p_now` (mỗi chương một khối, lỗi thì bỏ giờ hẹn, giữ nháp), nên các trigger của chương (published_at, `story_stats`, thông báo đẩy) chạy như khi tác giả bấm xuất bản; chương ra trễ tối đa ~1 phút. Ca kiểm tra SQL truyền `p_now` tương lai để giả lập tới giờ. Job `cleanup-cron-logs` (03:00 UTC mỗi ngày) xóa `cron.job_run_details` cũ hơn 7 ngày. Gói Free: project tạm dừng sau 1 tuần không hoạt động thì cron cũng dừng; bật lại thì lần chạy đầu xuất bản bù chương đã quá giờ.
 
 **Thông báo đẩy chương mới (app di động):** trigger `chapters_notify_insert` / `chapters_notify_update` (mỗi câu lệnh, transition table) gọi `private.send_chapter_push`: chương xuất bản lần đầu ở truyện công khai thì gửi một tin mỗi truyện (chương mới nhất trong câu lệnh) tới mọi máy của người theo dõi, trừ tác giả, bằng `pg_net` (`net.http_post` tới `https://exp.host/--/api/v2/push/send`, tối đa 100 tin mỗi lần gọi). `data.url` = `/story/<slug>/chapter-<n>` để app mở đúng chương. Chưa xử lý biên nhận của Expo (mã hết hạn `DeviceNotRegistered` chưa tự bị xóa).
 
@@ -271,7 +275,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | studio | `createStory`, `updateStory` | Upload bìa (nếu có), rồi `rpc('create_story' / 'update_story')` |
 | studio | `publishStory`, `unpublishStory`, `deleteStory` | `update stories set visibility` / `delete`, rồi xóa file bìa |
 | studio | `submitStoryForReview` | `rpc('submit_story_for_review')`, rồi đọc lại `studio_stories` |
-| studio | `getMyChapters`, `getMyChapter`, `saveChapter`, `setChapterStatus`, `deleteChapter` | Thao tác thẳng trên `chapters` (chủ truyện thấy cả nháp). Luật số chương và chương công khai cuối do trigger lo |
+| studio | `getMyChapters`, `getMyChapter`, `saveChapter`, `setChapterStatus`, `deleteChapter` | Thao tác thẳng trên `chapters` (chủ truyện thấy cả nháp). Luật số chương và chương công khai cuối do trigger lo. `saveChapter` chỉ gửi `scheduled_at` khi có truyền `scheduledAt` (và không xuất bản) |
+| studio | `setChapterSchedule`, `scheduleChapters` | `chapters.update({ scheduled_at }).eq('story_id').eq('number')` / `rpc('schedule_chapters', { p_story_id, p_items: [{ number, at }] })` |
 | studio | `importChapters` | Một lần `chapters.insert([...])`, đánh số tiếp từ số lớn nhất hiện có |
 | studio | `getStoryStats` | `rpc('studio_story_stats')` |
 | studio | `getStoryReports` | `chapter_reports.select('*, reporter:profiles(id, display_name)')`, sắp theo `status` (enum: `open` trước), rồi `created_at` giảm dần |

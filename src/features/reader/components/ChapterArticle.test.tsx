@@ -12,6 +12,7 @@ const chapter = (content: string): ChapterContent => ({
     chapterCount: 1,
     coverUrl: null,
     visibility: 'published',
+    nextChapter: null,
   },
   number: 1,
   title: 'Mở đầu',

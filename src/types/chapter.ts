@@ -1,4 +1,4 @@
-import type { Author, StoryStatus, StoryVisibility } from './story'
+import type { Author, NextChapter, StoryStatus, StoryVisibility } from './story'
 
 export type ChapterSummary = {
   number: number
@@ -21,6 +21,8 @@ export type Chapter = {
   createdAt: string
   updatedAt: string
   publishedAt: string | null
+  /** Giờ hẹn tự xuất bản (chỉ chương nháp); null: không hẹn */
+  scheduledAt: string | null
 }
 
 export type ChapterNeighbor = { number: number; title: string }
@@ -37,6 +39,8 @@ export type ChapterContent = {
     coverUrl: string | null
     /** Chủ truyện đọc được cả truyện chưa công khai; loại này không lưu vào kho đọc offline */
     visibility: StoryVisibility
+    /** Chương hẹn giờ sớm nhất (cuối chương mới nhất báo "Chương N ra lúc …") */
+    nextChapter: NextChapter | null
   }
   number: number
   title: string

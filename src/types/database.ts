@@ -101,6 +101,7 @@ export type Database = {
           id: string
           number: number
           published_at: string | null
+          scheduled_at: string | null
           status: Database["public"]["Enums"]["publication_status"]
           story_id: string
           title: string
@@ -112,6 +113,7 @@ export type Database = {
           id?: string
           number: number
           published_at?: string | null
+          scheduled_at?: string | null
           status?: Database["public"]["Enums"]["publication_status"]
           story_id: string
           title?: string
@@ -123,6 +125,7 @@ export type Database = {
           id?: string
           number?: number
           published_at?: string | null
+          scheduled_at?: string | null
           status?: Database["public"]["Enums"]["publication_status"]
           story_id?: string
           title?: string
@@ -760,6 +763,8 @@ export type Database = {
           last_chapter_at: string | null
           latest_chapter_number: number | null
           latest_chapter_title: string | null
+          next_chapter_at: string | null
+          next_chapter_number: number | null
           rating_avg: number | null
           rating_count: number | null
           rating_counts: number[]
@@ -775,6 +780,8 @@ export type Database = {
           last_chapter_at?: string | null
           latest_chapter_number?: number | null
           latest_chapter_title?: string | null
+          next_chapter_at?: string | null
+          next_chapter_number?: number | null
           rating_avg?: number | null
           rating_count?: number | null
           rating_counts?: number[]
@@ -790,6 +797,8 @@ export type Database = {
           last_chapter_at?: string | null
           latest_chapter_number?: number | null
           latest_chapter_title?: string | null
+          next_chapter_at?: string | null
+          next_chapter_number?: number | null
           rating_avg?: number | null
           rating_count?: number | null
           rating_counts?: number[]
@@ -1029,6 +1038,8 @@ export type Database = {
           id: string | null
           latest_chapter_number: number | null
           latest_chapter_title: string | null
+          next_chapter_at: string | null
+          next_chapter_number: number | null
           owner_id: string | null
           rating_avg: number | null
           rating_count: number | null
@@ -1397,6 +1408,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      schedule_chapters: {
+        Args: { p_items: Json; p_story_id: string }
+        Returns: number
       }
       search_stories: {
         Args: { p_query: string }
