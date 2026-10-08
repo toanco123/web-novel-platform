@@ -358,6 +358,7 @@ function StoryPreview({
     status: values.status,
     description: values.description,
     coverUrl: values.coverUrl,
+    coverThumbUrl: values.coverUrl,
     chapterCount: 0,
     viewCount: 0,
     ratingAvg: 0,

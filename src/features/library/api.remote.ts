@@ -5,7 +5,12 @@
 // có phiên.
 import type { PostgrestError } from '@supabase/supabase-js'
 import { getUserId, requireUserId, unauthenticated } from '@/features/auth/api'
-import { storiesByIds, storiesBySlugs, storyIdBySlug } from '@/features/stories/cards.remote'
+import {
+  storiesByIds,
+  storiesBySlugs,
+  storyIdBySlug,
+  toStory,
+} from '@/features/stories/cards.remote'
 import { businessCode, isUniqueViolation, unwrap } from '@/lib/dbError'
 import { isNetworkError } from '@/lib/network'
 import { db } from '@/lib/supabase'
@@ -141,18 +146,14 @@ async function historyOf(userId: string, storyIds: string[]) {
 export async function getLibrary(): Promise<LibraryItem[]> {
   const userId = await requireUserId()
   await mergeGuestHistory()
-  const follows = unwrap(await db().rpc('get_library'))
+  // library_cards (bọc get_library) trả thẳng thẻ truyện: bỏ request lấy thẻ theo id
+  const follows = unwrap(await db().rpc('library_cards'))
   if (!follows.length) return []
   const ids = follows.map((f) => f.story_id)
-  const [stories, history] = await Promise.all([
-    inChunks(ids, IDS_PER_QUERY, storiesByIds),
-    inChunks(ids, IDS_PER_QUERY, (chunk) => historyOf(userId, chunk)),
-  ])
-  const storyById = new Map(stories.map((s) => [s.id, s]))
+  const history = await inChunks(ids, IDS_PER_QUERY, (chunk) => historyOf(userId, chunk))
   const readById = new Map(history.map((h) => [h.story_id, h]))
-  return follows.flatMap((f) => {
-    const story = storyById.get(f.story_id)
-    if (!story) return []
+  return follows.map((f) => {
+    const story = toStory(f.card)
     const read = readById.get(f.story_id)
     return {
       story,

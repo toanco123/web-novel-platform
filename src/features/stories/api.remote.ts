@@ -12,7 +12,6 @@ import {
   parseAuthorSlug,
   publicStoryCards,
   type StoryCardRow,
-  storiesByIds,
   storyBySlug,
   toStory,
 } from './cards.remote'
@@ -35,22 +34,15 @@ const EDITOR_PICK_COUNT = 8
 /** Slug thể loại luôn có dạng này (ràng buộc ở DB); giá trị khác trên URL không khớp truyện nào */
 const GENRE_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
-const isPublic = (s: Story) => s.visibility === 'published' && s.chapterCount > 0
-
 // ── Trang chủ ───────────────────────────────────────────────────────────
 
-/** Truyện chọn tay (sửa ở /admin/featured) theo position; bỏ truyện không còn công khai */
+/**
+ * Truyện chọn tay (sửa ở /admin/featured) theo position, một request: RPC trả thẳng thẻ truyện và
+ * đã bỏ truyện không còn công khai
+ */
 async function curated(list: 'featured' | 'editor_pick'): Promise<Story[]> {
-  const rows = unwrap(
-    await db()
-      .from('curated_stories')
-      .select('story_id')
-      .eq('list', list)
-      .order('position')
-      .order('story_id'),
-  )
-  const stories = await storiesByIds(rows.map((r) => r.story_id))
-  return stories.filter(isPublic)
+  const rows = unwrap(await db().rpc('curated_story_cards', { p_list: list }))
+  return rows.map(toStory)
 }
 
 export async function getFeaturedStories(): Promise<Story[]> {
@@ -121,8 +113,8 @@ export async function getStoriesByAuthor(authorSlug: string, excludeSlug?: strin
 
 /** Truyện liên quan: nhiều thể loại trùng nhất, rồi nhiều lượt đọc nhất (bỏ truyện cùng tác giả) */
 export async function getRelatedStories(slug: string, limit = 6): Promise<Story[]> {
-  const rows = unwrap(await db().rpc('related_stories', { p_slug: slug, p_limit: limit }))
-  return storiesByIds(rows.map((r) => r.story_id))
+  const rows = unwrap(await db().rpc('related_story_cards', { p_slug: slug, p_limit: limit }))
+  return rows.map((r) => toStory(r.card))
 }
 
 // ── Danh sách có bộ lọc (/list/:type, /genres/:slug) ──────────────
@@ -159,10 +151,13 @@ export async function browseStories({
 
 // ── Tìm kiếm ────────────────────────────────────────────────────────────
 
-/** RPC search_stories chấm điểm giống matchScore: điểm cao trước, rồi đọc nhiều */
+/**
+ * RPC search_story_cards (bọc search_stories, kèm thẻ truyện) chấm điểm giống matchScore: điểm cao
+ * trước, rồi đọc nhiều
+ */
 const searchQuery = (query: string, options?: { count: 'exact' }) =>
   db()
-    .rpc('search_stories', { p_query: query }, options)
+    .rpc('search_story_cards', { p_query: query }, options)
     .order('score', { ascending: false })
     .order('view_count', { ascending: false })
     .order('story_id')
@@ -203,15 +198,14 @@ export async function searchStories(query: string, page = 1): Promise<SearchResu
     ),
     genresMatching(q),
   ])
-  const items = await storiesByIds(result.items.map((r) => r.story_id))
-  return { ...result, items, genres }
+  return { ...result, items: result.items.map((r) => toStory(r.card)), genres }
 }
 
 /** Gợi ý nhanh khi gõ ở ô tìm kiếm */
 export async function getSearchSuggestions(query: string, limit = 5): Promise<Story[]> {
   if (!slugify(query)) return []
   const rows = unwrap(await searchQuery(query).limit(limit))
-  return storiesByIds(rows.map((r) => r.story_id))
+  return rows.map((r) => toStory(r.card))
 }
 
 // ── Bảng xếp hạng ───────────────────────────────────────────────────────
@@ -230,9 +224,7 @@ export async function getRanking({
   limit?: number
 } = {}): Promise<RankedStory[]> {
   const rows = unwrap(
-    await db().rpc('story_ranking', { p_by: by, p_period: period, p_limit: limit }),
+    await db().rpc('story_ranking_cards', { p_by: by, p_period: period, p_limit: limit }),
   )
-  const values = new Map(rows.map((r) => [r.story_id, Number(r.value)]))
-  const stories = await storiesByIds(rows.map((r) => r.story_id))
-  return stories.map((story) => ({ story, value: values.get(story.id) ?? 0 }))
+  return rows.map((r) => ({ story: toStory(r.card), value: Number(r.value) }))
 }

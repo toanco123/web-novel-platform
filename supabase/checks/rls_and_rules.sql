@@ -1959,6 +1959,128 @@ select pg_temp.expect(
   and exists (select 1 from cron.job where jobname = 'cleanup-cron-logs' and active),
   'có job cron xuất bản chương hẹn giờ và job dọn log cron');
 
+-- ── Thẻ truyện trả thẳng, mô tả rút gọn, ảnh bìa thu nhỏ ────────────────
+-- 81: tác giả, 82: bạn đọc
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000081', 'the1@kiem-tra.local', '{"display_name": "Tác Giả Thẻ"}'),
+  ('00000000-0000-4000-8000-000000000082', 'the2@kiem-tra.local', '{"display_name": "Bạn Đọc Thẻ"}');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000081", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Truyện Thẻ Nhanh Zqx', repeat('Mô tả rất dài. ', 40), 'ongoing', array['bang-tin-mot'],
+  null, '{"title": "Một", "content": "Nội dung chương một."}', true);
+select * from public.create_story(
+  'Truyện Thẻ Nháp Zqx', 'Bản nháp không hiện ở thẻ công khai.', 'ongoing', array['bang-tin-mot'],
+  null, '{"title": "Một", "content": "Nội dung chương một."}', false);
+reset role;
+select pg_temp.approve('truyen-the-nhanh-zqx');
+
+-- Mô tả rút gọn
+select pg_temp.expect(
+  (select char_length(description_short) = 300 and char_length(description) > 300
+    from public.story_cards where slug = 'truyen-the-nhanh-zqx'),
+  'story_cards.description_short: 300 ký tự đầu của mô tả');
+
+-- Thẻ chọn tay: đúng thứ tự, bỏ truyện nháp
+insert into public.curated_stories (list, story_id, position) values
+  ('editor_pick', pg_temp.story_id('truyen-the-nhap-zqx'), -32000),
+  ('editor_pick', pg_temp.story_id('truyen-the-nhanh-zqx'), -31999);
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect(
+  (select (c).slug = 'truyen-the-nhanh-zqx'
+    from public.curated_story_cards('editor_pick') c limit 1)
+  and not exists (select 1 from public.curated_story_cards('editor_pick') c
+    where c.slug = 'truyen-the-nhap-zqx'),
+  'curated_story_cards: theo vị trí, bỏ truyện nháp');
+
+-- Tìm kiếm, xếp hạng: có thẻ, không lộ truyện nháp
+select pg_temp.expect(
+  (select count(*) = 1 and bool_and((r.card).slug = 'truyen-the-nhanh-zqx')
+    from public.search_story_cards('the nhanh zqx') r),
+  'search_story_cards: kèm thẻ truyện');
+select pg_temp.expect(
+  not exists (select 1 from public.search_story_cards('the nhap zqx')),
+  'search_story_cards: không trả truyện nháp');
+select pg_temp.expect(
+  not exists (select 1 from public.story_ranking_cards('views', 'all', 100) r
+    where (r.card).id is null or (r.card).visibility <> 'published'),
+  'story_ranking_cards: mọi dòng có thẻ truyện công khai');
+select pg_temp.expect(
+  (select count(*) from public.story_ranking_cards('views', 'all', 100))
+    = (select count(*) from public.story_ranking('views', 'all', 100)),
+  'story_ranking_cards: cùng số dòng với story_ranking');
+
+-- Tủ truyện: kèm thẻ
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000082", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.follows (story_id) values (pg_temp.story_id('truyen-the-nhanh-zqx'));
+select pg_temp.expect(
+  (select count(*) = 1 and bool_and((l.card).slug = 'truyen-the-nhanh-zqx' and l.new_chapters = 0)
+    from public.library_cards() l),
+  'library_cards: truyện theo dõi kèm thẻ');
+reset role;
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect_error($$select * from public.library_cards()$$, '42501');
+
+-- Ảnh bìa thu nhỏ: đi cùng ảnh gốc, đổi ảnh gốc thì bỏ bản nhỏ cũ, chỉ chủ truyện ghi được
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000081", "role": "authenticated"}', true);
+set local role authenticated;
+update public.stories
+set cover_path = '00000000-0000-4000-8000-000000000081/anh.webp',
+  cover_thumb_path = '00000000-0000-4000-8000-000000000081/anh-thumb.webp'
+where slug = 'truyen-the-nhanh-zqx';
+select pg_temp.expect(
+  (select cover_thumb_path = '00000000-0000-4000-8000-000000000081/anh-thumb.webp'
+    from public.story_cards where slug = 'truyen-the-nhanh-zqx'),
+  'ghi bìa kèm bản nhỏ');
+update public.stories set cover_path = '00000000-0000-4000-8000-000000000081/moi.jpg'
+where slug = 'truyen-the-nhanh-zqx';
+select pg_temp.expect(
+  (select cover_thumb_path is null from public.stories where slug = 'truyen-the-nhanh-zqx'),
+  'đổi ảnh gốc không kèm bản nhỏ thì bỏ bản nhỏ cũ');
+select pg_temp.expect_error(
+  $$update public.stories set cover_thumb_path = '00000000-0000-4000-8000-000000000081/khac-thumb.webp'
+    where slug = 'truyen-the-nhanh-zqx'$$,
+  'invalid_cover_thumb');
+update public.stories set cover_thumb_path = '00000000-0000-4000-8000-000000000081/moi-thumb.webp'
+where slug = 'truyen-the-nhanh-zqx';
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000082", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected($$update public.stories set cover_thumb_path = null$$) = 0,
+  'người khác không ghi được cover_thumb_path');
+
+-- Hạn mức ảnh: 30 ảnh mới trong ngày thì hết lượt, trừ bản nhỏ của ảnh gốc đã có
+reset role;
+insert into storage.objects (bucket_id, name)
+select 'covers', '00000000-0000-4000-8000-000000000081/a' || g || '.webp'
+from generate_series(1, 30) g;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000081", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  not private.image_upload_allowed('00000000-0000-4000-8000-000000000081/moi.webp'),
+  'hạn mức ảnh: hết 30 ảnh mới trong ngày');
+select pg_temp.expect(
+  private.image_upload_allowed('00000000-0000-4000-8000-000000000081/a1-thumb.webp'),
+  'hạn mức ảnh: bản nhỏ của ảnh gốc đã có vẫn tải được');
+select pg_temp.expect(
+  not private.image_upload_allowed('00000000-0000-4000-8000-000000000081/khong-co-thumb.webp'),
+  'hạn mức ảnh: bản nhỏ không có ảnh gốc vẫn bị tính');
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

@@ -3,6 +3,9 @@ const COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const COVER_WIDTH = 480
 const COVER_HEIGHT = 720 // tỉ lệ 2:3
 const AVATAR_SIZE = 128
+// Bản bìa nhỏ cho thẻ, danh sách: đủ nét cho thẻ rộng tới ~160px trên màn mật độ điểm ảnh gấp đôi
+const COVER_THUMB_WIDTH = 320
+const COVER_THUMB_HEIGHT = 480
 
 export class CoverError extends Error {
   constructor(message: string) {
@@ -30,9 +33,19 @@ export function validateCoverFile(file: File) {
  */
 async function prepareImage(file: File, width: number, height: number): Promise<string> {
   validateCoverFile(file)
+  return renderImage(file, width, height, 0.85)
+}
+
+/** Cắt giữa `source` theo tỉ lệ đích, vẽ lại đúng kích thước, xuất data URL WebP (hoặc JPEG) */
+async function renderImage(
+  source: Blob,
+  width: number,
+  height: number,
+  quality: number,
+): Promise<string> {
   let bitmap: ImageBitmap
   try {
-    bitmap = await createImageBitmap(file)
+    bitmap = await createImageBitmap(source)
   } catch {
     throw new CoverError('Không đọc được ảnh này. Thử một ảnh khác nhé.')
   }
@@ -53,12 +66,18 @@ async function prepareImage(file: File, width: number, height: number): Promise<
   ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, width, height)
   bitmap.close()
 
-  const webp = canvas.toDataURL('image/webp', 0.85)
-  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.85)
+  const webp = canvas.toDataURL('image/webp', quality)
+  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', quality)
 }
 
 /** Ảnh bìa truyện: cắt giữa theo khung 2:3, 480×720 */
 export const prepareCover = (file: File) => prepareImage(file, COVER_WIDTH, COVER_HEIGHT)
+
+/** Bản bìa nhỏ 320×480 từ ảnh bìa đã chuẩn bị (data URL của prepareCover) */
+export async function makeCoverThumb(coverDataUrl: string) {
+  const blob = await (await fetch(coverDataUrl)).blob()
+  return renderImage(blob, COVER_THUMB_WIDTH, COVER_THUMB_HEIGHT, 0.8)
+}
 
 /** Ảnh đại diện: cắt giữa thành hình vuông 128×128 (nhỏ để lưu tạm trong localStorage) */
 export const prepareAvatar = (file: File) => prepareImage(file, AVATAR_SIZE, AVATAR_SIZE)

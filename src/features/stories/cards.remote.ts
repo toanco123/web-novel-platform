@@ -10,6 +10,41 @@ import type { Genre, Story } from '@/types/story'
 export type StoryCardRow = Database['public']['Views']['story_cards']['Row']
 
 /**
+ * Cột cần cho thẻ truyện (danh sách): mô tả lấy bản rút gọn 300 ký tự, bỏ các cột thẻ không dùng.
+ * Trang chi tiết (storyBySlug) lấy đủ cột. PostgREST vẫn lọc / sắp xếp được theo cột không chọn.
+ */
+export const CARD_COLUMNS =
+  'id, slug, title, description:description_short, status, visibility, owner_id, author_name, author_key, cover_path, cover_thumb_path, genres, chapter_count, first_chapter_number, latest_chapter_number, latest_chapter_title, view_count, rating_count, rating_avg, created_at, updated_at, next_chapter_number, next_chapter_at' as const
+
+/** Các cột toStory dùng: đủ cho cả dòng chọn CARD_COLUMNS lẫn dòng đầy đủ của view */
+type StoryCardFields = Pick<
+  StoryCardRow,
+  | 'id'
+  | 'slug'
+  | 'title'
+  | 'description'
+  | 'status'
+  | 'visibility'
+  | 'owner_id'
+  | 'author_name'
+  | 'author_key'
+  | 'cover_path'
+  | 'cover_thumb_path'
+  | 'genres'
+  | 'chapter_count'
+  | 'first_chapter_number'
+  | 'latest_chapter_number'
+  | 'latest_chapter_title'
+  | 'view_count'
+  | 'rating_count'
+  | 'rating_avg'
+  | 'created_at'
+  | 'updated_at'
+  | 'next_chapter_number'
+  | 'next_chapter_at'
+>
+
+/**
  * Khóa "tác giả" của truyện: chủ truyện, cộng bút danh nếu có (author_key của story_cards), giống
  * bản giả: tac-gia-<uuid> hoặc tac-gia-<uuid>-<bút-danh-dạng-slug>
  */
@@ -28,7 +63,7 @@ export function parseAuthorSlug(slug: string) {
 type GenreJson = { slug: string; name: string; description: string | null }
 
 /** Cột của view đều có kiểu `| null` (Postgres không suy được NOT NULL qua view) */
-export function toStory(row: StoryCardRow): Story {
+export function toStory(row: StoryCardFields): Story {
   const genres = (row.genres as GenreJson[] | null) ?? []
   return {
     id: row.id!,
@@ -43,6 +78,7 @@ export function toStory(row: StoryCardRow): Story {
     status: row.status!,
     description: row.description ?? '',
     coverUrl: row.cover_path ? publicImageUrl('covers', row.cover_path) : null,
+    coverThumbUrl: row.cover_thumb_path ? publicImageUrl('covers', row.cover_thumb_path) : null,
     chapterCount: row.chapter_count ?? 0,
     viewCount: row.view_count ?? 0,
     ratingAvg: Number(row.rating_avg ?? 0),
@@ -67,7 +103,7 @@ export function toStory(row: StoryCardRow): Story {
 export function publicStoryCards(options?: { count?: 'exact' }) {
   return db()
     .from('story_cards')
-    .select('*', options)
+    .select(CARD_COLUMNS, options)
     .eq('visibility', 'published')
     .gt('chapter_count', 0)
 }
@@ -90,7 +126,7 @@ export async function storiesByIds(ids: string[]): Promise<Story[]> {
   const rows = unwrap(
     await db()
       .from('story_cards')
-      .select('*')
+      .select(CARD_COLUMNS)
       .in('id', [...new Set(ids)]),
   )
   const byId = new Map(rows.map((r) => [r.id, toStory(r)]))
@@ -103,7 +139,7 @@ export async function storiesBySlugs(slugs: string[]): Promise<Story[]> {
   const rows = unwrap(
     await db()
       .from('story_cards')
-      .select('*')
+      .select(CARD_COLUMNS)
       .in('slug', [...new Set(slugs)]),
   )
   const bySlug = new Map(rows.map((r) => [r.slug, toStory(r)]))

@@ -14,6 +14,7 @@ const fake = vi.hoisted(() => ({
   queries: [] as Call[][],
   uploaded: [] as string[],
   removed: [] as string[],
+  thumbFails: false,
 }))
 
 vi.mock('@/lib/supabase', () => ({
@@ -40,8 +41,21 @@ vi.mock('@/lib/imageUpload', () => ({
     fake.uploaded.push(`${userId}/moi.webp`)
     return `${userId}/moi.webp`
   },
-  removeImage: async (_bucket: string, path: string | null) => {
-    if (path) fake.removed.push(path)
+  uploadThumb: async (_bucket: string, original: string) => {
+    const path = original.replace(/\.[a-z]+$/, '-thumb.webp')
+    fake.uploaded.push(path)
+    return path
+  },
+  removeImage: async (_bucket: string, ...paths: (string | null)[]) => {
+    fake.removed.push(...paths.filter((p): p is string => !!p))
+  },
+}))
+// Bản bìa nhỏ: jsdom không có canvas thật; fake.thumbFails giả lỗi khi tạo ảnh
+vi.mock('@/lib/image', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/image')>('@/lib/image')),
+  makeCoverThumb: async () => {
+    if (fake.thumbFails) throw new Error('canvas')
+    return 'data:image/webp;base64,BB'
   },
 }))
 
@@ -132,8 +146,9 @@ const chapterRow = (number: number, over: object = {}) => ({
   published_at: null,
   ...over,
 })
-/** Kết quả kiểm tra chủ truyện (stories.select('slug, cover_path')) */
-const own = (coverPath: string | null = null) => ok({ slug: 'mua-ha', cover_path: coverPath })
+/** Kết quả kiểm tra chủ truyện (stories.select('slug, cover_path, cover_thumb_path')) */
+const own = (coverPath: string | null = null, thumbPath: string | null = null) =>
+  ok({ slug: 'mua-ha', cover_path: coverPath, cover_thumb_path: thumbPath })
 
 beforeEach(() => {
   fake.userId = USER
@@ -141,6 +156,7 @@ beforeEach(() => {
   fake.queries = []
   fake.uploaded = []
   fake.removed = []
+  fake.thumbFails = false
 })
 
 afterEach(() => expect(fake.responses, 'còn kết quả chưa dùng').toEqual([]))
@@ -270,32 +286,55 @@ test('tạo truyện: một lần RPC, tên gọn khoảng trắng, chương đ�
   expect(rpcArgs()).toMatchObject({ p_first_chapter: null, p_publish: false })
 })
 
-test('ảnh bìa: lưu lỗi thì xóa ảnh vừa upload, đổi hoặc bỏ ảnh thì xóa ảnh cũ', async () => {
+test('ảnh bìa: lưu lỗi thì xóa ảnh vừa upload, đổi hoặc bỏ ảnh thì xóa ảnh cũ (cả bản nhỏ)', async () => {
   fake.responses = [business('too_many_genres')]
   await expect(
     api.createStory({ ...input, coverUrl: 'data:image/webp;base64,AAAA' }),
   ).rejects.toMatchObject({ code: 'too_many_genres' })
-  expect(fake.uploaded).toEqual(['u1/moi.webp'])
-  expect(fake.removed).toEqual(['u1/moi.webp'])
+  expect(fake.uploaded).toEqual(['u1/moi.webp', 'u1/moi-thumb.webp'])
+  expect(fake.removed).toEqual(['u1/moi.webp', 'u1/moi-thumb.webp'])
 
-  // Giữ ảnh cũ: gửi lại đường dẫn cũ, không upload, không xóa
+  // Truyện mới có bìa: lưu xong thì ghi bản nhỏ (RPC chỉ nhận cover_path)
   fake.uploaded = []
   fake.removed = []
-  fake.responses = [own('u1/cu.webp'), ok(studioRow({ cover_path: 'u1/cu.webp' }))]
+  fake.responses = [ok(studioRow({ cover_path: 'u1/moi.webp' })), ok(null)]
+  await api.createStory({ ...input, coverUrl: 'data:image/webp;base64,AAAA' })
+  expect(lastQuery()).toContainEqual(['update', { cover_thumb_path: 'u1/moi-thumb.webp' }])
+  expect(lastQuery()).toContainEqual(['eq', 'id', STORY_ID])
+
+  // Giữ ảnh cũ: gửi lại đường dẫn cũ, không upload, không xóa, không ghi bản nhỏ
+  fake.uploaded = []
+  fake.removed = []
+  fake.responses = [
+    own('u1/cu.webp', 'u1/cu-thumb.webp'),
+    ok(studioRow({ cover_path: 'u1/cu.webp' })),
+  ]
   const kept = await api.updateStory(STORY_ID, { ...input, coverUrl: fake.cdn + 'u1/cu.webp' })
   expect(rpcArgs()).toMatchObject({ p_id: STORY_ID, p_cover_path: 'u1/cu.webp' })
   expect(kept.coverUrl).toBe(fake.cdn + 'u1/cu.webp')
   expect([fake.uploaded, fake.removed]).toEqual([[], []])
 
-  // Ảnh mới: upload, lưu xong mới xóa ảnh cũ
-  fake.responses = [own('u1/cu.webp'), ok(studioRow({ cover_path: 'u1/moi.webp' }))]
+  // Ảnh mới: upload cả bản nhỏ, lưu xong mới xóa ảnh cũ và bản nhỏ cũ
+  fake.responses = [
+    own('u1/cu.webp', 'u1/cu-thumb.webp'),
+    ok(studioRow({ cover_path: 'u1/moi.webp' })),
+    ok(null),
+  ]
   await api.updateStory(STORY_ID, { ...input, coverUrl: 'data:image/webp;base64,AAAA' })
-  expect(rpcArgs()).toMatchObject({ p_cover_path: 'u1/moi.webp' })
-  expect(fake.removed).toEqual(['u1/cu.webp'])
+  expect(fake.queries.at(-2)).toContainEqual([
+    'rpc',
+    'update_story',
+    expect.objectContaining({ p_cover_path: 'u1/moi.webp' }),
+  ])
+  expect(lastQuery()).toContainEqual(['update', { cover_thumb_path: 'u1/moi-thumb.webp' }])
+  expect(fake.removed).toEqual(['u1/cu.webp', 'u1/cu-thumb.webp'])
 
   // Form cũ (tab khác đã đổi bìa và xóa file cũ) gửi URL bìa cũ: giữ bìa đang lưu, không xóa gì
   fake.removed = []
-  fake.responses = [own('u1/moi.webp'), ok(studioRow({ cover_path: 'u1/moi.webp' }))]
+  fake.responses = [
+    own('u1/moi.webp', 'u1/moi-thumb.webp'),
+    ok(studioRow({ cover_path: 'u1/moi.webp' })),
+  ]
   await api.updateStory(STORY_ID, { ...input, coverUrl: fake.cdn + 'u1/cu.webp' })
   expect(rpcArgs()).toMatchObject({ p_cover_path: 'u1/moi.webp' })
   expect(fake.removed).toEqual([])
@@ -304,19 +343,28 @@ test('ảnh bìa: lưu lỗi thì xóa ảnh vừa upload, đổi hoặc bỏ �
   await api.createStory({ ...input, coverUrl: fake.cdn + 'u1/cua-truyen-khac.webp' })
   expect(rpcArgs().p_cover_path).toBeUndefined()
 
-  // Bỏ ảnh: không gửi p_cover_path (tham số mặc định null)
+  // Bỏ ảnh: không gửi p_cover_path (tham số mặc định null), xóa ảnh và bản nhỏ
   fake.removed = []
-  fake.responses = [own('u1/moi.webp'), ok(studioRow())]
+  fake.responses = [own('u1/moi.webp', 'u1/moi-thumb.webp'), ok(studioRow())]
   await api.updateStory(STORY_ID, input)
   expect(rpcArgs().p_cover_path).toBeUndefined()
-  expect(fake.removed).toEqual(['u1/moi.webp'])
+  expect(fake.removed).toEqual(['u1/moi.webp', 'u1/moi-thumb.webp'])
 
-  // Xóa truyện: xóa luôn file bìa
+  // Xóa truyện: xóa luôn file bìa và bản nhỏ
   fake.removed = []
-  fake.responses = [own('u1/cu.webp'), ok([{ id: STORY_ID }])]
+  fake.responses = [own('u1/cu.webp', 'u1/cu-thumb.webp'), ok([{ id: STORY_ID }])]
   await api.deleteStory(STORY_ID)
   expect(lastQuery()).toContainEqual(['delete'])
-  expect(fake.removed).toEqual(['u1/cu.webp'])
+  expect(fake.removed).toEqual(['u1/cu.webp', 'u1/cu-thumb.webp'])
+})
+
+test('ảnh bìa: tạo bản nhỏ lỗi thì vẫn lưu truyện với ảnh gốc, không ghi bản nhỏ', async () => {
+  fake.thumbFails = true
+  fake.responses = [ok(studioRow({ cover_path: 'u1/moi.webp' }))]
+  const story = await api.createStory({ ...input, coverUrl: 'data:image/webp;base64,AAAA' })
+  expect(story.coverUrl).toBe(fake.cdn + 'u1/moi.webp')
+  expect(fake.uploaded).toEqual(['u1/moi.webp'])
+  expect(writes()).toHaveLength(0)
 })
 
 test('lưu chương: đánh số và kiểm tra như bản giả trước khi ghi', async () => {

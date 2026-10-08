@@ -5,7 +5,8 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { requireUserId, unauthenticated } from '@/features/auth/api'
 import { businessCode, isUniqueViolation, unwrap } from '@/lib/dbError'
-import { isDataUrl, publicImageUrl, removeImage, uploadImage } from '@/lib/imageUpload'
+import { makeCoverThumb } from '@/lib/image'
+import { isDataUrl, publicImageUrl, removeImage, uploadImage, uploadThumb } from '@/lib/imageUpload'
 import { db } from '@/lib/supabase'
 import { isUuid } from '@/lib/uuid'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
@@ -137,7 +138,7 @@ async function ownStory(storyId: string) {
     unwrap(
       await db()
         .from('stories')
-        .select('slug, cover_path')
+        .select('slug, cover_path, cover_thumb_path')
         .eq('id', storyId)
         .eq('owner_id', userId)
         .maybeSingle(),
@@ -161,10 +162,24 @@ async function findMyStory(id: string): Promise<MyStory | null> {
  *   truyện trỏ tới file đã xóa rồi xóa nốt bìa đang dùng.
  */
 async function resolveCover(userId: string, coverUrl: string | null, current: string | null) {
-  if (!coverUrl) return { path: null, uploaded: null }
-  if (!isDataUrl(coverUrl)) return { path: current, uploaded: null }
+  if (!coverUrl) return { path: null, thumb: null, uploaded: [] as string[] }
+  if (!isDataUrl(coverUrl)) return { path: current, thumb: null, uploaded: [] as string[] }
   const path = await uploadImage('covers', userId, coverUrl)
-  return { path, uploaded: path }
+  // Bản nhỏ 320×480 cho thẻ truyện; lỗi thì bỏ qua (thẻ dùng ảnh gốc), không chặn việc lưu truyện
+  const thumb = await makeCoverThumb(coverUrl)
+    .then((dataUrl) => uploadThumb('covers', path, dataUrl))
+    .catch(() => null)
+  return { path, thumb, uploaded: thumb ? [path, thumb] : [path] }
+}
+
+/**
+ * Ghi bản bìa nhỏ vừa tải lên (create_story / update_story chỉ nhận cover_path; đổi bìa thì trigger
+ * đã bỏ bản nhỏ cũ). Lỗi thì xóa file bản nhỏ, thẻ truyện dùng ảnh gốc
+ */
+async function saveCoverThumb(storyId: string, thumb: string | null) {
+  if (!thumb) return
+  const { error } = await db().from('stories').update({ cover_thumb_path: thumb }).eq('id', storyId)
+  if (error) await removeImage('covers', thumb)
 }
 
 // ── Truyện ──────────────────────────────────────────────────────────────
@@ -210,9 +225,10 @@ export async function createStory(
     })
     .single()
   if (error) {
-    await removeImage('covers', cover.uploaded)
+    await removeImage('covers', ...cover.uploaded)
     throw studioError(error) ?? error
   }
+  await saveCoverThumb(data.id!, cover.thumb)
   return toMyStory(data)
 }
 
@@ -234,10 +250,13 @@ export async function updateStory(id: string, input: StoryInput): Promise<MyStor
     })
     .single()
   if (error) {
-    await removeImage('covers', cover.uploaded)
+    await removeImage('covers', ...cover.uploaded)
     throw studioError(error) ?? error
   }
-  if (current.cover_path !== cover.path) await removeImage('covers', current.cover_path)
+  await saveCoverThumb(id, cover.thumb)
+  if (current.cover_path !== cover.path) {
+    await removeImage('covers', current.cover_path, current.cover_thumb_path)
+  }
   return toMyStory(data)
 }
 
@@ -273,7 +292,7 @@ export async function deleteStory(id: string): Promise<void> {
   const { story } = await ownStory(id)
   const rows = unwrap(await db().from('stories').delete().eq('id', id).select('id'), studioError)
   if (!rows.length) throw notFound()
-  await removeImage('covers', story.cover_path)
+  await removeImage('covers', story.cover_path, story.cover_thumb_path)
 }
 
 // ── Chương ──────────────────────────────────────────────────────────────

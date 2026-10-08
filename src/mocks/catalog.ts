@@ -50,6 +50,8 @@ export function toStory(stored: StoredStory, genres = allGenres(), views = loadV
     status: stored.status,
     description: stored.description,
     coverUrl: stored.coverUrl,
+    // Bìa giả là data URL, không có bản nhỏ riêng
+    coverThumbUrl: stored.coverUrl,
     chapterCount: published.length,
     viewCount: totalViews(views[stored.slug]),
     ratingAvg: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0,

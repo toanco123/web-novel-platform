@@ -217,24 +217,23 @@ test('gộp lịch sử khách: lỗi khác (cổng API, mạng) thì giữ bả
   expect(loadGuestHistory()).toEqual([])
 })
 
-test('tủ truyện: theo dõi nhiều truyện thì chia id thành nhiều truy vấn, giữ thứ tự get_library', async () => {
+test('tủ truyện: RPC trả kèm thẻ truyện, lịch sử đọc chia id thành nhiều truy vấn, giữ thứ tự', async () => {
   fake.userId = USER
   const ids = Array.from({ length: 250 }, (_, i) => `id-${249 - i}`)
   fake.respond = (calls) => {
-    const [[kind, name]] = calls
+    const [[kind]] = calls
     if (kind === 'rpc') {
       return ok(
         ids.map((id) => ({
           story_id: id,
-          slug: `truyen-${id}`,
           followed_at: TIME,
           seen_chapter: 3,
           new_chapters: 0,
+          card: card(id),
         })),
       )
     }
     const values = inValues(calls)
-    if (name === 'story_cards') return ok(values.map(card))
     // Chỉ truyện id-7 đã đọc tới chương 2
     return ok(
       values
@@ -256,7 +255,8 @@ test('tủ truyện: theo dõi nhiều truyện thì chia id thành nhiều truy
 
   const chunkSizes = (table: string) =>
     fake.queries.filter(([[, name]]) => name === table).map((calls) => inValues(calls).length)
-  expect(chunkSizes('story_cards')).toEqual([100, 100, 50])
+  expect(rpcCalls('library_cards')).toHaveLength(1)
+  expect(chunkSizes('story_cards')).toEqual([])
   expect(chunkSizes('reading_history')).toEqual([100, 100, 50])
 })
 
