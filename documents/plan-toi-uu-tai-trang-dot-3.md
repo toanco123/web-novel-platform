@@ -1,6 +1,14 @@
 # Plan: Tối ưu tải trang đợt 3
 
-Trạng thái: chờ duyệt spec (08/10/2026).
+Trạng thái: ✅ xong (08/10/2026), migration `faster_cards_and_thumbs` đã push lên DB production. Nhánh `faster-loading-3`. App di động không đổi (RPC cũ giữ nguyên).
+
+**Khác so với bản spec đã duyệt** (phát hiện lúc làm):
+- **Hàm bọc thay vì thêm cột `card` vào RPC cũ:** `story_ranking_cards`, `related_story_cards`, `search_story_cards`, `library_cards` gọi RPC cũ `with ordinality` rồi nối `story_cards`. Không phải chép lại thân hàm dài (`story_ranking`), RPC cũ giữ nguyên cho app.
+- Thẻ từ các hàm bọc chứa mô tả đầy đủ (dòng `story_cards` trọn vẹn); chỉ danh sách đọc thẳng `story_cards` mới dùng `description_short`.
+- **Bản bìa nhỏ tạo lúc tải lên trong bản remote** (`makeCoverThumb` + `uploadThumb`), không đổi `prepareCover`; `create_story` / `update_story` giữ nguyên, client ghi `cover_thumb_path` bằng một lệnh update ngay sau đó. Trigger `stories_cover_thumb` bỏ bản nhỏ cũ khi đổi bìa mà không ghi bản nhỏ mới. Tạo / tải bản nhỏ lỗi thì bỏ qua, truyện vẫn lưu với ảnh gốc. `StoryCover`: bản nhỏ lỗi thì thử ảnh gốc rồi mới tới bìa chữ.
+- **Vendor chunk không gom Radix:** gom thì JS vào trang tăng 7,3 KB (kéo cả component chỉ trang tải sau dùng).
+- `chapterLoader` import động `chapterQuery` và mục lục chương tách sang `chapters/queries.ts`: nếu không, kho đọc offline (IndexedDB) bị kéo vào bundle chính (+5,4 KB).
+- Thêm devDependency `playwright-core` cho `scripts/measure-load.mjs` (không tải trình duyệt; dùng Chromium có sẵn trong cache của Playwright).
 
 ## Context
 
@@ -95,3 +103,19 @@ Loader chỉ tải **dữ liệu công khai** (giống nhau với mọi người
 4. Migration (cột `card`, `curated_story_cards`, `description_short`, `cover_thumb_path`, hạn mức ảnh), ca kiểm tra SQL, thử trong transaction; push (hỏi người dùng), advisors, sinh kiểu.
 5. Bản remote: đọc `card`, `CARD_COLUMNS`; ảnh thu nhỏ (`image.ts`, tải / xóa ảnh, `StoryCover`) + test.
 6. Đo lại, cập nhật `thiet-ke-database.md`, `CLAUDE.md`, lộ trình, `plan-toi-uu-tai-trang.md`; ghi chú app di động; kiểm tra giao diện; toàn bộ test, lint, build; commit, gộp vào `main`.
+
+## Kết quả đo
+
+`vite preview` trên máy, cùng gọi Supabase thật, Slow 4G (độ trễ 150 ms, 1,6 Mbps), CPU chậm 4 lần, khổ điện thoại, trung vị 3 lần (08/10/2026). "Dữ liệu" là lúc request Supabase đầu tiên bắt đầu.
+
+| Trang | Dữ liệu (`main` → mới) | LCP (`main` → mới) | FCP (`main` → mới) |
+|---|---|---|---|
+| Trang chủ | 2,73 → 2,15 s | ~3,96 → ~3,98 s (dao động 3,3–4,8 s) | 2,19 → 2,2 s |
+| Chi tiết truyện | 3,11 → 2,14 s | 3,66 → 3,20 s | 2,21 → 2,19 s |
+| Trang đọc | 3,37 → 2,55 s | 4,09 → 3,51 s | 4,09 → 3,51 s |
+| Xếp hạng | 2,37 → 2,14 s | 2,46 → 2,49 s | 2,17 → 2,19 s |
+
+- Dữ liệu bắt đầu tải sớm hơn 0,2–1 s ở mọi trang (route loader). LCP trang truyện, trang đọc giảm 0,45–0,6 s. Trang chủ: LCP dao động mạnh giữa các lần đo, trung bình gần như không đổi; nút thắt là chạy JS trên CPU chậm, không còn là mạng.
+- FCP trang chủ / truyện không đổi: đó là lúc khung trang tĩnh hiện (đợt 1), không phụ thuộc dữ liệu.
+- JS vào trang (gzip, `scripts/entry-js-size.mjs`): `main` 261,6 KB → mới 262,6 KB (loader +3 KB, vendor chunk −2 KB). Vendor chunk giữ nguyên tên file khi chỉ đổi code app (đã kiểm tra bằng hai lần build).
+- Ảnh bìa nhỏ: chưa đo được trên dữ liệu thật (production mới có 1 bìa, là bìa cũ chưa có bản nhỏ); mỗi thẻ có bìa nhẹ đi từ khoảng 81 KB xuống 15–20 KB khi tác giả tải bìa mới.
