@@ -2,6 +2,7 @@ import { useParams, useSearchParams } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { NotFound } from '@/components/common/NotFound'
 import { SectionError, SectionHeading } from '@/components/common/SectionHeading'
+import { parseChapterListParams } from '@/features/chapters/api'
 import { ChapterList } from '@/features/chapters/components/ChapterList'
 import { CommentsSection } from '@/features/comments/components/CommentsSection'
 import { useComments } from '@/features/comments/hooks'
@@ -47,8 +48,7 @@ export default function StoryDetailPage() {
 
 function StoryDetail({ story }: { story: Story }) {
   const [params] = useSearchParams()
-  const page = Math.max(1, Number(params.get('page')) || 1)
-  const order: ChapterOrder = params.get('sort') === 'newest' ? 'desc' : 'asc'
+  const { page, order } = parseChapterListParams(params)
   const comments = useComments(story.slug)
   const byAuthor = useStoriesByAuthor(story.author.slug, story.slug)
   const related = useRelatedStories(story.slug)

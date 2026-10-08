@@ -47,7 +47,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 |---|---|---|
 | `profiles` | `id` (= `auth.users.id`), `display_name` (1–30), `avatar_url` | Trigger tạo khi có tài khoản mới. Tên lấy lần lượt từ `display_name` của form đăng ký, `full_name`/`name` (Google, Facebook), rồi phần trước @ của email |
 | `genres` | `slug` (khóa chính), `name` (2–30), `description` (≤200), `created_by` | `slug` luôn = `slugify(name)` do trigger đặt, nên tạo trùng là lỗi `23505` |
-| `stories` | `id`, `owner_id`, `slug` (unique, không đổi), `title` (2–120), `description` (≤3000), `status`, `visibility`, `cover_path`, `search_title` (tự sinh), `created_at`, `updated_at`, `published_at`, `review_status`, `review_submitted_at`, `reviewed_at`, `review_reason` (1–500, chỉ có khi `rejected`) | `updated_at` = lần sửa gần nhất của tác giả, kể cả sửa chương (sắp xếp khu Sáng tác). `published_at` = lần đầu công khai. `review_status` null = chưa gửi duyệt (hoặc bị gỡ); chỉ truyện `approved` mới công khai được (quản trị viên miễn duyệt, plan `plan-duyet-truyen.md`) |
+| `stories` | `id`, `owner_id`, `slug` (unique, không đổi), `title` (2–120), `description` (≤3000), `status`, `visibility`, `cover_path`, `search_title` (tự sinh), `created_at`, `updated_at`, `published_at`, `review_status`, `review_submitted_at`, `reviewed_at`, `review_reason` (1–500, chỉ có khi `rejected`), `cover_thumb_path` (bìa nhỏ 320×480, null: chưa có) | `updated_at` = lần sửa gần nhất của tác giả, kể cả sửa chương (sắp xếp khu Sáng tác). `published_at` = lần đầu công khai. `review_status` null = chưa gửi duyệt (hoặc bị gỡ); chỉ truyện `approved` mới công khai được (quản trị viên miễn duyệt, plan `plan-duyet-truyen.md`) |
 | `story_genres` | `story_id`, `genre_slug`, `position` | Tối đa 5 thể loại (`too_many_genres`) |
 | `chapters` | `id`, `story_id`, `number` (1–99999), `title` (≤120), `content` (1–200 000), `status`, `created_at`, `updated_at`, `published_at`, `scheduled_at` (giờ hẹn tự xuất bản, chỉ chương nháp) | `published_at` = lần đầu xuất bản, ẩn rồi xuất bản lại vẫn giữ mốc cũ. Hẹn giờ: plan `plan-hen-gio-dang-chuong.md`; xuất bản (tay hoặc tự động) thì `scheduled_at` về null. `content` là HTML rút gọn của trình soạn hoặc văn bản thuần kiểu cũ; client giới hạn 100 000 ký tự chữ nhìn thấy, DB cho tới 200 000 vì có thẻ định dạng (`documents/plan-trinh-soan-dinh-dang.md`) |
 | `story_stats` | `chapter_count`, `first_chapter_number`, `latest_chapter_number`, `latest_chapter_title`, `last_chapter_at`, `view_count`, `follower_count`, `rating_counts int[5]`, `rating_count`, `rating_sum`, `rating_avg`, `next_chapter_number`, `next_chapter_at` | Các cột về chương chỉ tính chương đã xuất bản; `next_chapter_*` là chương nháp có giờ hẹn sớm nhất (trigger `chapters_after_change`). `rating_*` tự sinh từ `rating_counts`; `rating_avg` = 0 khi chưa có lượt chấm |
@@ -138,7 +138,7 @@ Lỗi nghiệp vụ nằm trong `error.message` (mã `P0001`). Các luật tự 
 | Truyện mới | 10 / ngày mỗi người (`story_limit`) |
 | Chương mới | 500 / ngày mỗi người (`chapter_limit`) |
 | Nội dung chương ghi vào (tạo + sửa) | 10.000.000 byte UTF-8 / ngày mỗi người (`chapter_limit`); file `.txt` nhập tối đa 2 MB nên đủ ~5 lần nhập / ngày |
-| Ảnh tải lên (bìa + đại diện) | 30 ảnh mới / 24 giờ và 300 ảnh đang lưu mỗi người (policy `images_insert_own` qua `private.image_upload_allowed()`; vượt thì Storage trả lỗi RLS, client đổi sang `ImageLimitError`) |
+| Ảnh tải lên (bìa + đại diện) | 30 ảnh mới / 24 giờ và 300 ảnh đang lưu mỗi người (policy `images_insert_own` qua `private.image_upload_allowed(name)`; vượt thì Storage trả lỗi RLS, client đổi sang `ImageLimitError`). Bản bìa nhỏ `{uuid}-thumb.(webp|jpg)` không tính khi đã có ảnh gốc `{uuid}.(webp|jpg)` |
 
 **Chống sửa dữ liệu qua API:** người gửi báo lỗi không có quyền sửa `chapter_reports.created_at` (trigger `chapter_reports_touch` đặt lại khi sửa ghi chú); `profiles.avatar_url` chỉ nhận `null` hoặc ảnh trong `avatars/{uid}/` của project (trigger `profiles_check_avatar`, URL project viết cứng trong hàm); lúc đăng ký chỉ lấy ảnh từ Google/Facebook, không lấy từ `options.data` của đăng ký email.
 
@@ -154,7 +154,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 |---|---|---|
 | `profiles` | mọi người | chủ sửa `display_name`, `avatar_url` |
 | `genres` | mọi người | người đã đăng nhập thêm mới (`name`, `description`) |
-| `stories` | truyện công khai, cộng truyện nháp của chính mình; quản trị viên thấy thêm truyện chờ duyệt | chủ truyện. Insert được: `slug, title, description, status, cover_path`. Update được: `title, description, status, visibility, cover_path` (công khai chỉ khi đã duyệt; cột duyệt chỉ ghi qua RPC) |
+| `stories` | truyện công khai, cộng truyện nháp của chính mình; quản trị viên thấy thêm truyện chờ duyệt | chủ truyện. Insert được: `slug, title, description, status, cover_path`. Update được: `title, description, status, visibility, cover_path, cover_thumb_path` (công khai chỉ khi đã duyệt; cột duyệt chỉ ghi qua RPC). `cover_thumb_path` phải là `{uuid}-thumb.(webp|jpg)` của đúng `cover_path` (`invalid_cover_thumb`); đổi `cover_path` mà không ghi bản nhỏ thì trigger `stories_cover_thumb` đặt về null |
 | `story_genres`, `story_stats`, `chapter_views`, `curated_stories` | ai thấy truyện thì thấy | `story_genres`: chủ truyện. Ba bảng còn lại: không ai ghi từ client |
 | `chapters` | chương đã xuất bản của truyện công khai (quản trị viên: cả của truyện chờ duyệt); chủ truyện thấy cả nháp | chủ truyện. Insert được: `story_id, number, title, content, status, scheduled_at`. Update được: `number, title, content, status, scheduled_at` |
 | `follows`, `reading_history`, `ratings` | chỉ chủ | chỉ chủ |
@@ -179,7 +179,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 ## 6. View và RPC
 
 **View** (`security_invoker`, nên RLS của bảng gốc vẫn áp dụng):
-- **`story_cards`**: map ra kiểu `Story`. `created_at` = lần đầu công khai, `updated_at` = lần xuất bản chương gần nhất. `next_chapter_number`, `next_chapter_at` (từ `story_stats`) → `Story.nextChapter`: người đọc chỉ thấy số chương và giờ ra của chương hẹn giờ sớm nhất.
+- **`story_cards`**: map ra kiểu `Story`. `created_at` = lần đầu công khai, `updated_at` = lần xuất bản chương gần nhất. `next_chapter_number`, `next_chapter_at` (từ `story_stats`) → `Story.nextChapter`: người đọc chỉ thấy số chương và giờ ra của chương hẹn giờ sớm nhất. `description_short` (300 ký tự đầu, danh sách lấy cột này thay `description`), `cover_thumb_path` → `Story.coverThumbUrl`.
   - Danh sách công khai phải lọc thêm `visibility = 'published'` và `chapter_count > 0`, vì chủ truyện còn thấy cả truyện nháp của mình.
 - **`studio_stories`**: map ra kiểu `MyStory`, chỉ gồm truyện của người đang đăng nhập.
 - **`genre_cards`**: thể loại kèm `story_count` (số truyện công khai).
@@ -189,6 +189,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | Hàm | Ai gọi được | Việc |
 |---|---|---|
 | `create_story(title, description, status, genres[], cover_path?, first_chapter?, publish?)` | đã đăng nhập | Tạo truyện, thể loại và chương đầu trong một transaction; trả về dòng `studio_stories`. `first_chapter` = `{"number"?, "title", "content"}`. Slug trùng thì thêm `-2`, `-3`… `publish`: xuất bản chương đầu, rồi tác giả thì gửi duyệt, quản trị viên thì công khai |
+| `story_ranking_cards`, `related_story_cards`, `search_story_cards`, `library_cards`, `curated_story_cards(list)` | như RPC được bọc (`library_cards`: đã đăng nhập) | Hàm bọc INVOKER trả thẳng thẻ truyện (cột `card` = dòng `story_cards`; `curated_story_cards` trả `setof story_cards`, chỉ truyện công khai có chương) cùng kết quả của `story_ranking` / `related_stories` / `search_stories` / `get_library` (giữ thứ tự bằng `with ordinality`). RLS của `story_cards` áp dụng: truyện người gọi không thấy thì không có dòng. RPC cũ giữ nguyên cho app di động |
 | `schedule_chapters(story_id, items)` | chủ truyện | Xếp giờ hẹn cho nhiều chương nháp một lần (`items` = `[{"number", "at"}]`, INVOKER, một transaction). Lỗi: `not_found` (truyện không phải của mình, chương không có), `invalid_schedule` (chương không phải nháp, giờ sai) |
 | `submit_story_for_review(story_id)` | chủ truyện | Gửi duyệt / gửi lại sau khi bị từ chối (`pending`). Lỗi: `not_found`, `story_taken_down`, `already_pending`, `already_approved`, `no_published_chapters` |
 | `update_story(id, title, description, status, genres[], cover_path?)` | đã đăng nhập | Sửa truyện và thay thể loại cùng lúc |
@@ -258,14 +259,15 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | auth | `updateProfile` | Upload lên `avatars`, rồi `update profiles` |
 | auth | `deleteAccount({ password, captchaToken })` | Tài khoản email: kiểm tra mật khẩu bằng cách đăng nhập lại (kèm captcha). Xóa thư mục `{uid}/` trong `avatars` và `covers` (Storage không tự xóa theo), rồi `rpc('delete_account')` và `auth.signOut({ scope: 'local' })` |
 | auth | `changePassword` | `auth.updateUser({ password })`. Kiểm tra mật khẩu cũ bằng cách đăng nhập lại, hoặc bật "Secure password change" |
-| stories | `getFeaturedStories`, `getEditorPicks` | `curated_stories` (theo `list`, `position`), rồi `story_cards.in('id', …)`. Chưa có truyện chọn tay nào công khai thì lấy tự động: nổi bật là 4 truyện công khai nhiều lượt đọc nhất (rồi cập nhật gần nhất); biên tập chọn là 8 truyện theo `rating_avg`, `rating_count`, `created_at` giảm dần |
+| stories | `getFeaturedStories`, `getEditorPicks` | `rpc('curated_story_cards', { p_list })` (một request). Chưa có truyện chọn tay nào công khai thì lấy tự động: nổi bật là 4 truyện công khai nhiều lượt đọc nhất (rồi cập nhật gần nhất); biên tập chọn là 8 truyện theo `rating_avg`, `rating_count`, `created_at` giảm dần |
 | stories | `getLatestUpdated` / `getNewReleases` | `story_cards` công khai, `order('updated_at' / 'created_at', desc)` |
 | stories | `getStory(slug)` | `story_cards.eq('slug', slug).maybeSingle()` (RLS cho chủ truyện thấy cả bản nháp) |
 | stories | `getStoriesByAuthor` | `story_cards` công khai `.eq('owner_id', <tách từ author slug>).neq('slug', …)` |
-| stories | `getRelatedStories` | `rpc('related_stories')` → `story_cards` |
+| stories | `getRelatedStories` | `rpc('related_story_cards')` → `toStory(row.card)` |
 | stories | `browseStories` | `story_cards` công khai. Thể loại: `.contains('genre_slugs', [slug])`. Độ dài: lọc `chapter_count`. Kèm sắp xếp và `.range()` với `count: 'exact'` |
-| stories | `searchStories`, `getSearchSuggestions` | `rpc('search_stories', { p_query }, { count: 'exact' }).order('score', desc).order('view_count', desc).range()` → `story_cards`. Thể loại khớp lấy từ `genre_cards` |
-| stories | `getRanking`, `getTrendingWeekly` | `rpc('story_ranking')` → `story_cards` |
+| stories | `searchStories`, `getSearchSuggestions` | `rpc('search_story_cards', { p_query }, { count: 'exact' }).order('score', desc).order('view_count', desc).range()` → `toStory(row.card)` (thẻ dựng cho mọi truyện khớp trước khi cắt trang; nhiều truyện thì chuyển sang tham số limit/offset). Thể loại khớp lấy từ `genre_cards` |
+| stories | `getRanking`, `getTrendingWeekly` | `rpc('story_ranking_cards')` → `toStory(row.card)` |
+| stories | danh sách dùng `publicStoryCards`, `storiesByIds`, `storiesBySlugs` | `story_cards.select(CARD_COLUMNS)` (`cards.remote.ts`): chỉ cột thẻ cần, mô tả là `description:description_short`; `getStory` lấy đủ cột |
 | chapters | `getChapterList` | `chapters.select('number, title, published_at, stories!inner(slug)').eq('stories.slug', slug).eq('status', 'published').order('number')` qua `loadPage`. Lọc truyện bằng join nên RLS của `stories` áp dụng |
 | chapters | `getChapter` | Chương theo `(stories.slug, number, status = published)`, chạy song song với `storyBySlug`, chương trước (`number <` lớn nhất) và chương sau (`number >` nhỏ nhất), mỗi bên `limit 1` |
 | chapters | `recordChapterView` | `rpc('record_chapter_view', { p_slug, p_number })`. Giữ `Set` chống đếm trùng ở client; gọi lỗi thì bỏ khóa khỏi `Set` để lần mở sau thử lại |
@@ -282,7 +284,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | studio | `getStoryReports` | `chapter_reports.select('*, reporter:profiles(id, display_name)')`, sắp theo `status` (enum: `open` trước), rồi `created_at` giảm dần |
 | studio | `setReportStatus` | `update chapter_reports set status` |
 | library | `getFollowStatus`, `followStory`, `unfollowStory` | `follows` select / insert `{ story_id }` (bỏ qua lỗi `23505`) / delete |
-| library | `getLibrary`, `getLibraryUpdateCount` | `rpc('get_library')` + `story_cards` + `reading_history`; `rpc('library_update_count')` |
+| library | `getLibrary`, `getLibraryUpdateCount` | `rpc('library_cards')` (kèm thẻ) + `reading_history`; `rpc('library_update_count')` |
 | library | `getReadingHistory`, `getStoryProgress` | Đã đăng nhập: `reading_history` (`order('read_at', desc).limit(100)`) → `story_cards`. Khách: localStorage khóa `reading-history-guest` (`features/library/guestHistory.ts`; `src/mocks/activity.ts` chỉ bản giả dùng) |
 | library | `saveReadingProgress` | Đã đăng nhập: `rpc('save_reading_progress')`. Khách: localStorage |
 | library | gộp lịch sử khách | Lần gọi đầu có session (`getLibrary`, `getLibraryUpdateCount`, các hàm lịch sử): `rpc('merge_guest_history', { p_entries })` một lần, xong thì xóa bản local |

@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { NotFound } from '@/components/common/NotFound'
 import { Button } from '@/components/ui/button'
 import { SITE_NAME } from '@/config/site'
+import { parseChapterSegment } from '@/features/chapters/api'
 import { chapterQuery, useRecordChapterView } from '@/features/chapters/hooks'
 import { ReportChapterDialog } from '@/features/feedback/components/ReportChapterDialog'
 import { NotSavedNotice } from '@/features/offline/components/NotSavedNotice'
@@ -34,12 +35,6 @@ import type { ChapterContent } from '@/types/chapter'
 import { Seo } from '@/components/common/Seo'
 import { ReaderSkeleton, ReaderToolbarSkeleton } from '@/features/reader/components/ReaderSkeleton'
 import { chapterSeo } from '@/lib/seo'
-
-// Router không hỗ trợ tham số nằm giữa đoạn URL ("chapter-:number") nên tự tách ở đây
-const parseChapterSegment = (segment: string) => {
-  const match = /^chapter-(\d{1,6})$/.exec(segment)
-  return match ? Number(match[1]) : null
-}
 
 /**
  * state khi điều hướng trong trang đọc:

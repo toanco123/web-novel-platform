@@ -20,10 +20,21 @@ export function imagePathFromUrl(bucket: ImageBucket, url: string | null | undef
 }
 
 /** Upload ảnh (data URL) vào thư mục của người dùng, trả về đường dẫn trong bucket */
-export async function uploadImage(bucket: ImageBucket, userId: string, dataUrl: string) {
+export const uploadImage = (bucket: ImageBucket, userId: string, dataUrl: string) =>
+  upload(bucket, `${userId}/${crypto.randomUUID()}`, dataUrl)
+
+/**
+ * Bản nhỏ cạnh ảnh gốc: {uuid}.webp → {uuid}-thumb.webp (đuôi theo định dạng của bản nhỏ). Hạn mức
+ * ảnh không tính bản nhỏ của ảnh gốc đã có (private.image_upload_allowed)
+ */
+export const uploadThumb = (bucket: ImageBucket, originalPath: string, dataUrl: string) =>
+  upload(bucket, `${originalPath.replace(/\.[a-z]+$/, '')}-thumb`, dataUrl)
+
+/** Upload vào `base` + đuôi theo định dạng ảnh (.jpg hoặc .webp) */
+async function upload(bucket: ImageBucket, base: string, dataUrl: string) {
   const blob = await (await fetch(dataUrl)).blob()
   const ext = blob.type === 'image/jpeg' ? 'jpg' : 'webp'
-  const path = `${userId}/${crypto.randomUUID()}.${ext}`
+  const path = `${base}.${ext}`
   const { error } = await db()
     .storage.from(bucket)
     .upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false })
@@ -43,8 +54,9 @@ export async function removeUserImages(bucket: ImageBucket, userId: string) {
   }
 }
 
-/** Xóa ảnh cũ; lỗi thì bỏ qua (chỉ để lại file thừa, không ảnh hưởng dữ liệu) */
-export async function removeImage(bucket: ImageBucket, path: string | null | undefined) {
-  if (!path) return
-  await db().storage.from(bucket).remove([path])
+/** Xóa ảnh cũ (ảnh gốc và bản nhỏ); lỗi thì bỏ qua (chỉ để lại file thừa, không ảnh hưởng dữ liệu) */
+export async function removeImage(bucket: ImageBucket, ...paths: (string | null | undefined)[]) {
+  const existing = paths.filter((p): p is string => !!p)
+  if (!existing.length) return
+  await db().storage.from(bucket).remove(existing)
 }

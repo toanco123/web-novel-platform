@@ -2,17 +2,18 @@ import { useParams } from 'react-router'
 import { Container } from '@/components/common/Container'
 import { NotFound } from '@/components/common/NotFound'
 import { SegmentedLinks } from '@/components/common/SegmentedLinks'
+import { LIST_FILTERS } from '@/features/stories/browseParams'
 import { StoryBrowser } from '@/features/stories/StoryBrowser'
 import { paths } from '@/lib/routes'
 import { STATIC_PAGES, staticPageSeo } from '@/lib/seo'
-import type { StoryStatus } from '@/types/story'
 import { Seo } from '@/components/common/Seo'
 
 // Tiêu đề và mô tả của từng danh sách nằm ở STATIC_PAGES (dùng chung với thẻ SEO)
-const lists: Record<string, { to: string; tab: string; status?: StoryStatus }> = {
+// Bộ lọc cố định của từng danh sách ở LIST_FILTERS (dùng chung với route loader)
+const lists: Record<string, { to: string; tab: string }> = {
   latest: { to: paths.latest, tab: 'Mới cập nhật' },
-  ongoing: { to: paths.ongoing, tab: 'Đang ra', status: 'ongoing' },
-  completed: { to: paths.completed, tab: 'Truyện full', status: 'completed' },
+  ongoing: { to: paths.ongoing, tab: 'Đang ra' },
+  completed: { to: paths.completed, tab: 'Truyện full' },
 }
 
 export default function BrowsePage() {
@@ -42,7 +43,7 @@ export default function BrowsePage() {
       <div className="mt-8">
         {/* Không đặt key: bộ lọc nằm trên URL (link tab không mang theo nên tự bắt đầu lại), giữ
             nguyên component thì đổi tab vẫn thấy lưới cũ mờ đi thay vì nháy khung chờ */}
-        <StoryBrowser fixed={{ status: list.status }} />
+        <StoryBrowser fixed={LIST_FILTERS[type]} />
       </div>
     </Container>
   )

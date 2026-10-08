@@ -43,6 +43,8 @@ export type Story = {
   status: StoryStatus
   description: string
   coverUrl: string | null
+  /** Bản bìa nhỏ 320×480 cho thẻ, danh sách; null: chưa có (bìa cũ), dùng coverUrl */
+  coverThumbUrl: string | null
   chapterCount: number
   viewCount: number
   ratingAvg: number

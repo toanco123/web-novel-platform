@@ -16,6 +16,7 @@ import { BROWSE_PER_PAGE, type BrowseFilters } from './api'
 import {
   browseSearch,
   lengthOptions,
+  browseFilters,
   parseBrowseParams,
   sortOptions,
   statusOptions,
@@ -42,7 +43,7 @@ export function StoryBrowser({
 }: Props) {
   const [params, setParams] = useSearchParams()
   const chosen = parseBrowseParams(params)
-  const filters: BrowseFilters = { ...chosen, ...definedOnly(fixed) }
+  const filters = browseFilters(params, fixed)
   const { data, isPending, isError, isPlaceholderData } = useBrowseStories(filters)
   const { data: genres } = useGenres()
 
@@ -155,9 +156,6 @@ export function StoryBrowser({
     </div>
   )
 }
-
-const definedOnly = <T extends object>(obj: T) =>
-  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>
 
 function FilterSelect<T extends string>({
   label,

@@ -1,7 +1,7 @@
 {
   "name": "web-truyen",
   "private": true,
-  "version": "0.0.26",
+  "version": "0.0.29",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -63,6 +63,7 @@
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.1.1",
     "oxlint": "^1.81.0",
+    "playwright-core": "^1.64.0",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4.3.3",

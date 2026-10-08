@@ -9,10 +9,26 @@ import {
 } from '@/layouts/LayoutFallbacks'
 import { MainLayout } from '@/layouts/MainLayout'
 import { ReaderLayout } from '@/layouts/ReaderLayout'
+import {
+  chapterLoader,
+  genreLoader,
+  homeLoader,
+  listLoader,
+  onUrlChange,
+  rankingLoader,
+  searchLoader,
+  storyLoader,
+} from './loaders'
+import { queryClient } from './queryClient'
+import { routerContext } from './routerContext'
 
 const page = (load: () => Promise<{ default: React.ComponentType }>) => async () => ({
   Component: (await load()).default,
 })
+
+// Loader tải trước dữ liệu công khai, khai báo ngoài `lazy` để chạy song song với việc tải chunk
+// của trang (src/app/loaders.ts)
+const preload = (loader: RouteObject['loader']) => ({ loader, shouldRevalidate: onUrlChange })
 
 export const routes: RouteObject[] = [
   {
@@ -20,13 +36,33 @@ export const routes: RouteObject[] = [
     HydrateFallback: MainLayoutFallback,
     ErrorBoundary: RouteError,
     children: [
-      { index: true, lazy: page(() => import('@/pages/HomePage')) },
-      { path: 'story/:slug', lazy: page(() => import('@/pages/StoryDetailPage')) },
+      { index: true, ...preload(homeLoader), lazy: page(() => import('@/pages/HomePage')) },
+      {
+        path: 'story/:slug',
+        ...preload(storyLoader),
+        lazy: page(() => import('@/pages/StoryDetailPage')),
+      },
       { path: 'genres', lazy: page(() => import('@/pages/GenresPage')) },
-      { path: 'genres/:slug', lazy: page(() => import('@/pages/GenreStoriesPage')) },
-      { path: 'list/:type', lazy: page(() => import('@/pages/BrowsePage')) },
-      { path: 'ranking', lazy: page(() => import('@/pages/RankingPage')) },
-      { path: 'search', lazy: page(() => import('@/pages/SearchPage')) },
+      {
+        path: 'genres/:slug',
+        ...preload(genreLoader),
+        lazy: page(() => import('@/pages/GenreStoriesPage')),
+      },
+      {
+        path: 'list/:type',
+        ...preload(listLoader),
+        lazy: page(() => import('@/pages/BrowsePage')),
+      },
+      {
+        path: 'ranking',
+        ...preload(rankingLoader),
+        lazy: page(() => import('@/pages/RankingPage')),
+      },
+      {
+        path: 'search',
+        ...preload(searchLoader),
+        lazy: page(() => import('@/pages/SearchPage')),
+      },
       { path: 'library', lazy: page(() => import('@/pages/LibraryPage')) },
       { path: 'rewards', lazy: page(() => import('@/pages/RewardsPage')) },
       { path: 'account', lazy: page(() => import('@/pages/AccountPage')) },
@@ -83,7 +119,11 @@ export const routes: RouteObject[] = [
     ErrorBoundary: RouteError,
     children: [
       // Đoạn cuối có dạng "chapter-12"; trang tự tách số chương
-      { path: 'story/:slug/:chapter', lazy: page(() => import('@/pages/ChapterReaderPage')) },
+      {
+        path: 'story/:slug/:chapter',
+        ...preload(chapterLoader),
+        lazy: page(() => import('@/pages/ChapterReaderPage')),
+      },
     ],
   },
   {
@@ -100,4 +140,4 @@ export const routes: RouteObject[] = [
   },
 ]
 
-export const router = createBrowserRouter(routes)
+export const router = createBrowserRouter(routes, { getContext: () => routerContext(queryClient) })

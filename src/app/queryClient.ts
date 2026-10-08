@@ -19,3 +19,6 @@ export function createQueryClient() {
     },
   })
 }
+
+/** Bản dùng chung của app: Providers và route loader (router.tsx) cùng dùng (test tạo bản riêng) */
+export const queryClient = createQueryClient()

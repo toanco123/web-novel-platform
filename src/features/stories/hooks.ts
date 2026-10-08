@@ -1,4 +1,10 @@
-import { keepPreviousData, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  queryOptions,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
 import type { Story } from '@/types/story'
 import * as api from './api'
 
@@ -19,16 +25,46 @@ export const storyKeys = {
     ['stories', 'ranking', by, period] as const,
 }
 
-export const useFeaturedStories = () =>
-  useQuery({ queryKey: storyKeys.featured, queryFn: api.getFeaturedStories })
-export const useEditorPicks = () =>
-  useQuery({ queryKey: storyKeys.editorPicks, queryFn: () => api.getEditorPicks() })
-export const useTrendingWeekly = () =>
-  useQuery({ queryKey: storyKeys.trendingWeekly, queryFn: () => api.getTrendingWeekly() })
-export const useLatestUpdated = () =>
-  useQuery({ queryKey: storyKeys.latestUpdated, queryFn: () => api.getLatestUpdated() })
-export const useNewReleases = () =>
-  useQuery({ queryKey: storyKeys.newReleases, queryFn: () => api.getNewReleases() })
+/**
+ * Query dữ liệu công khai, dùng chung cho hook và route loader (src/app/loaders.ts) để key và hàm
+ * tải luôn khớp: loader tải trước, hook đọc lại đúng cache đó
+ */
+export const storyQueries = {
+  featured: () => queryOptions({ queryKey: storyKeys.featured, queryFn: api.getFeaturedStories }),
+  editorPicks: () =>
+    queryOptions({ queryKey: storyKeys.editorPicks, queryFn: () => api.getEditorPicks() }),
+  trendingWeekly: () =>
+    queryOptions({ queryKey: storyKeys.trendingWeekly, queryFn: () => api.getTrendingWeekly() }),
+  latestUpdated: () =>
+    queryOptions({ queryKey: storyKeys.latestUpdated, queryFn: () => api.getLatestUpdated() }),
+  newReleases: () =>
+    queryOptions({ queryKey: storyKeys.newReleases, queryFn: () => api.getNewReleases() }),
+  detail: (slug: string) =>
+    queryOptions({ queryKey: storyKeys.detail(slug), queryFn: () => api.getStory(slug) }),
+  related: (slug: string) =>
+    queryOptions({ queryKey: storyKeys.related(slug), queryFn: () => api.getRelatedStories(slug) }),
+  browse: (filters: api.BrowseFilters) =>
+    queryOptions({
+      queryKey: storyKeys.browse(filters),
+      queryFn: () => api.browseStories(filters),
+    }),
+  search: (query: string, page: number) =>
+    queryOptions({
+      queryKey: storyKeys.search(query, page),
+      queryFn: () => api.searchStories(query, page),
+    }),
+  ranking: (by: api.RankingCriterion, period: api.RankingPeriod) =>
+    queryOptions({
+      queryKey: storyKeys.ranking(by, period),
+      queryFn: () => api.getRanking({ by, period }),
+    }),
+}
+
+export const useFeaturedStories = () => useQuery(storyQueries.featured())
+export const useEditorPicks = () => useQuery(storyQueries.editorPicks())
+export const useTrendingWeekly = () => useQuery(storyQueries.trendingWeekly())
+export const useLatestUpdated = () => useQuery(storyQueries.latestUpdated())
+export const useNewReleases = () => useQuery(storyQueries.newReleases())
 
 /**
  * Bấm từ thẻ truyện thì truyện đã có sẵn trong cache của danh sách (trang chủ, duyệt, tìm kiếm, xếp
@@ -38,8 +74,7 @@ export const useNewReleases = () =>
 export function useStory(slug: string, { enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient()
   return useQuery({
-    queryKey: storyKeys.detail(slug),
-    queryFn: () => api.getStory(slug),
+    ...storyQueries.detail(slug),
     placeholderData: () => storyFromLists(queryClient, slug),
     enabled,
   })
@@ -94,22 +129,16 @@ export const useStoriesByAuthor = (authorSlug: string | undefined, excludeSlug: 
     enabled: !!authorSlug,
   })
 
-export const useRelatedStories = (slug: string) =>
-  useQuery({ queryKey: storyKeys.related(slug), queryFn: () => api.getRelatedStories(slug) })
+export const useRelatedStories = (slug: string) => useQuery(storyQueries.related(slug))
 
 /** Giữ kết quả cũ khi đổi bộ lọc/trang để lưới không nháy trống */
 export const useBrowseStories = (filters: api.BrowseFilters) =>
-  useQuery({
-    queryKey: storyKeys.browse(filters),
-    queryFn: () => api.browseStories(filters),
-    placeholderData: keepPreviousData,
-  })
+  useQuery({ ...storyQueries.browse(filters), placeholderData: keepPreviousData })
 
 /** Chỉ giữ kết quả cũ khi đổi trang của cùng từ khóa; từ khóa mới thì chờ (không hiện số cũ với từ mới) */
 export const useSearchStories = (query: string, page: number) =>
   useQuery({
-    queryKey: storyKeys.search(query, page),
-    queryFn: () => api.searchStories(query, page),
+    ...storyQueries.search(query, page),
     enabled: query.trim().length > 0,
     placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[2] === query ? prev : undefined),
   })
@@ -123,8 +152,4 @@ export const useSearchSuggestions = (query: string) =>
   })
 
 export const useRanking = (by: api.RankingCriterion, period: api.RankingPeriod) =>
-  useQuery({
-    queryKey: storyKeys.ranking(by, period),
-    queryFn: () => api.getRanking({ by, period }),
-    placeholderData: keepPreviousData,
-  })
+  useQuery({ ...storyQueries.ranking(by, period), placeholderData: keepPreviousData })

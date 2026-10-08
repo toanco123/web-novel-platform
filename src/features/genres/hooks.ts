@@ -1,11 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as api from './api'
 
 export const genreKeys = {
   all: ['genres'] as const,
 }
 
-export const useGenres = () => useQuery({ queryKey: genreKeys.all, queryFn: api.getGenres })
+/** Mọi thể loại (dùng chung cho hook và route loader) */
+export const genresQuery = () => queryOptions({ queryKey: genreKeys.all, queryFn: api.getGenres })
+
+export const useGenres = () => useQuery(genresQuery())
 
 export function useCreateGenre() {
   const queryClient = useQueryClient()

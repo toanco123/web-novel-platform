@@ -631,6 +631,7 @@ export type Database = {
         Row: {
           author_name: string | null
           cover_path: string | null
+          cover_thumb_path: string | null
           created_at: string
           description: string
           id: string
@@ -652,6 +653,7 @@ export type Database = {
         Insert: {
           author_name?: string | null
           cover_path?: string | null
+          cover_thumb_path?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -673,6 +675,7 @@ export type Database = {
         Update: {
           author_name?: string | null
           cover_path?: string | null
+          cover_thumb_path?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -1029,8 +1032,10 @@ export type Database = {
           author_name: string | null
           chapter_count: number | null
           cover_path: string | null
+          cover_thumb_path: string | null
           created_at: string | null
           description: string | null
+          description_short: string | null
           first_chapter_number: number | null
           follower_count: number | null
           genre_slugs: string[] | null
@@ -1324,6 +1329,44 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      curated_story_cards: {
+        Args: { p_list: string }
+        Returns: {
+          author_key: string | null
+          author_name: string | null
+          chapter_count: number | null
+          cover_path: string | null
+          cover_thumb_path: string | null
+          created_at: string | null
+          description: string | null
+          description_short: string | null
+          first_chapter_number: number | null
+          follower_count: number | null
+          genre_slugs: string[] | null
+          genres: Json | null
+          id: string | null
+          latest_chapter_number: number | null
+          latest_chapter_title: string | null
+          next_chapter_at: string | null
+          next_chapter_number: number | null
+          owner_id: string | null
+          rating_avg: number | null
+          rating_count: number | null
+          rating_counts: number[] | null
+          slug: string | null
+          status: Database["public"]["Enums"]["story_status"] | null
+          title: string | null
+          updated_at: string | null
+          view_count: number | null
+          visibility: Database["public"]["Enums"]["publication_status"] | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "story_cards"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       daily_checkin: { Args: never; Returns: Json }
       delete_account: { Args: never; Returns: undefined }
       get_library: {
@@ -1333,6 +1376,16 @@ export type Database = {
           new_chapters: number
           seen_chapter: number
           slug: string
+          story_id: string
+        }[]
+      }
+      library_cards: {
+        Args: never
+        Returns: {
+          card: Database["public"]["Views"]["story_cards"]["Row"]
+          followed_at: string
+          new_chapters: number
+          seen_chapter: number
           story_id: string
         }[]
       }
@@ -1352,6 +1405,18 @@ export type Database = {
           overlap: number
           story_id: string
         }[]
+      }
+      related_story_cards: {
+        Args: { p_limit?: number; p_slug: string }
+        Returns: {
+          card: Database["public"]["Views"]["story_cards"]["Row"]
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "story_cards"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       report_chapter: {
         Args: {
@@ -1421,11 +1486,27 @@ export type Database = {
           view_count: number
         }[]
       }
+      search_story_cards: {
+        Args: { p_query: string }
+        Returns: {
+          card: Database["public"]["Views"]["story_cards"]["Row"]
+          score: number
+          story_id: string
+          view_count: number
+        }[]
+      }
       slugify: { Args: { value: string }; Returns: string }
       story_ranking: {
         Args: { p_by?: string; p_limit?: number; p_period?: string }
         Returns: {
           story_id: string
+          value: number
+        }[]
+      }
+      story_ranking_cards: {
+        Args: { p_by?: string; p_limit?: number; p_period?: string }
+        Returns: {
+          card: Database["public"]["Views"]["story_cards"]["Row"]
           value: number
         }[]
       }

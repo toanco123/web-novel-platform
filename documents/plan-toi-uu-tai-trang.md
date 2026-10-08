@@ -19,7 +19,7 @@ Bundle không quá nặng. Vấn đề chính là cảm giác chờ:
 
 Người dùng chọn làm **đợt 1 + 2** (chỉ frontend, không đổi database). **Đợt 3** để sau: route loader, sửa RPC trả thẳng thẻ truyện, chọn cột thay `select('*')`, ảnh thu nhỏ, tách vendor chunk.
 
-**Trạng thái:** ✅ Xong đợt 1 + 2 (07/10/2026).
+**Trạng thái:** ✅ Xong đợt 1 + 2 (07/10/2026). Đợt 3 xong 08/10/2026, chi tiết và kết quả đo ở `plan-toi-uu-tai-trang-dot-3.md`.
 
 Kết quả đo lại (cùng cách đo, bản build mới):
 - **Khung trang:** hiện ngay từ 0,8 s (trước: màn trắng tới khoảng 2,5 s rồi vòng xoay, 4 s mới hiện trang).
