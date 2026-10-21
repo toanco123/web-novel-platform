@@ -28,6 +28,8 @@ const MAX_FRAME_MS = 100
 const MEASURE_MS = 1000
 /** Vị trí lệch quá mức này so với lần đặt trước thì coi là người đọc tự cuộn */
 const USER_SCROLL_PX = 2
+/** Trang đứng yên chừng này (hết đà trôi sau khi vuốt, lăn chuột) thì mới cuộn tiếp */
+const SETTLE_MS = 200
 
 /**
  * - 'end': từng chương thì đoạn cuối của chương đã lên trên thanh nổi; cuộn liên tục thì đã
@@ -97,6 +99,8 @@ export function useAutoScroll(chapter: number, continuous: boolean): AutoScroll 
     let measuredAt = -Infinity
     let pxPerWord = 0
     let touching = false
+    // Lần cuối người đọc chạm tay hoặc tự cuộn (thời điểm khung hình)
+    let movedAt = -Infinity
     const onTouchStart = () => {
       touching = true
     }
@@ -109,10 +113,11 @@ export function useAutoScroll(chapter: number, continuous: boolean): AutoScroll 
       const dt = last === null ? 0 : Math.min(now - last, MAX_FRAME_MS)
       last = now
       const { chapter, continuous, speed } = latest.current
-      // Người đọc tự cuộn (lăn chuột, phím, kéo thanh cuộn): đi tiếp từ chỗ mới
-      if (Math.abs(window.scrollY - expected) > USER_SCROLL_PX) target = window.scrollY
-      // Đang chạm tay, hoặc đang mở mục lục / cài đặt / hộp thoại: đứng yên
-      if (touching || document.querySelector('[role="dialog"]')) {
+      // Đang chạm tay, người đọc tự cuộn (vuốt và đà trôi sau khi nhấc tay, lăn chuột, phím, kéo
+      // thanh cuộn) hoặc đang mở mục lục / cài đặt / hộp thoại: đứng yên, trang đứng hẳn thì đi tiếp
+      // từ chỗ mới. Gọi scrollTo khi trang còn trôi sẽ giằng co với đà trôi làm trang giật.
+      if (touching || Math.abs(window.scrollY - expected) > USER_SCROLL_PX) movedAt = now
+      if (now - movedAt < SETTLE_MS || document.querySelector('[role="dialog"]')) {
         target = expected = window.scrollY
         return
       }
