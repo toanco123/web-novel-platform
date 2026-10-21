@@ -88,6 +88,34 @@ test('bấm Tự động cuộn: trang tự trôi xuống, chỉnh được tố
   expect(screen.queryByRole('region', { name: 'Tự động cuộn' })).toBeNull()
 })
 
+test('vuốt rồi nhấc tay: đứng yên khi trang còn trôi theo đà, trang đứng hẳn mới cuộn tiếp từ đó', async () => {
+  withRoomToScroll()
+  let scrollY = 0
+  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => scrollY)
+  const { user } = renderApp(`${base}/chapter-12`)
+  await screen.findByRole('heading', { level: 1 }, slow)
+  await user.click(screen.getByRole('button', { name: 'Tự động cuộn' }))
+  runFrames(3)
+
+  // Vuốt: đặt tay, kéo, nhấc tay; trang còn trôi thêm một lúc
+  window.dispatchEvent(new Event('touchstart'))
+  scrollY = 300
+  runFrames(1)
+  window.dispatchEvent(new Event('touchend'))
+  scrollTo.mockClear()
+  for (let i = 0; i < 6; i++) {
+    scrollY += 40
+    runFrames(1)
+  }
+  expect(autoScrollTops()).toEqual([])
+
+  // Trang đứng hẳn: cuộn tiếp từ chỗ người đọc dừng
+  runFrames(8)
+  const tops = autoScrollTops()
+  expect(tops.length).toBeGreaterThan(0)
+  expect(tops[0]).toBeGreaterThanOrEqual(540)
+})
+
 test('hết chương thì dừng, bấm "Chương sau" để sang chương sau và cuộn tiếp', async () => {
   const { router, user } = renderApp(`${base}/chapter-12`)
   await screen.findByRole('heading', { level: 1 }, slow)
