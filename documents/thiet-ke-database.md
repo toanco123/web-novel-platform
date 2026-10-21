@@ -189,7 +189,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | Hàm | Ai gọi được | Việc |
 |---|---|---|
 | `create_story(title, description, status, genres[], cover_path?, first_chapter?, publish?)` | đã đăng nhập | Tạo truyện, thể loại và chương đầu trong một transaction; trả về dòng `studio_stories`. `first_chapter` = `{"number"?, "title", "content"}`. Slug trùng thì thêm `-2`, `-3`… `publish`: xuất bản chương đầu, rồi tác giả thì gửi duyệt, quản trị viên thì công khai |
-| `story_ranking_cards`, `related_story_cards`, `search_story_cards`, `library_cards`, `curated_story_cards(list)` | như RPC được bọc (`library_cards`: đã đăng nhập) | Hàm bọc INVOKER trả thẳng thẻ truyện (cột `card` = dòng `story_cards`; `curated_story_cards` trả `setof story_cards`, chỉ truyện công khai có chương) cùng kết quả của `story_ranking` / `related_stories` / `search_stories` / `get_library` (giữ thứ tự bằng `with ordinality`). RLS của `story_cards` áp dụng: truyện người gọi không thấy thì không có dòng. RPC cũ giữ nguyên cho app di động |
+| `story_ranking_cards`, `related_story_cards`, `search_story_cards`, `library_cards`, `curated_story_cards(list)` | như RPC được bọc (`library_cards`: đã đăng nhập) | Hàm bọc INVOKER trả thẳng thẻ truyện (cột `card` = dòng `story_cards`; `related_story_cards` và `curated_story_cards` trả `setof story_cards`, mỗi dòng là một thẻ, `curated_story_cards` chỉ lấy truyện công khai có chương) cùng kết quả của `story_ranking` / `related_stories` / `search_stories` / `get_library` (giữ thứ tự bằng `with ordinality`). RLS của `story_cards` áp dụng: truyện người gọi không thấy thì không có dòng. RPC cũ giữ nguyên cho app di động |
 | `schedule_chapters(story_id, items)` | chủ truyện | Xếp giờ hẹn cho nhiều chương nháp một lần (`items` = `[{"number", "at"}]`, INVOKER, một transaction). Lỗi: `not_found` (truyện không phải của mình, chương không có), `invalid_schedule` (chương không phải nháp, giờ sai) |
 | `submit_story_for_review(story_id)` | chủ truyện | Gửi duyệt / gửi lại sau khi bị từ chối (`pending`). Lỗi: `not_found`, `story_taken_down`, `already_pending`, `already_approved`, `no_published_chapters` |
 | `update_story(id, title, description, status, genres[], cover_path?)` | đã đăng nhập | Sửa truyện và thay thể loại cùng lúc |
@@ -263,7 +263,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | stories | `getLatestUpdated` / `getNewReleases` | `story_cards` công khai, `order('updated_at' / 'created_at', desc)` |
 | stories | `getStory(slug)` | `story_cards.eq('slug', slug).maybeSingle()` (RLS cho chủ truyện thấy cả bản nháp) |
 | stories | `getStoriesByAuthor` | `story_cards` công khai `.eq('owner_id', <tách từ author slug>).neq('slug', …)` |
-| stories | `getRelatedStories` | `rpc('related_story_cards')` → `toStory(row.card)` |
+| stories | `getRelatedStories` | `rpc('related_story_cards')` → `toStory(row)` (`setof story_cards`) |
 | stories | `browseStories` | `story_cards` công khai. Thể loại: `.contains('genre_slugs', [slug])`. Độ dài: lọc `chapter_count`. Kèm sắp xếp và `.range()` với `count: 'exact'` |
 | stories | `searchStories`, `getSearchSuggestions` | `rpc('search_story_cards', { p_query }, { count: 'exact' }).order('score', desc).order('view_count', desc).range()` → `toStory(row.card)` (thẻ dựng cho mọi truyện khớp trước khi cắt trang; nhiều truyện thì chuyển sang tham số limit/offset). Thể loại khớp lấy từ `genre_cards` |
 | stories | `getRanking`, `getTrendingWeekly` | `rpc('story_ranking_cards')` → `toStory(row.card)` |

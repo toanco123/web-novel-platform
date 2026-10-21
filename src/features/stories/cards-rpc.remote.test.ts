@@ -96,10 +96,11 @@ test('xếp hạng: một RPC story_ranking_cards, giữ thứ tự và giá tr�
   ])
 })
 
-test('truyện liên quan, đề cử trang chủ: một RPC, đọc thẻ từ kết quả', async () => {
-  fake.respond = () => ok([{ card: card('x') }, { card: card('y') }])
+// Hai hàm này trả `setof story_cards`: mỗi dòng là một thẻ, không bọc trong cột `card`
+test('truyện liên quan, đề cử trang chủ: một RPC, dòng kết quả là thẻ', async () => {
+  fake.respond = () => ok([card('x'), card('y')])
   expect((await getRelatedStories('goc')).map((s) => s.slug)).toEqual(['x', 'y'])
-  expect(fake.queries).toHaveLength(1)
+  expect(fake.queries).toEqual([[['rpc', 'related_story_cards', { p_slug: 'goc', p_limit: 6 }]]])
 
   fake.queries = []
   fake.respond = () => ok([card('p'), card('q')])

@@ -2081,6 +2081,22 @@ select pg_temp.expect(
   'hạn mức ảnh: bản nhỏ không có ảnh gốc vẫn bị tính');
 reset role;
 
+-- Truyện liên quan: mỗi dòng là một thẻ (client đọc thẳng dòng, không có cột `card`), đúng thứ tự
+-- của related_stories
+select pg_temp.expect(
+  pg_get_function_result('public.related_story_cards(text, integer)'::regprocedure)
+    = 'SETOF story_cards',
+  'related_story_cards: trả setof story_cards');
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect(
+  (select array_agg(c.id) from public.related_story_cards('truong-an-khong-tuyet') c)
+    is not distinct from
+  (select array_agg(r.story_id order by r.ord)
+    from public.related_stories('truong-an-khong-tuyet') with ordinality as r (story_id, overlap, ord)),
+  'related_story_cards: cùng truyện, cùng thứ tự với related_stories');
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;
