@@ -1409,7 +1409,33 @@ export type Database = {
       related_story_cards: {
         Args: { p_limit?: number; p_slug: string }
         Returns: {
-          card: Database["public"]["Views"]["story_cards"]["Row"]
+          author_key: string | null
+          author_name: string | null
+          chapter_count: number | null
+          cover_path: string | null
+          cover_thumb_path: string | null
+          created_at: string | null
+          description: string | null
+          description_short: string | null
+          first_chapter_number: number | null
+          follower_count: number | null
+          genre_slugs: string[] | null
+          genres: Json | null
+          id: string | null
+          latest_chapter_number: number | null
+          latest_chapter_title: string | null
+          next_chapter_at: string | null
+          next_chapter_number: number | null
+          owner_id: string | null
+          rating_avg: number | null
+          rating_count: number | null
+          rating_counts: number[] | null
+          slug: string | null
+          status: Database["public"]["Enums"]["story_status"] | null
+          title: string | null
+          updated_at: string | null
+          view_count: number | null
+          visibility: Database["public"]["Enums"]["publication_status"] | null
         }[]
         SetofOptions: {
           from: "*"

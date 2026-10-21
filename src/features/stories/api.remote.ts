@@ -114,7 +114,7 @@ export async function getStoriesByAuthor(authorSlug: string, excludeSlug?: strin
 /** Truyện liên quan: nhiều thể loại trùng nhất, rồi nhiều lượt đọc nhất (bỏ truyện cùng tác giả) */
 export async function getRelatedStories(slug: string, limit = 6): Promise<Story[]> {
   const rows = unwrap(await db().rpc('related_story_cards', { p_slug: slug, p_limit: limit }))
-  return rows.map((r) => toStory(r.card))
+  return rows.map(toStory)
 }
 
 // ── Danh sách có bộ lọc (/list/:type, /genres/:slug) ──────────────
