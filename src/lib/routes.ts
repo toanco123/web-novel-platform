@@ -58,6 +58,8 @@ export const paths = {
   adminImport: '/admin/import',
   /** Chọn truyện cho banner nổi bật và khối đề cử của trang chủ */
   adminFeatured: '/admin/featured',
+  /** Phiếu đề cử: theo truyện (mặc định) hoặc theo người dùng (?view=users) */
+  adminVotes: '/admin/votes',
 }
 
 function withNext(path: string, next?: string) {

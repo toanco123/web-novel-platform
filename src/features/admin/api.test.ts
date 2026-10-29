@@ -2,7 +2,7 @@ import { recordChapterView } from '@/features/chapters/api'
 import { addComment } from '@/features/comments/api'
 import { followStory } from '@/features/library/api'
 import * as studio from '@/features/studio/api'
-import { dayKey, loadViews, saveViews } from '@/mocks/activity'
+import { dayKey, loadViews, saveCheckins, saveLedger, saveViews, saveVotes } from '@/mocks/activity'
 import { loadUserStories, saveUserStories } from '@/mocks/userContent'
 import { pendingStory, publishStory, registerUser, signInAs, signOut } from '@/test/helpers'
 import * as admin from './api'
@@ -590,4 +590,64 @@ test('bình luận đã sửa sau khi bị báo cáo: giữ nội dung lúc bị
   expect(item.reports).toEqual([
     expect.objectContaining({ reporterName: 'Mai', contentSnapshot: 'Lời lẽ khó nghe' }),
   ])
+})
+
+test('phiếu đề cử: theo truyện, theo người dùng, sổ giao dịch; chỉ quản trị viên xem được', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const mai = await registerUser('Mai', 'mai@gmail.com')
+  const now = new Date().toISOString()
+  const old = new Date(Date.now() - 20 * 86_400_000).toISOString()
+  // Linh đề cử 12 phiếu (8 phiếu cách đây 20 ngày), Mai 1 phiếu: 13 phiếu, Linh chiếm 92%
+  saveVotes([
+    { storySlug: story.slug, userId: linh, amount: 8, createdAt: old },
+    { storySlug: story.slug, userId: linh, amount: 4, createdAt: now },
+    { storySlug: story.slug, userId: mai, amount: 1, createdAt: now },
+  ])
+  saveLedger(linh, [
+    { id: '2', amount: -4, reason: 'vote', storySlug: story.slug, balanceAfter: 0, createdAt: now },
+    { id: '1', amount: 4, reason: 'checkin', storySlug: null, balanceAfter: 4, createdAt: old },
+  ])
+  saveCheckins(linh, [{ day: '2026-10-28', streak: 3, reward: 1 }])
+
+  // Người thường không xem được
+  await expect(admin.getAdminVoteStories({ page: 1 })).rejects.toBeInstanceOf(admin.AdminError)
+  await expect(admin.getAdminVoteUsers({ page: 1 })).rejects.toBeInstanceOf(admin.AdminError)
+  await expect(admin.getAdminUserLedger(linh)).rejects.toBeInstanceOf(admin.AdminError)
+
+  signInAs('demo')
+  const stories = await admin.getAdminVoteStories({ page: 1 })
+  expect(stories.items).toHaveLength(1)
+  expect(stories.items[0]).toMatchObject({
+    slug: story.slug,
+    totalVotes: 13,
+    weekVotes: 5,
+    voterCount: 2,
+    topVoterId: linh,
+    topVoterName: 'Linh',
+    concentrated: true,
+  })
+  expect(stories.items[0].topShare).toBeCloseTo(12 / 13)
+  expect((await admin.getAdminVoteStories({ page: 1, concentrated: true })).total).toBe(1)
+  expect((await admin.getAdminVoteStories({ page: 1, q: 'khong co' })).total).toBe(0)
+
+  // Dưới ngưỡng 10 phiếu thì không bị đánh dấu dù một người chiếm hết
+  saveVotes([{ storySlug: story.slug, userId: linh, amount: 9, createdAt: now }])
+  expect((await admin.getAdminVoteStories({ page: 1 })).items[0].concentrated).toBe(false)
+  expect((await admin.getAdminVoteStories({ page: 1, concentrated: true })).total).toBe(0)
+
+  // Người dùng: chỉ người có hoạt động phiếu
+  const users = await admin.getAdminVoteUsers({ page: 1 })
+  expect(users.items.map((u) => u.displayName)).toEqual(['Linh'])
+  expect(users.items[0]).toMatchObject({
+    voted: 9,
+    balance: 0,
+    checkinCount: 1,
+    lastStreak: 3,
+  })
+
+  const ledger = await admin.getAdminUserLedger(linh)
+  expect(ledger.map((e) => e.reason)).toEqual(['vote', 'checkin'])
+  expect(ledger[0].story).toEqual({ slug: story.slug, title: 'Mùa Hạ Năm Ấy' })
+  expect(ledger[1].story).toBeNull()
 })

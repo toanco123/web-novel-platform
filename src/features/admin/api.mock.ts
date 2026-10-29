@@ -8,11 +8,14 @@ import {
   dayKey,
   followerCount,
   loadAllFollows,
+  loadCheckins,
   loadCommentReports,
   loadContactMessages,
+  loadLedger,
   loadReports,
   loadUserComments,
   loadViews,
+  loadVotes,
   removeComments,
   saveCommentReports,
   saveContactMessages,
@@ -40,9 +43,11 @@ import {
   AdminError,
   adminPageSize,
   CURATED_LIMITS,
+  isVoteConcentrated,
   type AdminComment,
   type AdminCommentQuery,
   type AdminContactMessage,
+  type AdminLedgerEntry,
   type AdminMessageQuery,
   type AdminOverview,
   type AdminPeriodTotals,
@@ -52,6 +57,10 @@ import {
   type AdminStoryQuery,
   type AdminUser,
   type AdminUserQuery,
+  type AdminVoteStory,
+  type AdminVoteStoryQuery,
+  type AdminVoteUser,
+  type AdminVoteUserQuery,
   type CuratedStory,
   type ReviewInput,
   type SortOrder,
@@ -792,4 +801,133 @@ export async function setCuratedStories(list: CuratedList, storyIds: string[]) {
   const known = new Set(allStories().map((s) => s.id))
   if (ids.some((id) => !known.has(id))) throw new AdminError('not_found')
   saveCurated(list, ids)
+}
+
+// ── Phiếu đề cử ─────────────────────────────────────────────────────────
+
+const voteStorySortKeys: Record<
+  NonNullable<AdminVoteStoryQuery['sort']>,
+  (s: AdminVoteStory) => string | number
+> = {
+  title: (s) => s.title,
+  total: (s) => s.totalVotes,
+  week: (s) => s.weekVotes,
+  voters: (s) => s.voterCount,
+  share: (s) => s.topShare,
+}
+
+export async function getAdminVoteStories({
+  q = '',
+  concentrated,
+  sort = 'total',
+  order,
+  page,
+  pageSize,
+}: AdminVoteStoryQuery): Promise<Page<AdminVoteStory>> {
+  await delay()
+  await requireAdmin()
+  const query = slugify(q)
+  const votes = loadVotes()
+  const users = new Map(loadUsers().map((u) => [u.id, u.displayName]))
+  const weekAgo = Date.now() - 7 * 86_400_000
+  const stories = allStories()
+    .flatMap((story): AdminVoteStory[] => {
+      const mine = votes.filter((v) => v.storySlug === story.slug)
+      if (mine.length === 0) return []
+      const perUser = new Map<string, number>()
+      for (const v of mine) perUser.set(v.userId, (perUser.get(v.userId) ?? 0) + v.amount)
+      const totalVotes = mine.reduce((sum, v) => sum + v.amount, 0)
+      const [topVoterId, topAmount] = [...perUser].sort((a, b) => b[1] - a[1])[0]
+      const topShare = topAmount / totalVotes
+      return [
+        {
+          id: story.id,
+          slug: story.slug,
+          title: story.title,
+          ownerName: story.authorName ?? story.ownerName,
+          totalVotes,
+          weekVotes: mine
+            .filter((v) => Date.parse(v.createdAt) > weekAgo)
+            .reduce((sum, v) => sum + v.amount, 0),
+          voterCount: perUser.size,
+          topVoterId,
+          topVoterName: users.get(topVoterId) ?? '',
+          topShare,
+          concentrated: isVoteConcentrated(totalVotes, topShare),
+        },
+      ]
+    })
+    .filter((s) => matches(query, s.title, s.ownerName) && (!concentrated || s.concentrated))
+    .sort(by((s) => s.totalVotes))
+    .sort(by(voteStorySortKeys[sort], order))
+  return paginate(stories, page, adminPageSize(pageSize))
+}
+
+const voteUserSortKeys: Record<
+  NonNullable<AdminVoteUserQuery['sort']>,
+  (u: AdminVoteUser) => string | number | null
+> = {
+  name: (u) => u.displayName,
+  balance: (u) => u.balance,
+  voted: (u) => u.voted,
+  checkins: (u) => u.checkinCount,
+  streak: (u) => u.lastStreak,
+  created: (u) => u.createdAt,
+}
+
+export async function getAdminVoteUsers({
+  q = '',
+  sort = 'voted',
+  order,
+  page,
+  pageSize,
+}: AdminVoteUserQuery): Promise<Page<AdminVoteUser>> {
+  await delay()
+  await requireAdmin()
+  const query = slugify(q)
+  const votes = loadVotes()
+  const users = loadUsers()
+    .map((u): AdminVoteUser => {
+      const checkins = loadCheckins(u.id)
+      return {
+        id: u.id,
+        email: u.email,
+        displayName: u.displayName,
+        balance: loadLedger(u.id)[0]?.balanceAfter ?? 0,
+        voted: votes.filter((v) => v.userId === u.id).reduce((sum, v) => sum + v.amount, 0),
+        checkinCount: checkins.length,
+        // Điểm danh lưu mới nhất trước
+        lastStreak: checkins[0]?.streak ?? 0,
+        createdAt: u.createdAt ?? null,
+      }
+    })
+    // Chỉ người có hoạt động phiếu, như bản DB
+    .filter(
+      (u) =>
+        (u.balance > 0 || u.voted > 0 || u.checkinCount > 0) &&
+        matches(query, u.displayName, u.email),
+    )
+    .sort(by((u) => u.voted))
+    .sort(by(voteUserSortKeys[sort], order))
+  return paginate(users, page, adminPageSize(pageSize))
+}
+
+/** Sổ phiếu của một người: 100 dòng mới nhất */
+export async function getAdminUserLedger(userId: string): Promise<AdminLedgerEntry[]> {
+  await delay()
+  await requireAdmin()
+  const titles = new Map(allStories().map((s) => [s.slug, s.title]))
+  return loadLedger(userId)
+    .slice(0, 100)
+    .map((e) => ({
+      id: e.id,
+      amount: e.amount,
+      reason: e.reason,
+      story:
+        e.storySlug && titles.has(e.storySlug)
+          ? { slug: e.storySlug, title: titles.get(e.storySlug) ?? '' }
+          : null,
+      balanceAfter: e.balanceAfter,
+      createdAt: e.createdAt,
+    }))
 }

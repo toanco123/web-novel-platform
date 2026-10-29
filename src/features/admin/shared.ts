@@ -433,3 +433,90 @@ export class AdminError extends Error {
 /** Lời báo cho thao tác admin thất bại */
 export const adminErrorMessage = (error: unknown) =>
   error instanceof AdminError ? error.message : 'Chưa lưu được. Kiểm tra mạng rồi thử lại.'
+
+// ── Phiếu đề cử (trang /admin/votes) ────────────────────────────────────
+
+/** Truyện có từ ngần này phiếu mà một người chiếm từ tỉ lệ này thì bị đánh dấu "Tập trung" (DB viết cứng cùng ngưỡng) */
+export const VOTE_CONCENTRATED_MIN_TOTAL = 10
+export const VOTE_CONCENTRATED_SHARE = 0.5
+
+export const isVoteConcentrated = (total: number, topShare: number) =>
+  total >= VOTE_CONCENTRATED_MIN_TOTAL && topShare >= VOTE_CONCENTRATED_SHARE
+
+export type AdminVoteStory = {
+  id: string
+  slug: string
+  title: string
+  /** Bút danh hoặc tên chủ truyện */
+  ownerName: string
+  totalVotes: number
+  /** Phiếu trong 7 ngày gần nhất */
+  weekVotes: number
+  /** Số người đã đề cử */
+  voterCount: number
+  /** Người đề cử nhiều phiếu nhất; null: tài khoản đã bị xóa */
+  topVoterId: string | null
+  topVoterName: string
+  /** Phần phiếu của người đề cử nhiều nhất, 0–1 */
+  topShare: number
+  /** Dấu hiệu dồn phiếu, xem isVoteConcentrated */
+  concentrated: boolean
+}
+
+export const ADMIN_VOTE_STORY_SORTS = ['title', 'total', 'week', 'voters', 'share'] as const
+export type AdminVoteStorySort = (typeof ADMIN_VOTE_STORY_SORTS)[number]
+
+export type AdminVoteStoryQuery = {
+  q?: string
+  /** Chỉ truyện có dấu hiệu dồn phiếu */
+  concentrated?: boolean
+  /** Mặc định: total, giảm dần */
+  sort?: AdminVoteStorySort
+  order?: SortOrder
+  page: number
+  pageSize?: number
+}
+
+export type AdminVoteUser = {
+  id: string
+  email: string
+  displayName: string
+  /** Số phiếu đang có */
+  balance: number
+  /** Tổng phiếu đã đề cử */
+  voted: number
+  checkinCount: number
+  /** Chuỗi ở lần điểm danh gần nhất */
+  lastStreak: number
+  createdAt: string | null
+}
+
+export const ADMIN_VOTE_USER_SORTS = [
+  'name',
+  'balance',
+  'voted',
+  'checkins',
+  'streak',
+  'created',
+] as const
+export type AdminVoteUserSort = (typeof ADMIN_VOTE_USER_SORTS)[number]
+
+export type AdminVoteUserQuery = {
+  q?: string
+  /** Mặc định: voted, giảm dần */
+  sort?: AdminVoteUserSort
+  order?: SortOrder
+  page: number
+  pageSize?: number
+}
+
+export type AdminLedgerEntry = {
+  id: string
+  /** + nhận, − dùng */
+  amount: number
+  reason: 'checkin' | 'vote'
+  /** null: điểm danh, hoặc truyện đã bị xóa */
+  story: { slug: string; title: string } | null
+  balanceAfter: number
+  createdAt: string
+}

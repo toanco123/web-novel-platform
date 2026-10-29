@@ -1,4 +1,5 @@
 import { cleanup, screen, within } from '@testing-library/react'
+import { saveLedger, saveVotes } from '@/mocks/activity'
 import { pendingStory, publishStory, registerUser, signInAs } from '@/test/helpers'
 import { renderApp } from '@/test/renderApp'
 
@@ -561,3 +562,46 @@ test('kiểm duyệt bình luận: bình luận đã sửa sau khi bị báo cá
   expect(row.getByText('Nội dung lúc bị báo cáo')).toBeInTheDocument()
   expect(row.getByText('Lời lẽ khó nghe')).toBeInTheDocument()
 })
+
+test('phiếu đề cử: tab theo truyện đánh dấu tập trung, tab người dùng mở sổ phiếu', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const mai = await registerUser('Mai', 'mai@gmail.com')
+  await registerUser('Hoa', 'hoa@gmail.com')
+  const now = new Date().toISOString()
+  saveVotes([
+    { storySlug: story.slug, userId: linh, amount: 12, createdAt: now },
+    { storySlug: story.slug, userId: mai, amount: 1, createdAt: now },
+  ])
+  saveLedger(linh, [
+    {
+      id: '1',
+      amount: -12,
+      reason: 'vote',
+      storySlug: story.slug,
+      balanceAfter: 0,
+      createdAt: now,
+    },
+  ])
+  signInAs('demo')
+  const { router, user } = renderApp('/admin/votes')
+
+  // Mặc định: theo truyện, truyện bị một người chiếm 92% của 13 phiếu
+  const row = (await screen.findByText('Mùa Hạ Năm Ấy', { selector: 'a' }, slow)).closest('tr')!
+  expect(within(row).getByText('Tập trung')).toBeInTheDocument()
+  expect(within(row).getByText('92%')).toBeInTheDocument()
+
+  // Bấm tên người đề cử nhiều nhất: mở sổ phiếu của họ
+  await user.click(within(row).getByRole('button', { name: 'Linh' }))
+  const dialog = await screen.findByRole('dialog', {}, slow)
+  expect(within(dialog).getByText('Sổ phiếu của Linh')).toBeInTheDocument()
+  expect(await within(dialog).findByText('Mùa Hạ Năm Ấy', {}, slow)).toBeInTheDocument()
+  await user.click(within(dialog).getByRole('button', { name: /Close|Đóng/ }))
+
+  // Tab người dùng: chỉ người có hoạt động phiếu
+  await user.click(screen.getByText('Theo người dùng'))
+  await expect.poll(() => router.state.location.search, slow).toBe('?view=users')
+  expect(await screen.findByText('linh@gmail.com', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('mai@gmail.com')).toBeInTheDocument()
+  expect(screen.queryByText('hoa@gmail.com')).not.toBeInTheDocument()
+}, 20_000)

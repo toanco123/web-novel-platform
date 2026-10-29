@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Tags,
+  Ticket,
   Users,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useRef } from 'react'
@@ -32,6 +33,7 @@ const menu = [
   { key: paths.adminInbox, icon: Inbox, label: 'Hộp thư' },
   { key: paths.adminReports, icon: Flag, label: 'Báo lỗi' },
   { key: paths.adminComments, icon: MessageSquare, label: 'Bình luận' },
+  { key: paths.adminVotes, icon: Ticket, label: 'Phiếu' },
   { key: paths.adminGenres, icon: Tags, label: 'Thể loại' },
   { key: paths.adminImport, icon: FileUp, label: 'Nhập truyện' },
 ]
