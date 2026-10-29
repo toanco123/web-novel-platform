@@ -887,6 +887,10 @@ select set_config('request.jwt.claims',
   '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
     "app_metadata": {"role": "admin"}}', true);
 set local role authenticated;
+-- DB thật có thể đã có danh sách đề cử: chụp lại để so sánh sau khi sửa danh sách nổi bật
+select set_config('test.editor_pick_before', (select coalesce(string_agg(t.story_id::text, ',' order by t.ord), '')
+    from public.admin_curated('editor_pick')
+      with ordinality as t(story_id, slug, title, author_name, is_public, ord)), true);
 select public.admin_set_curated('featured', array[
   pg_temp.story_id('chi-pheo'), pg_temp.story_id('truyen-chong-spam'), pg_temp.story_id('chi-pheo')]);
 select pg_temp.expect(
@@ -896,7 +900,9 @@ select pg_temp.expect(
       with ordinality as t(story_id, slug, title, author_name, is_public, ord)),
   'chọn truyện nổi bật: giữ thứ tự, bỏ id lặp lại');
 select pg_temp.expect(
-  not exists (select 1 from public.admin_curated('editor_pick')),
+  (select coalesce(string_agg(t.story_id::text, ',' order by t.ord), '')
+    from public.admin_curated('editor_pick')
+      with ordinality as t(story_id, slug, title, author_name, is_public, ord)) = current_setting('test.editor_pick_before'),
   'danh sách đề cử không đổi khi sửa danh sách nổi bật');
 select pg_temp.expect_error(
   $$select public.admin_set_curated('featured',
