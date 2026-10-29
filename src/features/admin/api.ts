@@ -31,4 +31,6 @@ export const {
   getAdminVoteStories,
   getAdminVoteUsers,
   getAdminUserLedger,
+  getAdminRatings,
+  deleteAdminRating,
 } = api

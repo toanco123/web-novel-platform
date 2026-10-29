@@ -10,6 +10,7 @@ import {
   Inbox,
   LayoutDashboard,
   MessageSquare,
+  Star,
   Tags,
   Ticket,
   Users,
@@ -34,6 +35,7 @@ const menu = [
   { key: paths.adminReports, icon: Flag, label: 'Báo lỗi' },
   { key: paths.adminComments, icon: MessageSquare, label: 'Bình luận' },
   { key: paths.adminVotes, icon: Ticket, label: 'Phiếu' },
+  { key: paths.adminRatings(), icon: Star, label: 'Điểm chấm' },
   { key: paths.adminGenres, icon: Tags, label: 'Thể loại' },
   { key: paths.adminImport, icon: FileUp, label: 'Nhập truyện' },
 ]

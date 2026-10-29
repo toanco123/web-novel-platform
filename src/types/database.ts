@@ -1149,6 +1149,10 @@ export type Database = {
           title: string
         }[]
       }
+      admin_delete_rating: {
+        Args: { p_story_id: string; p_user_id: string }
+        Returns: undefined
+      }
       admin_delete_comment: { Args: { p_id: string }; Returns: undefined }
       admin_delete_genre: { Args: { p_slug: string }; Returns: undefined }
       admin_dismiss_comment_reports: {
@@ -1160,6 +1164,21 @@ export type Database = {
         Returns: number
       }
       admin_overview: { Args: { p_days?: number }; Returns: Json }
+      admin_ratings: {
+        Args: { p_query?: string }
+        Returns: {
+          created_at: string
+          score: number
+          story_id: string
+          story_slug: string
+          story_title: string
+          user_email: string
+          user_id: string
+          user_name: string
+          user_rating_avg: number
+          user_rating_count: number
+        }[]
+      }
       admin_reports: {
         Args: {
           p_query?: string
