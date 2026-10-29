@@ -1249,6 +1249,18 @@ export type Database = {
         Args: { p_description: string; p_name: string; p_slug: string }
         Returns: Json
       }
+      admin_user_ledger: {
+        Args: { p_user_id: string }
+        Returns: {
+          amount: number
+          balance_after: number
+          created_at: string
+          id: number
+          reason: string
+          story_slug: string
+          story_title: string
+        }[]
+      }
       admin_users: {
         Args: { p_query?: string }
         Returns: {
@@ -1264,6 +1276,35 @@ export type Database = {
           last_sign_in_at: string
           provider: string
           story_count: number
+        }[]
+      }
+      admin_vote_stories: {
+        Args: { p_query?: string }
+        Returns: {
+          id: string
+          is_concentrated: boolean
+          owner_name: string
+          slug: string
+          title: string
+          top_share: number
+          top_voter_id: string
+          top_voter_name: string
+          total_votes: number
+          voter_count: number
+          week_votes: number
+        }[]
+      }
+      admin_vote_users: {
+        Args: { p_query?: string }
+        Returns: {
+          balance: number
+          checkin_count: number
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          last_streak: number
+          voted: number
         }[]
       }
       comment_threads: {

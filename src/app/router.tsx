@@ -111,6 +111,7 @@ export const routes: RouteObject[] = [
       { path: 'comments', lazy: page(() => import('@/pages/admin/AdminCommentsPage')) },
       { path: 'genres', lazy: page(() => import('@/pages/admin/AdminGenresPage')) },
       { path: 'import', lazy: page(() => import('@/pages/admin/AdminImportPage')) },
+      { path: 'votes', lazy: page(() => import('@/pages/admin/AdminVotesPage')) },
     ],
   },
   {

@@ -16,6 +16,7 @@ import {
   type AdminComment,
   type AdminCommentQuery,
   type AdminContactMessage,
+  type AdminLedgerEntry,
   type AdminMessageQuery,
   type AdminOverview,
   type AdminReport,
@@ -24,6 +25,10 @@ import {
   type AdminStoryQuery,
   type AdminUser,
   type AdminUserQuery,
+  type AdminVoteStory,
+  type AdminVoteStoryQuery,
+  type AdminVoteUser,
+  type AdminVoteUserQuery,
   type CuratedStory,
   type ReviewInput,
   type SortOrder,
@@ -422,4 +427,100 @@ export async function setCuratedStories(list: CuratedList, storyIds: string[]) {
   await requireUserId()
   if (!storyIds.every(isUuid)) throw new AdminError('not_found')
   unwrap(await db().rpc('admin_set_curated', { p_list: list, p_story_ids: storyIds }), adminError)
+}
+
+// ── Phiếu đề cử ─────────────────────────────────────────────────────────
+
+const voteStorySortColumns = {
+  title: 'title',
+  total: 'total_votes',
+  week: 'week_votes',
+  voters: 'voter_count',
+  share: 'top_share',
+} as const
+
+export async function getAdminVoteStories({
+  q,
+  concentrated,
+  sort = 'total',
+  order,
+  page,
+  pageSize,
+}: AdminVoteStoryQuery): Promise<Page<AdminVoteStory>> {
+  await requireUserId()
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc('admin_vote_stories', { p_query: q || undefined }, { count: 'exact' })
+    if (concentrated) query = query.eq('is_concentrated', true)
+    return query.order(voteStorySortColumns[sort], direction(order)).order('id').range(from, to)
+  }).catch(rethrow)
+  return {
+    ...result,
+    items: result.items.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      title: r.title,
+      ownerName: r.owner_name,
+      totalVotes: Number(r.total_votes),
+      weekVotes: Number(r.week_votes),
+      voterCount: r.voter_count,
+      topVoterId: r.top_voter_id ?? null,
+      topVoterName: r.top_voter_name ?? '',
+      topShare: Number(r.top_share),
+      concentrated: r.is_concentrated,
+    })),
+  }
+}
+
+const voteUserSortColumns = {
+  name: 'display_name',
+  balance: 'balance',
+  voted: 'voted',
+  checkins: 'checkin_count',
+  streak: 'last_streak',
+  created: 'created_at',
+} as const
+
+export async function getAdminVoteUsers({
+  q,
+  sort = 'voted',
+  order,
+  page,
+  pageSize,
+}: AdminVoteUserQuery): Promise<Page<AdminVoteUser>> {
+  await requireUserId()
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) =>
+    db()
+      .rpc('admin_vote_users', { p_query: q || undefined }, { count: 'exact' })
+      .order(voteUserSortColumns[sort], direction(order))
+      .order('id')
+      .range(from, to),
+  ).catch(rethrow)
+  return {
+    ...result,
+    items: result.items.map((r) => ({
+      id: r.id,
+      email: r.email,
+      displayName: r.display_name,
+      balance: r.balance,
+      voted: Number(r.voted),
+      checkinCount: r.checkin_count,
+      lastStreak: r.last_streak,
+      createdAt: r.created_at ?? null,
+    })),
+  }
+}
+
+/** Sổ phiếu của một người: 100 dòng mới nhất */
+export async function getAdminUserLedger(userId: string): Promise<AdminLedgerEntry[]> {
+  await requireUserId()
+  if (!isUuid(userId)) throw new AdminError('not_found')
+  const rows = unwrap(await db().rpc('admin_user_ledger', { p_user_id: userId }), adminError)
+  return rows.map((r) => ({
+    id: String(r.id),
+    amount: r.amount,
+    reason: r.reason === 'vote' ? 'vote' : 'checkin',
+    story: r.story_slug ? { slug: r.story_slug, title: r.story_title } : null,
+    balanceAfter: r.balance_after,
+    createdAt: r.created_at,
+  }))
 }

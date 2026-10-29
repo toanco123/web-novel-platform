@@ -28,4 +28,7 @@ export const {
   mergeGenres,
   getCuratedStories,
   setCuratedStories,
+  getAdminVoteStories,
+  getAdminVoteUsers,
+  getAdminUserLedger,
 } = api

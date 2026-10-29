@@ -70,6 +70,34 @@ export function useAdminComments(query: api.AdminCommentQuery) {
   })
 }
 
+export function useAdminVoteStories(query: api.AdminVoteStoryQuery) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: [...adminKeys.all(userId), 'vote-stories', query],
+    queryFn: () => api.getAdminVoteStories(query),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useAdminVoteUsers(query: api.AdminVoteUserQuery) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: [...adminKeys.all(userId), 'vote-users', query],
+    queryFn: () => api.getAdminVoteUsers(query),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Sổ phiếu của một người; chỉ tải khi có `targetId` (hộp thoại đang mở) */
+export function useAdminUserLedger(targetId: string | null) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: [...adminKeys.all(userId), 'user-ledger', targetId],
+    queryFn: () => api.getAdminUserLedger(targetId ?? ''),
+    enabled: targetId !== null,
+  })
+}
+
 /** Thao tác của admin: xong thì làm mới mọi dữ liệu admin (danh sách, ô số ở Tổng quan) */
 function useAdminMutation<T>(mutationFn: (input: T) => Promise<unknown>) {
   const queryClient = useQueryClient()

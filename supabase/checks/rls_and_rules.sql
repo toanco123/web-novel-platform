@@ -1605,6 +1605,48 @@ select pg_temp.expect(
     = '{"total": 3, "week": 3}'::jsonb,
   'studio_story_stats: có số đề cử');
 
+-- Quản trị xem phiếu: người thường bị chặn; admin thấy truyện, người dùng và sổ giao dịch
+select pg_temp.expect_error($$select * from public.admin_vote_stories()$$, 'forbidden');
+select pg_temp.expect_error($$select * from public.admin_vote_users()$$, 'forbidden');
+select pg_temp.expect_error(
+  $$select * from public.admin_user_ledger('00000000-0000-4000-8000-000000000052')$$, 'forbidden');
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select total_votes = 3 and week_votes = 3 and voter_count = 2
+      and top_voter_id = '00000000-0000-4000-8000-000000000053' and not is_concentrated
+    from public.admin_vote_stories('truyen duoc de cu') where slug = 'truyen-duoc-de-cu'),
+  'admin_vote_stories: tổng, 7 ngày, số người, người đề cử nhiều nhất; ít phiếu chưa bị đánh dấu');
+select pg_temp.expect(
+  (select voted = 2 and checkin_count = 2 and last_streak = 7 and balance = 1
+    from public.admin_vote_users() where id = '00000000-0000-4000-8000-000000000053'),
+  'admin_vote_users: số dư, phiếu đã đề cử, số lần điểm danh, chuỗi gần nhất');
+select pg_temp.expect(
+  (select count(*) = 2 and bool_and(story_slug = 'truyen-duoc-de-cu' or reason = 'checkin')
+    from public.admin_user_ledger('00000000-0000-4000-8000-000000000052')),
+  'admin_user_ledger: đủ hai dòng sổ của người đó');
+-- Một người chiếm ≥ 50% và truyện có ≥ 10 phiếu thì bị đánh dấu tập trung
+reset role;
+insert into public.story_votes (story_id, user_id, amount)
+values (pg_temp.story_id('truyen-duoc-de-cu'), '00000000-0000-4000-8000-000000000053', 10);
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select is_concentrated and total_votes = 13
+    from public.admin_vote_stories() where slug = 'truyen-duoc-de-cu'),
+  'admin_vote_stories: một người chiếm ≥ 50% của ≥ 10 phiếu thì đánh dấu tập trung');
+reset role;
+delete from public.story_votes
+where story_id = pg_temp.story_id('truyen-duoc-de-cu') and amount = 10;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000051", "role": "authenticated"}', true);
+set local role authenticated;
+
 -- Khách: xem tổng đề cử và bảng xếp hạng, không điểm danh / đề cử được
 reset role;
 select set_config('request.jwt.claims', '{"role": "anon"}', true);
