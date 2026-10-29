@@ -128,7 +128,8 @@ test('hết chương thì dừng, bấm "Chương sau" để sang chương sau v
   await user.click(within(bar).getByRole('button', { name: /Chương sau/ }))
   await expect.poll(() => router.state.location.pathname, slow).toBe(`${base}/chapter-13`)
   const next = await screen.findByRole('region', { name: 'Tự động cuộn' }, slow)
-  expect(within(next).getByRole('button', { name: 'Tạm dừng' })).toBeInTheDocument()
+  // Cuộn tiếp sau khi chương mới nạp xong, nên nút đổi sang "Tạm dừng" muộn hơn thanh nổi
+  expect(await within(next).findByRole('button', { name: 'Tạm dừng' }, slow)).toBeInTheDocument()
 })
 
 test('tự chuyển chương bằng phím → khi đang tự cuộn thì tạm dừng', async () => {
