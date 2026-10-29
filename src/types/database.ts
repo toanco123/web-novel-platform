@@ -1149,12 +1149,12 @@ export type Database = {
           title: string
         }[]
       }
+      admin_delete_comment: { Args: { p_id: string }; Returns: undefined }
+      admin_delete_genre: { Args: { p_slug: string }; Returns: undefined }
       admin_delete_rating: {
         Args: { p_story_id: string; p_user_id: string }
         Returns: undefined
       }
-      admin_delete_comment: { Args: { p_id: string }; Returns: undefined }
-      admin_delete_genre: { Args: { p_slug: string }; Returns: undefined }
       admin_dismiss_comment_reports: {
         Args: { p_comment_id: string }
         Returns: undefined
