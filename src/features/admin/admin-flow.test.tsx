@@ -1,5 +1,5 @@
 import { cleanup, screen, within } from '@testing-library/react'
-import { saveLedger, saveVotes } from '@/mocks/activity'
+import { saveLedger, saveRatings, saveVotes } from '@/mocks/activity'
 import { pendingStory, publishStory, registerUser, signInAs } from '@/test/helpers'
 import { renderApp } from '@/test/renderApp'
 
@@ -604,4 +604,34 @@ test('phiếu đề cử: tab theo truyện đánh dấu tập trung, tab ngư�
   expect(await screen.findByText('linh@gmail.com', {}, slow)).toBeInTheDocument()
   expect(screen.getByText('mai@gmail.com')).toBeInTheDocument()
   expect(screen.queryByText('hoa@gmail.com')).not.toBeInTheDocument()
+}, 20_000)
+
+test('điểm chấm: lọc theo điểm, xem điểm của một người, xóa một điểm', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const mai = await registerUser('Mai', 'mai@gmail.com')
+  const linhId = (await import('@/mocks/users'))
+    .loadUsers()
+    .find((u) => u.displayName === 'Linh')!.id
+  saveRatings({ [mai]: { [story.slug]: 1 }, [linhId]: { [story.slug]: 5 } })
+  signInAs('demo')
+  const { router, user } = renderApp('/admin/ratings')
+
+  expect(await screen.findByText('mai@gmail.com', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('linh@gmail.com')).toBeInTheDocument()
+
+  // Lọc 1 sao: chỉ còn điểm của Mai
+  await user.click(screen.getByRole('combobox', { name: 'Điểm' }))
+  await user.click(await screen.findByTitle('1 sao', {}, slow))
+  await expect.poll(() => router.state.location.search, slow).toBe('?score=1')
+  await expect.poll(() => screen.queryByText('linh@gmail.com'), slow).toBeNull()
+
+  // Xóa điểm của Mai: bấm Xóa ở dòng rồi xác nhận trong hộp hỏi
+  const row = screen.getByText('mai@gmail.com').closest('tr') as HTMLElement
+  await user.click(within(row).getByRole('button', { name: 'Xóa' }))
+  const confirm = await screen.findByRole('tooltip', {}, slow)
+  await user.click(within(confirm).getByRole('button', { name: 'Xóa' }))
+  expect(
+    await screen.findByText('Không có điểm chấm nào khớp bộ lọc', {}, slow),
+  ).toBeInTheDocument()
 }, 20_000)

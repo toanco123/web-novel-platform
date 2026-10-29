@@ -1,6 +1,6 @@
 # Plan: Admin xem phiếu đề cử và đánh giá
 
-Trạng thái: phần 1 (phiếu) xong trên nhánh `admin-votes`, chưa đẩy migration lên DB thật (29/10/2026); phần 2 (điểm chấm) chưa làm. Spec duyệt ngày 29/10/2026. Nối tiếp `plan-cong-cu-admin.md`, `plan-diem-danh-va-de-cu.md`.
+Trạng thái: phần 1 (phiếu) xong trên nhánh `admin-votes`, phần 2 (điểm chấm) xong trên nhánh `admin-ratings`; cả hai migration chưa đẩy lên DB thật (29/10/2026). Spec duyệt ngày 29/10/2026. Nối tiếp `plan-cong-cu-admin.md`, `plan-diem-danh-va-de-cu.md`.
 
 Khác với plan (phần 1):
 - RPC chỉ nhận từ khóa tìm (`admin_vote_stories(query)`, `admin_vote_users(query)`); lọc, sắp xếp, phân trang làm bằng PostgREST ngay trên kết quả, như các bảng admin khác.
@@ -8,6 +8,10 @@ Khác với plan (phần 1):
 - Tab Theo người dùng chỉ liệt kê người có hoạt động phiếu (đã điểm danh, đã đề cử hoặc đang có phiếu).
 - Cột "Chuỗi gần nhất" là chuỗi ở lần điểm danh gần nhất, không xét còn liên tiếp tới hôm nay.
 - Bấm tên người đề cử nhiều nhất (tab Theo truyện) cũng mở sổ phiếu.
+
+Khác với plan (phần 2):
+- RPC `admin_ratings(query)` chỉ nhận từ khóa; lọc điểm (`?score=`) và lọc theo người (`?user=<id>`, thay cho `user_only`) làm bằng PostgREST. Bấm số trong cột "Đã chấm" mở các điểm của người đó.
+- Cột "Lúc chấm" lấy `ratings.updated_at` (lần chấm hoặc sửa gần nhất); bản giả không có mốc nên hiện "–".
 
 ## Context
 

@@ -2,7 +2,15 @@ import { recordChapterView } from '@/features/chapters/api'
 import { addComment } from '@/features/comments/api'
 import { followStory } from '@/features/library/api'
 import * as studio from '@/features/studio/api'
-import { dayKey, loadViews, saveCheckins, saveLedger, saveViews, saveVotes } from '@/mocks/activity'
+import {
+  dayKey,
+  loadViews,
+  saveCheckins,
+  saveLedger,
+  saveRatings,
+  saveViews,
+  saveVotes,
+} from '@/mocks/activity'
 import { loadUserStories, saveUserStories } from '@/mocks/userContent'
 import { pendingStory, publishStory, registerUser, signInAs, signOut } from '@/test/helpers'
 import * as admin from './api'
@@ -650,4 +658,41 @@ test('phiếu đề cử: theo truyện, theo người dùng, sổ giao dịch; 
   expect(ledger.map((e) => e.reason)).toEqual(['vote', 'checkin'])
   expect(ledger[0].story).toEqual({ slug: story.slug, title: 'Mùa Hạ Năm Ấy' })
   expect(ledger[1].story).toBeNull()
+})
+
+test('điểm chấm: danh sách kèm thống kê của người chấm, lọc, xóa; chỉ quản trị viên', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const a = await publishStory('Mùa Hạ Năm Ấy', 1)
+  const b = await publishStory('Gió Thổi Qua Đồi', 1)
+  const mai = await registerUser('Mai', 'mai@gmail.com')
+  // Mai chấm 1 sao cho cả hai truyện, Linh chấm 5 sao cho một truyện
+  saveRatings({ [mai]: { [a.slug]: 1, [b.slug]: 1 }, [linh]: { [a.slug]: 5 } })
+
+  await expect(admin.getAdminRatings({ page: 1 })).rejects.toBeInstanceOf(admin.AdminError)
+  await expect(admin.deleteAdminRating(mai, a.id)).rejects.toBeInstanceOf(admin.AdminError)
+
+  signInAs('demo')
+  const all = await admin.getAdminRatings({ page: 1 })
+  expect(all.total).toBe(3)
+  const maiRows = all.items.filter((r) => r.userId === mai)
+  expect(maiRows).toHaveLength(2)
+  expect(maiRows[0]).toMatchObject({
+    userName: 'Mai',
+    userEmail: 'mai@gmail.com',
+    score: 1,
+    userRatingCount: 2,
+    userRatingAvg: 1,
+  })
+
+  expect((await admin.getAdminRatings({ page: 1, score: 1 })).total).toBe(2)
+  expect((await admin.getAdminRatings({ page: 1, userId: linh })).total).toBe(1)
+  expect((await admin.getAdminRatings({ page: 1, q: 'gio thoi' })).total).toBe(1)
+  const byCount = await admin.getAdminRatings({ page: 1, sort: 'count', order: 'asc' })
+  expect(byCount.items[0].userId).toBe(linh)
+
+  await admin.deleteAdminRating(mai, a.id)
+  expect(
+    (await admin.getAdminRatings({ page: 1, userId: mai })).items.map((r) => r.storySlug),
+  ).toEqual([b.slug])
+  await expect(admin.deleteAdminRating(mai, a.id)).rejects.toMatchObject({ code: 'not_found' })
 })

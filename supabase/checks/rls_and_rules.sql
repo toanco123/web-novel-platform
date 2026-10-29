@@ -1647,6 +1647,52 @@ select set_config('request.jwt.claims',
   '{"sub": "00000000-0000-4000-8000-000000000051", "role": "authenticated"}', true);
 set local role authenticated;
 
+-- Quản trị xem và xóa điểm chấm
+reset role;
+insert into public.ratings (user_id, story_id, score) values
+  ('00000000-0000-4000-8000-000000000052', pg_temp.story_id('truyen-duoc-de-cu'), 1),
+  ('00000000-0000-4000-8000-000000000053', pg_temp.story_id('truyen-duoc-de-cu'), 2);
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000052", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error($$select * from public.admin_ratings()$$, 'forbidden');
+select pg_temp.expect_error(
+  $$select public.admin_delete_rating('00000000-0000-4000-8000-000000000052',
+    (select id from public.stories where slug = 'truyen-duoc-de-cu'))$$, 'forbidden');
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select count(*) = 2 and bool_and(user_rating_count = 1)
+      and bool_or(user_id = '00000000-0000-4000-8000-000000000052' and score = 1
+        and user_rating_avg = 1)
+    from public.admin_ratings('truyen duoc de cu')),
+  'admin_ratings: thấy điểm của từng người kèm số điểm và điểm trung bình họ đã chấm');
+select public.admin_delete_rating('00000000-0000-4000-8000-000000000052',
+  pg_temp.story_id('truyen-duoc-de-cu'));
+reset role;
+select pg_temp.expect(
+  (select rating_counts = '{0,1,0,0,0}' from public.story_stats
+    where story_id = pg_temp.story_id('truyen-duoc-de-cu'))
+  and not exists (select 1 from public.ratings
+    where user_id = '00000000-0000-4000-8000-000000000052'
+      and story_id = pg_temp.story_id('truyen-duoc-de-cu')),
+  'admin_delete_rating: xóa điểm chấm và trừ khỏi số liệu của truyện');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$select public.admin_delete_rating('00000000-0000-4000-8000-000000000052',
+    (select id from public.stories where slug = 'truyen-duoc-de-cu'))$$, 'not_found');
+reset role;
+delete from public.ratings where story_id = pg_temp.story_id('truyen-duoc-de-cu');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000051", "role": "authenticated"}', true);
+set local role authenticated;
+
 -- Khách: xem tổng đề cử và bảng xếp hạng, không điểm danh / đề cử được
 reset role;
 select set_config('request.jwt.claims', '{"role": "anon"}', true);

@@ -98,6 +98,31 @@ export function useAdminUserLedger(targetId: string | null) {
   })
 }
 
+export function useAdminRatings(query: api.AdminRatingQuery) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: [...adminKeys.all(userId), 'ratings', query],
+    queryFn: () => api.getAdminRatings(query),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Xóa điểm chấm: làm mới cả điểm trung bình ở phần công khai */
+export function useDeleteAdminRating() {
+  const queryClient = useQueryClient()
+  const userId = useUserId()
+  return useMutation({
+    mutationFn: (input: { userId: string; storyId: string }) =>
+      api.deleteAdminRating(input.userId, input.storyId),
+    onSettled: () =>
+      Promise.all(
+        [adminKeys.all(userId), ['rating'], ['stories']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+  })
+}
+
 /** Thao tác của admin: xong thì làm mới mọi dữ liệu admin (danh sách, ô số ở Tổng quan) */
 function useAdminMutation<T>(mutationFn: (input: T) => Promise<unknown>) {
   const queryClient = useQueryClient()

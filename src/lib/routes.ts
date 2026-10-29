@@ -60,6 +60,9 @@ export const paths = {
   adminFeatured: '/admin/featured',
   /** Phiếu đề cử: theo truyện (mặc định) hoặc theo người dùng (?view=users) */
   adminVotes: '/admin/votes',
+  /** Điểm chấm của người đọc; userId: chỉ điểm của một người */
+  adminRatings: (userId?: string) =>
+    userId ? `/admin/ratings?user=${encodeURIComponent(userId)}` : '/admin/ratings',
 }
 
 function withNext(path: string, next?: string) {

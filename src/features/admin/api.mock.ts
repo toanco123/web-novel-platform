@@ -12,6 +12,7 @@ import {
   loadCommentReports,
   loadContactMessages,
   loadLedger,
+  loadRatings,
   loadReports,
   loadUserComments,
   loadViews,
@@ -19,6 +20,7 @@ import {
   removeComments,
   saveCommentReports,
   saveContactMessages,
+  saveRatings,
   saveReports,
 } from '@/mocks/activity'
 import { allGenres, toStory } from '@/mocks/catalog'
@@ -50,6 +52,8 @@ import {
   type AdminLedgerEntry,
   type AdminMessageQuery,
   type AdminOverview,
+  type AdminRating,
+  type AdminRatingQuery,
   type AdminPeriodTotals,
   type AdminReport,
   type AdminReportQuery,
@@ -930,4 +934,72 @@ export async function getAdminUserLedger(userId: string): Promise<AdminLedgerEnt
       balanceAfter: e.balanceAfter,
       createdAt: e.createdAt,
     }))
+}
+
+// ── Điểm chấm ───────────────────────────────────────────────────────────
+
+const ratingSortKeys: Record<
+  NonNullable<AdminRatingQuery['sort']>,
+  (r: AdminRating) => string | number | null
+> = {
+  user: (r) => r.userName,
+  story: (r) => r.storyTitle,
+  score: (r) => r.score,
+  time: (r) => r.createdAt,
+  count: (r) => r.userRatingCount,
+  avg: (r) => r.userRatingAvg,
+}
+
+export async function getAdminRatings({
+  q = '',
+  score,
+  userId,
+  sort = 'time',
+  order,
+  page,
+  pageSize,
+}: AdminRatingQuery): Promise<Page<AdminRating>> {
+  await delay()
+  await requireAdmin()
+  const query = slugify(q)
+  const stories = new Map(allStories().map((s) => [s.slug, s]))
+  const users = new Map(loadUsers().map((u) => [u.id, u]))
+  const ratings = Object.entries(loadRatings()).flatMap(([uid, byStory]) => {
+    const entries = Object.entries(byStory).filter(([slug]) => stories.has(slug))
+    const avg = entries.reduce((sum, [, v]) => sum + v, 0) / (entries.length || 1)
+    return entries.map(([slug, value]): AdminRating => {
+      const story = stories.get(slug)
+      return {
+        userId: uid,
+        userName: users.get(uid)?.displayName ?? '',
+        userEmail: users.get(uid)?.email ?? '',
+        storyId: story?.id ?? '',
+        storySlug: slug,
+        storyTitle: story?.title ?? slug,
+        score: value,
+        createdAt: null,
+        userRatingCount: entries.length,
+        userRatingAvg: Math.round(avg * 100) / 100,
+      }
+    })
+  })
+  const items = ratings
+    .filter(
+      (r) =>
+        matches(query, r.storyTitle, r.userName, r.userEmail) &&
+        (!score || r.score === score) &&
+        (!userId || r.userId === userId),
+    )
+    .sort(by(ratingSortKeys[sort], order))
+  return paginate(items, page, adminPageSize(pageSize))
+}
+
+export async function deleteAdminRating(userId: string, storyId: string) {
+  await delay()
+  await requireAdmin()
+  const slug = allStories().find((s) => s.id === storyId)?.slug
+  const ratings = loadRatings()
+  if (!slug || ratings[userId]?.[slug] === undefined) throw new AdminError('not_found')
+  const { [slug]: _removed, ...rest } = ratings[userId]
+  saveRatings({ ...ratings, [userId]: rest })
 }

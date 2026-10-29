@@ -520,3 +520,36 @@ export type AdminLedgerEntry = {
   balanceAfter: number
   createdAt: string
 }
+
+// ── Điểm chấm (trang /admin/ratings) ────────────────────────────────────
+
+export type AdminRating = {
+  userId: string
+  userName: string
+  userEmail: string
+  storyId: string
+  storySlug: string
+  storyTitle: string
+  score: 1 | 2 | 3 | 4 | 5
+  /** Lần chấm hoặc sửa điểm gần nhất; null: bản giả không lưu mốc */
+  createdAt: string | null
+  /** Số điểm người này đã chấm cho mọi truyện */
+  userRatingCount: number
+  /** Điểm trung bình người này đã chấm, 1–5 */
+  userRatingAvg: number
+}
+
+export const ADMIN_RATING_SORTS = ['user', 'story', 'score', 'time', 'count', 'avg'] as const
+export type AdminRatingSort = (typeof ADMIN_RATING_SORTS)[number]
+
+export type AdminRatingQuery = {
+  q?: string
+  score?: 1 | 2 | 3 | 4 | 5
+  /** Chỉ điểm của một người dùng */
+  userId?: string
+  /** Mặc định: time, giảm dần */
+  sort?: AdminRatingSort
+  order?: SortOrder
+  page: number
+  pageSize?: number
+}

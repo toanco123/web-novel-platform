@@ -19,6 +19,8 @@ import {
   type AdminLedgerEntry,
   type AdminMessageQuery,
   type AdminOverview,
+  type AdminRating,
+  type AdminRatingQuery,
   type AdminReport,
   type AdminReportQuery,
   type AdminStory,
@@ -523,4 +525,64 @@ export async function getAdminUserLedger(userId: string): Promise<AdminLedgerEnt
     balanceAfter: r.balance_after,
     createdAt: r.created_at,
   }))
+}
+
+// ── Điểm chấm ───────────────────────────────────────────────────────────
+
+const ratingSortColumns = {
+  user: 'user_name',
+  story: 'story_title',
+  score: 'score',
+  time: 'created_at',
+  count: 'user_rating_count',
+  avg: 'user_rating_avg',
+} as const
+
+export async function getAdminRatings({
+  q,
+  score,
+  userId,
+  sort = 'time',
+  order,
+  page,
+  pageSize,
+}: AdminRatingQuery): Promise<Page<AdminRating>> {
+  await requireUserId()
+  // Id người dùng sai định dạng (link sửa tay) thì coi như không có điểm nào
+  if (userId && !isUuid(userId)) return { items: [], total: 0, page: 1, pageCount: 1 }
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc('admin_ratings', { p_query: q || undefined }, { count: 'exact' })
+    if (score) query = query.eq('score', score)
+    if (userId) query = query.eq('user_id', userId)
+    return query
+      .order(ratingSortColumns[sort], direction(order))
+      .order('user_id')
+      .order('story_id')
+      .range(from, to)
+  }).catch(rethrow)
+  return {
+    ...result,
+    items: result.items.map((r) => ({
+      userId: r.user_id,
+      userName: r.user_name,
+      userEmail: r.user_email,
+      storyId: r.story_id,
+      storySlug: r.story_slug,
+      storyTitle: r.story_title,
+      score: r.score as AdminRating['score'],
+      createdAt: r.created_at ?? null,
+      userRatingCount: r.user_rating_count,
+      userRatingAvg: Number(r.user_rating_avg),
+    })),
+  }
+}
+
+/** Xóa điểm chấm của một người cho một truyện; điểm trung bình của truyện tự cập nhật */
+export async function deleteAdminRating(userId: string, storyId: string) {
+  await requireUserId()
+  if (!isUuid(userId) || !isUuid(storyId)) throw new AdminError('not_found')
+  unwrap(
+    await db().rpc('admin_delete_rating', { p_user_id: userId, p_story_id: storyId }),
+    adminError,
+  )
 }
