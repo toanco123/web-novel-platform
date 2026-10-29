@@ -23,6 +23,8 @@ npx shadcn@latest add <component>        # thêm component shadcn vào src/compo
 npx vitest run api                       # test của hàm Vercel (api/_lib)
 ```
 
+CI (`.github/workflows/ci.yml`, chạy ở push lên `main` và mọi pull request): `npm ci`, `lint`, `format:check`, `typecheck`, `test`, `build`. Chạy đủ các lệnh này trước khi push; CI không chạy `supabase/checks` (cần DB thật).
+
 ## Kiến trúc
 
 - **Entry**: `src/main.tsx` → `Providers` (`src/app/providers.tsx`: TanStack Query + TooltipProvider) → `RouterProvider` (import từ `react-router/dom`).
