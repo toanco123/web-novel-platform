@@ -1,0 +1,35 @@
+# Kiểm tra mỗi lần push lên main và mỗi pull request
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Một nhánh chỉ chạy lượt mới nhất
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, định dạng, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      # Test chạy trên dữ liệu giả, không cần khóa Supabase
+      - run: npm test
+      # Build không có VITE_SUPABASE_* nên ra bản dữ liệu giả; Vercel build bản thật khi deploy
+      - run: npm run build
