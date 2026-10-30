@@ -3,7 +3,9 @@ import { addComment } from '@/features/comments/api'
 import { publishStory, registerUser, signInAs } from '@/test/helpers'
 import { renderApp } from '@/test/renderApp'
 
-const slow = { timeout: 3000 }
+// Máy CI chậm: trang thông báo và popover tải theo chunk, nên chờ lâu hơn các test luồng khác
+vi.setConfig({ testTimeout: 20_000 })
+const slow = { timeout: 8000 }
 
 /** jsdom không có màn rộng: giả `min-width` khớp để chuông mở popover thay vì là link */
 function wideScreen() {
