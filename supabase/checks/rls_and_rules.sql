@@ -2191,6 +2191,73 @@ select pg_temp.expect(
   'related_story_cards: cùng truyện, cùng thứ tự với related_stories');
 reset role;
 
+-- ── Nhật ký thao tác admin ──────────────────────────────────────────────
+-- Các thao tác admin ở các khối trên đã để lại dòng nhật ký; thao tác lỗi thì không.
+reset role;
+select pg_temp.expect(
+  (select count(*) = 1 from private.admin_audit_log
+    where action = 'user.ban' and target_id = '00000000-0000-4000-8000-00000000000a'
+      and actor_name <> '')
+  and (select count(*) = 1 from private.admin_audit_log
+    where action = 'user.unban' and target_id = '00000000-0000-4000-8000-00000000000a'),
+  -- actor_id về null khi tài khoản admin bị xóa (khối xóa tài khoản sau đó), actor_name còn
+  'nhật ký: khóa và mở khóa tài khoản mỗi lần một dòng, có tên người làm');
+select pg_temp.expect(
+  not exists (select 1 from private.admin_audit_log
+    where action = 'user.ban' and target_id in ('00000000-0000-4000-8000-00000000000c',
+      '00000000-0000-4000-8000-00000000000d')),
+  'nhật ký: khóa bị từ chối (tự khóa, khóa admin khác) không để lại dòng');
+select pg_temp.expect(
+  exists (select 1 from private.admin_audit_log
+    where action = 'story.takedown' and target_id = pg_temp.story_id('truyen-chong-spam')::text
+      and details ->> 'reason' = 'Đạo văn' and target_label <> ''),
+  'nhật ký: gỡ truyện ghi lý do và tên truyện');
+select pg_temp.expect(
+  (select count(*) = 1 from private.admin_audit_log
+    where action = 'story.reject' and target_id = pg_temp.story_id('truyen-cho-duyet')::text
+      and details ->> 'reason' = 'Thiếu giới thiệu')
+  and (select count(*) = 1 from private.admin_audit_log
+    where action = 'story.approve' and target_id = pg_temp.story_id('truyen-cho-duyet')::text),
+  'nhật ký: từ chối (kèm lý do) và duyệt truyện');
+select pg_temp.expect(
+  (select count(*) = 1 from private.admin_audit_log
+    where action = 'genre.update' and details ->> 'from_slug' = 'the-loai-5')
+  and (select count(*) = 1 from private.admin_audit_log
+    where action = 'genre.merge' and target_id = 'co-dai' and details ->> 'into_slug' = 'the-loai-nam'
+      and (details ->> 'moved')::integer >= 1)
+  and (select count(*) = 1 from private.admin_audit_log
+    where action = 'genre.delete' and target_id = 'the-loai-nam'),
+  'nhật ký: sửa, gộp, xóa thể loại; thao tác gộp lần hai bị not_found không để lại dòng');
+select pg_temp.expect(
+  (select count(*) = 2 from private.admin_audit_log where action = 'comment.delete'
+    and details ->> 'content' is not null and details ->> 'story' is not null),
+  'nhật ký: xóa bình luận ghi nội dung và truyện; xóa id không có (not_found) không để lại dòng');
+
+-- Đọc nhật ký: chỉ quản trị viên; bảng và hàm ghi không gọi được từ API
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000b", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error($$select * from public.admin_audit_log()$$, 'forbidden');
+select pg_temp.expect_error($$select * from private.admin_audit_log$$, '42501');
+select pg_temp.expect_error(
+  $$select private.admin_log('user.ban', 'user', 'x', 'x', '{}')$$, '42501');
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000c", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select count(*) >= 1 and bool_and(action_group = 'genre')
+    from public.admin_audit_log('the loai') where action_group = 'genre'),
+  'admin_audit_log: admin đọc được, có cột nhóm thao tác');
+select pg_temp.expect(
+  (select count(*) = 2 from public.admin_audit_log() where action = 'user.ban'
+      or action = 'user.unban'),
+  'admin_audit_log: mới trước, đủ dòng khóa và mở khóa');
+select pg_temp.expect_error(
+  $$delete from private.admin_audit_log$$, '42501');
+reset role;
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

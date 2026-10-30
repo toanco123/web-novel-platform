@@ -123,6 +123,15 @@ export function useDeleteAdminRating() {
   })
 }
 
+export function useAdminAuditLog(query: api.AdminAuditQuery) {
+  const userId = useUserId()
+  return useQuery({
+    queryKey: [...adminKeys.all(userId), 'audit', query],
+    queryFn: () => api.getAdminAuditLog(query),
+    placeholderData: keepPreviousData,
+  })
+}
+
 /** Thao tác của admin: xong thì làm mới mọi dữ liệu admin (danh sách, ô số ở Tổng quan) */
 function useAdminMutation<T>(mutationFn: (input: T) => Promise<unknown>) {
   const queryClient = useQueryClient()
