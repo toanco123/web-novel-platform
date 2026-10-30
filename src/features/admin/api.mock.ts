@@ -46,6 +46,10 @@ import type { CuratedList, Genre } from '@/types/story'
 import {
   addDays,
   AdminError,
+  ANNOUNCEMENT_BODY_MAX,
+  ANNOUNCEMENT_TITLE_MAX,
+  type AnnouncementInput,
+  isInternalLink,
   adminPageSize,
   CURATED_LIMITS,
   isVoteConcentrated,
@@ -1113,6 +1117,33 @@ export async function deleteAdminRating(userId: string, storyId: string) {
     user: loadUsers().find((u) => u.id === userId)?.displayName ?? '',
     score: ratings[userId][slug],
   })
+}
+
+/** Gửi thông báo cho mọi tài khoản (như admin_send_announcement); trả về số người nhận */
+export async function sendAdminAnnouncement({ title, body, link }: AnnouncementInput) {
+  await delay()
+  const admin = await requireAdmin()
+  const text = title.trim()
+  const note = body.trim()
+  const target = link.trim()
+  if (
+    text.length < 1 ||
+    text.length > ANNOUNCEMENT_TITLE_MAX ||
+    note.length > ANNOUNCEMENT_BODY_MAX ||
+    !isInternalLink(target)
+  ) {
+    throw new AdminError('invalid_announcement')
+  }
+  const users = loadUsers()
+  for (const u of users) {
+    addNotification(u.id, { type: 'announcement', title: text, body: note, link: target || null })
+  }
+  audit(admin, 'announcement.send', 'announcement', crypto.randomUUID(), text, {
+    body: note,
+    link: target || null,
+    recipients: users.length,
+  })
+  return users.length
 }
 
 // ── Nhật ký thao tác ────────────────────────────────────────────────────

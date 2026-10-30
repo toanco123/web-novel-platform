@@ -7,6 +7,7 @@ import {
   FileUp,
   Flag,
   History,
+  Megaphone,
   Home,
   Inbox,
   LayoutDashboard,
@@ -39,6 +40,7 @@ const menu = [
   { key: paths.adminRatings(), icon: Star, label: 'Điểm chấm' },
   { key: paths.adminGenres, icon: Tags, label: 'Thể loại' },
   { key: paths.adminImport, icon: FileUp, label: 'Nhập truyện' },
+  { key: paths.adminAnnouncements, icon: Megaphone, label: 'Thông báo' },
   { key: paths.adminAudit(), icon: History, label: 'Nhật ký' },
 ]
 

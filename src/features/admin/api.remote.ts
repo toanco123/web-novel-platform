@@ -18,6 +18,7 @@ import {
   type AdminAuditEntry,
   type AdminAuditQuery,
   type AdminContactMessage,
+  type AnnouncementInput,
   type AdminLedgerEntry,
   type AdminMessageQuery,
   type AdminOverview,
@@ -585,6 +586,19 @@ export async function deleteAdminRating(userId: string, storyId: string) {
   if (!isUuid(userId) || !isUuid(storyId)) throw new AdminError('not_found')
   unwrap(
     await db().rpc('admin_delete_rating', { p_user_id: userId, p_story_id: storyId }),
+    adminError,
+  )
+}
+
+/** Gửi thông báo cho mọi tài khoản; trả về số người nhận */
+export async function sendAdminAnnouncement({ title, body, link }: AnnouncementInput) {
+  await requireUserId()
+  return unwrap(
+    await db().rpc('admin_send_announcement', {
+      p_title: title,
+      p_body: body,
+      p_link: link || undefined,
+    }),
     adminError,
   )
 }

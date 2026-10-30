@@ -673,3 +673,35 @@ test('nhật ký: xem, lọc theo nhóm và theo người làm, tìm theo đối
   await expect.poll(() => screen.queryByText('Truyện Đạo Văn'), slow).toBeNull()
   expect(screen.getByText('Bạn Spam')).toBeInTheDocument()
 }, 20_000)
+
+test('thông báo chung: soạn, xem trước, gửi có xác nhận, hiện ở danh sách đã gửi', async () => {
+  await registerUser('Linh', 'linh@gmail.com')
+  signInAs('demo')
+  const { user } = renderApp('/admin/announcements')
+
+  await user.click(await screen.findByRole('button', { name: 'Gửi thông báo' }, slow))
+  expect(await screen.findByText('Nhập tiêu đề.', {}, slow)).toBeInTheDocument()
+
+  await user.type(screen.getByLabelText('Tiêu đề'), 'Bảo trì hệ thống')
+  await user.type(screen.getByLabelText('Nội dung (không bắt buộc)'), 'Tối nay 22h')
+  // Xem trước theo nội dung đang gõ
+  const preview = screen
+    .getByText('Xem trước', { selector: '.ant-card-head-title' })
+    .closest('.ant-card')!
+  expect(
+    await within(preview as HTMLElement).findByText('Bảo trì hệ thống', {}, slow),
+  ).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Gửi thông báo' }))
+  await user.click(await screen.findByRole('button', { name: 'Gửi' }, slow))
+
+  expect(await screen.findByText(/Đã gửi thông báo cho \d+ người/, {}, slow)).toBeInTheDocument()
+  // Danh sách đã gửi đọc từ nhật ký
+  const sent = screen
+    .getByText('Đã gửi', { selector: '.ant-card-head-title' })
+    .closest('.ant-card')!
+  expect(
+    await within(sent as HTMLElement).findByText('Bảo trì hệ thống', {}, slow),
+  ).toBeInTheDocument()
+  expect(within(sent as HTMLElement).getByText(/người nhận · Tối nay 22h/)).toBeInTheDocument()
+})
