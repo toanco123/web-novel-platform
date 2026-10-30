@@ -23,10 +23,12 @@ import {
   saveRatings,
   saveReports,
 } from '@/mocks/activity'
+import { paths } from '@/lib/routes'
 import { appendAudit, loadAuditLog } from '@/mocks/adminAudit'
 import { allGenres, toStory } from '@/mocks/catalog'
 import { mockChapters } from '@/mocks/chapters'
 import { loadCurated, saveCurated } from '@/mocks/curated'
+import { addNotification } from '@/mocks/notifications'
 import { genres as seedGenres, stories as seedStories } from '@/mocks/stories'
 import {
   approvedReview,
@@ -733,6 +735,12 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
   audit(admin, text ? 'story.takedown' : 'story.restore', 'story', storyId, story.title, {
     reason: text || null,
   })
+  addNotification(story.owner.id, {
+    type: text ? 'story.takedown' : 'story.restored',
+    title: `Truyện "${story.title}" ${text ? 'đã bị gỡ' : 'đã được khôi phục'}`,
+    body: text || 'Bạn có thể gửi duyệt lại để công khai.',
+    link: paths.studioStory(storyId),
+  })
 }
 
 /** Duyệt (công khai luôn) hoặc từ chối (kèm lý do) truyện đang chờ duyệt */
@@ -768,6 +776,12 @@ export async function reviewStory({ storyId, approve, reason }: ReviewInput) {
   )
   if (approve) audit(admin, 'story.approve', 'story', storyId, story.title)
   else audit(admin, 'story.reject', 'story', storyId, story.title, { reason: text.slice(0, 500) })
+  addNotification(story.owner.id, {
+    type: approve ? 'story.approved' : 'story.rejected',
+    title: `Truyện "${story.title}" ${approve ? 'đã được duyệt' : 'chưa được duyệt'}`,
+    body: approve ? 'Truyện đã công khai cho người đọc.' : text.slice(0, 300),
+    link: paths.studioStory(storyId),
+  })
 }
 
 // ── Thể loại ────────────────────────────────────────────────────────────

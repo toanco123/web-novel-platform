@@ -30,6 +30,7 @@ comments 1─n private.comment_reports           (báo cáo bình luận vi ph�
 comments 1─n comment_likes                     (lượt thích, mỗi người một lượt)
 auth.users × profiles: user_blocks             (người chặn → người bị chặn, ẩn bình luận)
 profiles 1─n push_tokens                       (mã thông báo đẩy của máy, app di động)
+profiles 1─n notifications                     (hộp thông báo; story_id gộp thông báo chương mới)
                            1─n chapter_reports
                            1─n chapter_views    (mỗi ngày một dòng)
 profiles × stories: follows, reading_history, ratings   (khóa chính user_id + story_id)
@@ -62,6 +63,7 @@ Giới hạn độ dài lấy từ schema zod (`features/*/schemas.ts`). DB ch�
 | `contact_messages` | `name`, `email`, `topic`, `message` (10–2000), `user_id` | Chỉ insert, không ai đọc được qua API (xem trên Dashboard) |
 | `user_blocks` | `blocker_id` (mặc định `auth.uid()`), `blocked_id` (khóa ngoại tới `profiles`, để PostgREST nhúng tên, ảnh), `created_at` | Khóa chính `(blocker_id, blocked_id)`, không tự chặn mình (`23514`). Chặn ai thì mọi bình luận, trả lời của người đó ẩn với mình (policy đọc `comments`); người bị chặn không biết. Giao diện chặn / bỏ chặn có ở cả app (App Store Guideline 1.2) và web (`features/blocks`: nút "Chặn" dưới bình luận, mục "Người đã chặn" ở `/account`) |
 | `push_tokens` | `token` (khóa chính, mã Expo), `user_id`, `platform` (`ios` \| `android`), `updated_at` | Ghi qua `register_push_token` (máy đổi tài khoản thì mã chuyển chủ; mỗi tài khoản tối đa 10 máy, bỏ máy cũ nhất). Xóa mã của mình khi đăng xuất |
+| `notifications` | `id` (identity), `user_id`, `type` (`chapter.new` \| `comment.reply` \| `comment.story` \| `story.approved` \| `story.rejected` \| `story.takedown` \| `story.restored` \| `announcement`), `title` (1–120), `body` (≤300), `link` (đường dẫn nội bộ `/…`, null được), `story_id` (null được, cascade), `chapter_count`, `created_at`, `read_at` (null: chưa đọc) | Chỉ `private.notify` ghi (plan `plan-thong-bao.md`). Nội dung chụp sẵn, không phụ thuộc dữ liệu gốc. `chapter_count` = số chương đã gộp vào một thông báo `chapter.new` chưa đọc của truyện. Thông báo quá 90 ngày của người nhận bị xóa khi có thông báo mới. Index `(user_id, created_at desc)` và `(user_id) where read_at is null` |
 | `private.story_push_log` | `story_id`, `sent_at` | Lần gửi thông báo chương mới gần nhất của từng truyện (chống dội: 30 phút một lần, `private.push_cooldown()`). Không ai đọc ghi qua API |
 | `wallet_balances` | `user_id`, `currency`, `balance` (≥ 0), `updated_at` | Khóa chính `(user_id, currency)`. Chỉ `private.ledger_post` ghi |
 | `wallet_ledger` | `id`, `user_id`, `currency`, `amount` (≠ 0), `reason` (`checkin` \| `vote`), `story_id` (null khi điểm danh hoặc truyện đã xóa), `balance_after`, `created_at` | Sổ giao dịch, mỗi lần cộng / trừ một dòng. Chỉ chủ đọc. Giai đoạn 2 thêm `currency = 'coin'` |
@@ -140,6 +142,8 @@ Lỗi nghiệp vụ nằm trong `error.message` (mã `P0001`). Các luật tự 
 | Nội dung chương ghi vào (tạo + sửa) | 10.000.000 byte UTF-8 / ngày mỗi người (`chapter_limit`); file `.txt` nhập tối đa 2 MB nên đủ ~5 lần nhập / ngày |
 | Ảnh tải lên (bìa + đại diện) | 30 ảnh mới / 24 giờ và 300 ảnh đang lưu mỗi người (policy `images_insert_own` qua `private.image_upload_allowed(name)`; vượt thì Storage trả lỗi RLS, client đổi sang `ImageLimitError`). Bản bìa nhỏ `{uuid}-thumb.(webp|jpg)` không tính khi đã có ảnh gốc `{uuid}.(webp|jpg)` |
 
+**Sinh thông báo** (`private.notify`, migration `notifications`): trigger chương xuất bản lần đầu gọi `notify_new_chapters` (người theo dõi trừ tác giả; còn thông báo `chapter.new` chưa đọc của truyện thì gộp, cộng `chapter_count`, đưa lên đầu) trước `send_chapter_push`; trigger `comments_notify` (trả lời → người viết gốc, bình luận gốc → chủ truyện, trừ chính mình và trừ khi hai bên đã chặn nhau, `private.blocked_between`); `admin_review_story`, `admin_set_story_takedown` báo chủ truyện. Bản giả: `addNotification` (`src/mocks/notifications.ts`) trong bình luận và các hàm admin; chương mới chưa có.
+
 **Chống sửa dữ liệu qua API:** người gửi báo lỗi không có quyền sửa `chapter_reports.created_at` (trigger `chapter_reports_touch` đặt lại khi sửa ghi chú); `profiles.avatar_url` chỉ nhận `null` hoặc ảnh trong `avatars/{uid}/` của project (trigger `profiles_check_avatar`, URL project viết cứng trong hàm); lúc đăng ký chỉ lấy ảnh từ Google/Facebook, không lấy từ `options.data` của đăng ký email.
 
 **Captcha** (Cloudflare Turnstile, `features/auth/useCaptcha.tsx`): đăng nhập, đăng ký, quên mật khẩu và kiểm tra lại mật khẩu (đổi mật khẩu, xóa tài khoản) gửi `captchaToken`. Bật bằng `VITE_TURNSTILE_SITE_KEY` (Vercel) rồi mới bật Captcha ở Supabase Dashboard (Authentication > Attack Protection, dán Secret Key); làm ngược lại thì mọi form trên bị Supabase từ chối (`captcha_failed`).
@@ -164,6 +168,7 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | `contact_messages` | không ai | `anon` và `authenticated` insert |
 | `user_blocks` | chỉ người chặn | người chặn: insert (`blocked_id`), delete |
 | `push_tokens` | chỉ chủ | thêm / chuyển chủ qua `register_push_token`; chủ xóa |
+| `notifications` | chỉ chủ | không ai insert qua API (`private.notify`); chủ chỉ sửa cột `read_at` (grant theo cột) và xóa dòng của mình |
 | `wallet_balances`, `wallet_ledger`, `daily_checkins`, `story_votes` | chỉ chủ (`authenticated`) | không ai ghi từ client: chỉ qua `daily_checkin`, `vote_story` (DEFINER) |
 
 **Quy tắc khi viết migration mới:**
@@ -286,6 +291,8 @@ Mọi bảng đều bật RLS, và grant được ghi rõ cho `anon`/`authentica
 | studio | `getStoryStats` | `rpc('studio_story_stats')` |
 | studio | `getStoryReports` | `chapter_reports.select('*, reporter:profiles(id, display_name)')`, sắp theo `status` (enum: `open` trước), rồi `created_at` giảm dần |
 | studio | `setReportStatus` | `update chapter_reports set status` |
+| notifications | `getNotifications`, `getUnreadNotificationCount` | `notifications.select('id, type, title, body, link, created_at, read_at', { count: 'exact' }).order('created_at', desc).order('id', desc)` qua `loadPage`; đếm chưa đọc: `select('id', { count: 'exact', head: true }).is('read_at', null)` (RLS đã lọc theo chủ) |
+| notifications | `markNotificationsRead`, `markAllNotificationsRead`, `deleteNotification` | `update({ read_at }).in('id', …).is('read_at', null)` / `update({ read_at }).is('read_at', null)` / `delete().eq('id')` |
 | library | `getFollowStatus`, `followStory`, `unfollowStory` | `follows` select / insert `{ story_id }` (bỏ qua lỗi `23505`) / delete |
 | library | `getLibrary`, `getLibraryUpdateCount` | `rpc('library_cards')` (kèm thẻ) + `reading_history`; `rpc('library_update_count')` |
 | library | `getReadingHistory`, `getStoryProgress` | Đã đăng nhập: `reading_history` (`order('read_at', desc).limit(100)`) → `story_cards`. Khách: localStorage khóa `reading-history-guest` (`features/library/guestHistory.ts`; `src/mocks/activity.ts` chỉ bản giả dùng) |

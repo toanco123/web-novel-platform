@@ -31,6 +31,7 @@ import { UpdateBadge, UserMenu } from '@/features/auth/components/UserMenu'
 import { useSession, useSignOut } from '@/features/auth/hooks'
 import { useGenres } from '@/features/genres/hooks'
 import { useLibraryUpdateCount } from '@/features/library/hooks'
+import { NotificationBell } from '@/features/notifications/components/NotificationBell'
 import { CheckInButton } from '@/features/rewards/components/CheckInButton'
 import { useCurrentPath } from '@/hooks/useCurrentPath'
 import { paths } from '@/lib/routes'
@@ -72,6 +73,7 @@ export function Header() {
             </Link>
           </Button>
           <CheckInButton />
+          <NotificationBell />
           {/* Màn hẹp: nút theme nằm trong menu (MobileNav) để header không tràn ngang */}
           <ThemeToggle className="hidden sm:inline-flex" />
           <AccountSlot />

@@ -34,6 +34,7 @@ export const paths = {
   library: '/library',
   /** Điểm danh và lịch sử phiếu đề cử */
   rewards: '/rewards',
+  notifications: '/notifications',
   readingHistory: '/library?tab=history',
   /** Tab "Đã lưu" của tủ truyện: chương đọc được khi không có mạng */
   savedChapters: '/library?tab=saved',

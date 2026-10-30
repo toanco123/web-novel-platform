@@ -2258,6 +2258,233 @@ select pg_temp.expect_error(
   $$delete from private.admin_audit_log$$, '42501');
 reset role;
 
+-- ── Hộp thông báo ───────────────────────────────────────────────────────
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-4000-8000-000000000e01', 'tb-chu@kiem-tra.local', '{"display_name": "Chủ TB"}'),
+  ('00000000-0000-4000-8000-000000000e02', 'tb-theo@kiem-tra.local', '{"display_name": "Theo TB"}'),
+  ('00000000-0000-4000-8000-000000000e03', 'tb-khach@kiem-tra.local', '{"display_name": "Khách TB"}'),
+  ('00000000-0000-4000-8000-000000000e04', 'tb-la@kiem-tra.local', '{"display_name": "Lạ TB"}');
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+select * from public.create_story(
+  'Truyện Nhận Tin Zqy', 'Giới thiệu truyện đủ dài để qua kiểm tra.', 'ongoing', array[]::text[], null,
+  '{"title": "Mở đầu", "content": "Nội dung chương một."}', true);
+reset role;
+select pg_temp.approve('truyen-nhan-tin-zqy');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e02", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.follows (story_id) values (pg_temp.story_id('truyen-nhan-tin-zqy'));
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.follows (story_id) values (pg_temp.story_id('truyen-nhan-tin-zqy'));
+
+-- Chương mới: người theo dõi có thông báo, tác giả (cũng theo dõi) thì không
+insert into public.chapters (story_id, number, title, content, status)
+values (pg_temp.story_id('truyen-nhan-tin-zqy'), 2, 'Gặp gỡ', 'Nội dung chương hai.', 'published');
+reset role;
+select pg_temp.expect(
+  (select count(*) = 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e02' and type = 'chapter.new'
+      and story_id = pg_temp.story_id('truyen-nhan-tin-zqy')
+      and link = '/story/truyen-nhan-tin-zqy/chapter-2' and body = 'Chương 2: Gặp gỡ')
+  and not exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01' and type = 'chapter.new'),
+  'thông báo chương mới: người theo dõi có, tác giả không');
+
+-- Thêm chương nữa khi chưa đọc: gộp thành một dòng
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.chapters (story_id, number, title, content, status)
+values (pg_temp.story_id('truyen-nhan-tin-zqy'), 3, 'Chia xa', 'Nội dung chương ba.', 'published');
+reset role;
+select pg_temp.expect(
+  (select count(*) = 1 and bool_and(chapter_count = 2
+      and body = '2 chương mới, mới nhất chương 3' and link = '/story/truyen-nhan-tin-zqy/chapter-3')
+    from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e02' and type = 'chapter.new'
+      and story_id = pg_temp.story_id('truyen-nhan-tin-zqy')),
+  'thông báo chương mới: chưa đọc thì gộp, không thêm dòng');
+
+-- Đã đọc rồi thì chương sau tạo dòng mới
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e02", "role": "authenticated"}', true);
+set local role authenticated;
+update public.notifications set read_at = now() where type = 'chapter.new';
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.chapters (story_id, number, title, content, status)
+values (pg_temp.story_id('truyen-nhan-tin-zqy'), 4, '', 'Nội dung chương bốn.', 'published');
+reset role;
+select pg_temp.expect(
+  (select count(*) = 2 and count(*) filter (where read_at is null) = 1
+      and bool_or(read_at is null and body = 'Chương 4' and chapter_count = 1)
+    from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e02' and type = 'chapter.new'
+      and story_id = pg_temp.story_id('truyen-nhan-tin-zqy')),
+  'thông báo chương mới: dòng đã đọc thì chương sau thêm dòng mới');
+
+-- Bình luận: gốc báo chủ truyện, trả lời báo người viết gốc, tự viết thì không
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e03", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.comments (story_id, content)
+values (pg_temp.story_id('truyen-nhan-tin-zqy'), 'Truyện hay quá');
+reset role;
+select pg_temp.expect(
+  (select count(*) = 1 and bool_and(body = 'Truyện hay quá' and link = '/story/truyen-nhan-tin-zqy'
+      and title like 'Khách TB bình luận%')
+    from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01' and type = 'comment.story'),
+  'thông báo bình luận: chủ truyện nhận khi có bình luận gốc');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.comments (story_id, content, parent_id)
+select story_id, 'Cảm ơn bạn', id from public.comments
+where story_id = pg_temp.story_id('truyen-nhan-tin-zqy') and content = 'Truyện hay quá';
+insert into public.comments (story_id, content)
+values (pg_temp.story_id('truyen-nhan-tin-zqy'), 'Tự bình luận');
+reset role;
+select pg_temp.expect(
+  (select count(*) = 1 and bool_and(body = 'Cảm ơn bạn' and title like 'Chủ TB đã trả lời%')
+    from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e03' and type = 'comment.reply')
+  and (select count(*) = 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01' and type = 'comment.story'),
+  'thông báo trả lời: người viết gốc nhận, tự bình luận không báo chính mình');
+
+-- Người đã chặn thì không nhận thông báo bình luận
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.user_blocks (blocked_id) values ('00000000-0000-4000-8000-000000000e04');
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e04", "role": "authenticated"}', true);
+set local role authenticated;
+insert into public.comments (story_id, content)
+values (pg_temp.story_id('truyen-nhan-tin-zqy'), 'Bình luận của người bị chặn');
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01'
+      and body = 'Bình luận của người bị chặn'),
+  'thông báo bình luận: không gửi cho người đã chặn người viết');
+
+-- Duyệt, từ chối, gỡ truyện báo chủ truyện. Truyện bị gỡ là nháp, admin không còn thấy qua RLS
+-- nên lấy id từ trước
+create temp table tb_story as select pg_temp.story_id('truyen-nhan-tin-zqy') as id;
+grant select on tb_story to authenticated;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_set_story_takedown((select id from tb_story), 'Vi phạm bản quyền');
+select public.admin_set_story_takedown((select id from tb_story), '');
+reset role;
+select pg_temp.expect(
+  exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01' and type = 'story.takedown'
+      and body = 'Vi phạm bản quyền'
+      and link = '/studio/story/' || (select id from tb_story))
+  and exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01' and type = 'story.restored'),
+  'thông báo gỡ và khôi phục truyện: chủ truyện nhận, kèm lý do');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+select public.submit_story_for_review((select id from tb_story));
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_review_story((select id from tb_story), false, 'Thiếu giới thiệu');
+reset role;
+select pg_temp.expect(
+  exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01' and type = 'story.rejected'
+      and body = 'Thiếu giới thiệu'),
+  'thông báo từ chối truyện: chủ truyện nhận, kèm lý do');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e01", "role": "authenticated"}', true);
+set local role authenticated;
+select public.submit_story_for_review((select id from tb_story));
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select public.admin_review_story((select id from tb_story), true, null);
+reset role;
+select pg_temp.expect(
+  exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e01' and type = 'story.approved'),
+  'thông báo duyệt truyện: chủ truyện nhận');
+
+-- Quyền: không ghi qua API, chỉ đọc / đánh dấu đã đọc / xóa dòng của mình
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e02", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$insert into public.notifications (user_id, type, title)
+    values ('00000000-0000-4000-8000-000000000e02', 'announcement', 'Giả')$$, '42501');
+select pg_temp.expect_error(
+  $$update public.notifications set title = 'Sửa' where user_id = auth.uid()$$, '42501');
+select pg_temp.expect_error(
+  $$select private.notify('00000000-0000-4000-8000-000000000e02', 'announcement', 'x', '', null)$$,
+  '42501');
+select pg_temp.expect(
+  (select count(*) > 0 and bool_and(user_id = '00000000-0000-4000-8000-000000000e02')
+    from public.notifications),
+  'notifications: chỉ thấy thông báo của mình');
+select pg_temp.expect(
+  pg_temp.affected($$update public.notifications set read_at = now() where read_at is null$$) = 1,
+  'notifications: đánh dấu đã đọc được, chỉ dòng của mình');
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e04", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  (select count(*) = 0 from public.notifications)
+  and pg_temp.affected($$update public.notifications set read_at = now()$$) = 0
+  and pg_temp.affected($$delete from public.notifications$$) = 0,
+  'notifications: người khác không đọc, sửa hay xóa được thông báo của mình');
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e02", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect(
+  pg_temp.affected($$delete from public.notifications$$) >= 1,
+  'notifications: chủ xóa được thông báo của mình');
+select pg_temp.expect(
+  (select count(*) = 0 from public.notifications), 'notifications: xóa xong không còn dòng nào');
+select set_config('request.jwt.claims', '{"role": "anon"}', true);
+set local role anon;
+select pg_temp.expect_error($$select * from public.notifications$$, '42501');
+reset role;
+
+-- Dọn thông báo quá 90 ngày khi có thông báo mới
+insert into public.notifications (user_id, type, title, created_at)
+values ('00000000-0000-4000-8000-000000000e03', 'announcement', 'Cũ', now() - interval '91 days');
+select private.notify('00000000-0000-4000-8000-000000000e03', 'announcement', 'Mới', '', null);
+select pg_temp.expect(
+  not exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e03' and title = 'Cũ')
+  and exists (select 1 from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e03' and title = 'Mới'),
+  'notify: dọn thông báo quá 90 ngày của người nhận');
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;
