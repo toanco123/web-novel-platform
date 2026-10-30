@@ -51,3 +51,11 @@ Luôn ghi rõ trong brief:
 ## Sau khi agent xong
 
 Agent báo "xong" chưa phải là xong: chạy lại `npm run typecheck && npm run lint && npm test` ở nhánh làm việc, đọc diff của các file agent sửa, rồi mới commit (nhớ tăng version theo quy ước trong CLAUDE.md).
+
+## Mẫu chia việc cho tính năng có DB và web (ví dụ: hộp thông báo)
+
+1. Model chính viết spec trong `documents/`, chờ người dùng duyệt.
+2. Model chính viết migration và ca kiểm tra SQL, thử trong transaction rollback. Ca kiểm tra trên DB thật dễ vấp ba chỗ: slug trùng truyện có sẵn (đặt tên truyện lạ, vd có hậu tố), truyện bị gỡ thành nháp nên admin không còn thấy qua RLS (lấy id trước vào bảng tạm), và câu `expect(affected(delete) and count(*) = 0)` trong một câu lệnh thì `count` vẫn thấy dữ liệu cũ (tách hai câu).
+3. Song song được ngay sau bước 2: (a) web: `shared.ts`, api remote và mock, hooks, trang; (b) test api và test luồng; (c) tài liệu. Chỉ một người sửa mỗi file dùng chung.
+4. Hai phần độc lập (vd hộp thông báo và trang admin gửi thông báo) thì mỗi phần một nhánh; phần sau tách từ nhánh trước nếu cần hàm của nó.
+5. Kiểm tra giao diện chạy nền bằng agent `sonnet` trong lúc model chính gộp nhánh và chuẩn bị đẩy migration. Việc đẩy migration lên DB thật luôn do model chính làm và cần người dùng đồng ý.
