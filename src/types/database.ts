@@ -465,6 +465,60 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string
+          chapter_count: number
+          created_at: string
+          id: number
+          link: string | null
+          read_at: string | null
+          story_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string
+          chapter_count?: number
+          created_at?: string
+          id?: never
+          link?: string | null
+          read_at?: string | null
+          story_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          chapter_count?: number
+          created_at?: string
+          id?: never
+          link?: string | null
+          read_at?: string | null
+          story_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

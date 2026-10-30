@@ -9,6 +9,7 @@ import {
   requireUser,
 } from '@/features/auth/api'
 import { mockDelay as delay } from '@/lib/mockStorage'
+import { paths } from '@/lib/routes'
 import {
   blockedIds,
   loadCommentLikes,
@@ -23,6 +24,7 @@ import {
   saveUserComments,
 } from '@/mocks/activity'
 import { findStory } from '@/mocks/catalog'
+import { addNotification } from '@/mocks/notifications'
 import { countSince, HOUR, MINUTE } from '@/mocks/rateLimit'
 import { seedChapterComments, seedComments } from '@/mocks/comments'
 import { loadUserStories } from '@/mocks/userContent'
@@ -208,7 +210,32 @@ export async function addComment(
     isAuthor: false,
   }
   saveUserComments([comment, ...all])
+  notifyComment(comment, user.displayName, all)
   return (await present([comment], []))[0]
+}
+
+/** Như trigger comments_notify: trả lời báo người viết gốc, bình luận gốc báo chủ truyện */
+function notifyComment(comment: Comment, authorName: string, existing: Comment[]) {
+  const story = findStory(comment.storySlug)
+  if (!story) return
+  const recipient = comment.parentId
+    ? existing.find((c) => c.id === comment.parentId)?.user.id
+    : story.ownerId
+  if (!recipient || recipient === comment.user.id) return
+  // Chặn một trong hai chiều thì không báo
+  if (blockedIds(recipient).has(comment.user.id) || blockedIds(comment.user.id).has(recipient))
+    return
+  addNotification(recipient, {
+    type: comment.parentId ? 'comment.reply' : 'comment.story',
+    title: comment.parentId
+      ? `${authorName} đã trả lời bình luận của bạn`
+      : `${authorName} bình luận trong "${story.title}"`,
+    body: comment.content,
+    link:
+      comment.chapterNumber === null
+        ? paths.story(comment.storySlug)
+        : paths.chapter(comment.storySlug, comment.chapterNumber),
+  })
 }
 
 /**
