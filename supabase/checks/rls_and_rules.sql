@@ -2485,6 +2485,60 @@ select pg_temp.expect(
     where user_id = '00000000-0000-4000-8000-000000000e03' and title = 'Mới'),
   'notify: dọn thông báo quá 90 ngày của người nhận');
 
+-- ── Admin gửi thông báo chung ───────────────────────────────────────────
+
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-000000000e02", "role": "authenticated"}', true);
+set local role authenticated;
+select pg_temp.expect_error(
+  $$select public.admin_send_announcement('Bảo trì', 'Tối nay 22h')$$, 'forbidden');
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+select pg_temp.expect_error($$select public.admin_send_announcement('', 'x')$$, 'invalid_announcement');
+select pg_temp.expect_error(
+  $$select public.admin_send_announcement(repeat('a', 121), 'x')$$, 'invalid_announcement');
+select pg_temp.expect_error(
+  $$select public.admin_send_announcement('Tin', repeat('a', 301))$$, 'invalid_announcement');
+select pg_temp.expect_error(
+  $$select public.admin_send_announcement('Tin', 'x', 'https://evil.com')$$, 'invalid_announcement');
+select pg_temp.expect_error(
+  $$select public.admin_send_announcement('Tin', 'x', '//evil.com')$$, 'invalid_announcement');
+reset role;
+select pg_temp.expect(
+  not exists (select 1 from private.admin_audit_log where action = 'announcement.send'),
+  'announcement: đầu vào sai không để lại nhật ký');
+select set_config('request.jwt.claims',
+  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated",
+    "app_metadata": {"role": "admin"}}', true);
+set local role authenticated;
+create temp table tb_sent as
+  select public.admin_send_announcement('  Bảo trì hệ thống  ', 'Tối nay 22h', '/about') as n;
+grant select on tb_sent to authenticated;
+select pg_temp.expect(
+  (select n = (select count(*) from public.profiles) from tb_sent),
+  'admin_send_announcement: trả về số người nhận = số tài khoản');
+select public.admin_send_announcement('Không link', '');
+reset role;
+select pg_temp.expect(
+  (select count(*) = 1 and bool_and(details ->> 'body' = 'Tối nay 22h'
+      and (details ->> 'recipients')::integer = (select n from tb_sent)
+      and target_label = 'Bảo trì hệ thống')
+    from private.admin_audit_log
+    where action = 'announcement.send' and target_label = 'Bảo trì hệ thống'),
+  'announcement: ghi nhật ký kèm nội dung và số người nhận');
+select pg_temp.expect(
+  (select count(*) = 1 and bool_and(link = '/about' and body = 'Tối nay 22h' and read_at is null)
+    from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e02' and type = 'announcement'
+      and title = 'Bảo trì hệ thống')
+  and (select count(*) = 1 and bool_and(link is null)
+    from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000e03' and title = 'Không link'),
+  'announcement: mỗi tài khoản nhận một thông báo, link rỗng là null');
+
 select 'Tất cả kiểm tra đều qua' as ket_qua;
 
 rollback;

@@ -15,6 +15,7 @@ export const {
   getAdminStories,
   getAdminMessages,
   setMessageHandled,
+  sendAdminAnnouncement,
   getAdminReports,
   setAdminReportStatus,
   getAdminComments,

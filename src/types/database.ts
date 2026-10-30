@@ -1274,6 +1274,10 @@ export type Database = {
         Args: { p_approve: boolean; p_reason: string; p_story_id: string }
         Returns: undefined
       }
+      admin_send_announcement: {
+        Args: { p_body: string; p_link?: string; p_title: string }
+        Returns: number
+      }
       admin_set_contact_handled: {
         Args: { p_handled: boolean; p_id: number }
         Returns: undefined

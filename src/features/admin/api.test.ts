@@ -1,6 +1,7 @@
 import { recordChapterView } from '@/features/chapters/api'
 import { addComment } from '@/features/comments/api'
 import { followStory } from '@/features/library/api'
+import { getNotifications } from '@/features/notifications/api'
 import * as studio from '@/features/studio/api'
 import { appendAudit } from '@/mocks/adminAudit'
 import {
@@ -784,4 +785,49 @@ test('nhật ký thao tác: lọc theo nhóm, người làm, từ khóa không d
     11, 10, 1, 2,
   ])
   expect(second.items[0].id).toBe(all.items[2].id)
+})
+
+test('thông báo chung: gửi cho mọi tài khoản, ghi nhật ký, kiểm tra đầu vào', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  await expect(
+    admin.sendAdminAnnouncement({ title: 'Bảo trì', body: '', link: '' }),
+  ).rejects.toBeInstanceOf(admin.AdminError)
+
+  signInAs('demo')
+  for (const input of [
+    { title: '  ', body: '', link: '' },
+    { title: 'a'.repeat(121), body: '', link: '' },
+    { title: 'Tin', body: 'a'.repeat(301), link: '' },
+    { title: 'Tin', body: '', link: 'https://evil.com' },
+    { title: 'Tin', body: '', link: '//evil.com' },
+  ]) {
+    await expect(admin.sendAdminAnnouncement(input)).rejects.toMatchObject({
+      code: 'invalid_announcement',
+    })
+  }
+  expect((await admin.getAdminAuditLog({ group: 'announcement', page: 1 })).total).toBe(0)
+
+  const count = await admin.sendAdminAnnouncement({
+    title: ' Bảo trì hệ thống ',
+    body: 'Tối nay 22h',
+    link: '/about',
+  })
+  expect(count).toBeGreaterThanOrEqual(2)
+  const [entry] = (await admin.getAdminAuditLog({ group: 'announcement', page: 1 })).items
+  expect(entry).toMatchObject({
+    action: 'announcement.send',
+    targetLabel: 'Bảo trì hệ thống',
+    details: { body: 'Tối nay 22h', link: '/about', recipients: count },
+  })
+  expect(admin.auditDetailText(entry)).toBe(`${count} người nhận · Tối nay 22h`)
+
+  signInAs(linh)
+  const [note] = (await getNotifications(1, 10)).items
+  expect(note).toMatchObject({
+    type: 'announcement',
+    title: 'Bảo trì hệ thống',
+    body: 'Tối nay 22h',
+    link: '/about',
+    read: false,
+  })
 })

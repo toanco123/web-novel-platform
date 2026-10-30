@@ -142,6 +142,16 @@ function useAdminMutation<T>(mutationFn: (input: T) => Promise<unknown>) {
   })
 }
 
+/** Gửi thông báo chung; kết quả là số người nhận */
+export function useSendAdminAnnouncement() {
+  const queryClient = useQueryClient()
+  const userId = useUserId()
+  return useMutation({
+    mutationFn: api.sendAdminAnnouncement,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: adminKeys.all(userId) }),
+  })
+}
+
 export const useSetMessageHandled = () =>
   useAdminMutation(({ id, handled }: { id: string; handled: boolean }) =>
     api.setMessageHandled(id, handled),

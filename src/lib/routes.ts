@@ -61,6 +61,7 @@ export const paths = {
   adminFeatured: '/admin/featured',
   /** Phiếu đề cử: theo truyện (mặc định) hoặc theo người dùng (?view=users) */
   adminVotes: '/admin/votes',
+  adminAnnouncements: '/admin/announcements',
   /** Nhật ký thao tác admin; actorId: chỉ thao tác của một người */
   adminAudit: (actorId?: string) =>
     actorId ? `/admin/audit?actor=${encodeURIComponent(actorId)}` : '/admin/audit',

@@ -402,6 +402,7 @@ export type AdminErrorCode =
   | 'too_many_curated'
   | 'not_pending'
   | 'reason_required'
+  | 'invalid_announcement'
 
 const adminMessages: Record<AdminErrorCode, string> = {
   forbidden: 'Chỉ quản trị viên mới xem được trang này.',
@@ -416,6 +417,8 @@ const adminMessages: Record<AdminErrorCode, string> = {
   not_pending:
     'Truyện này không còn chờ duyệt. Có thể quản trị viên khác vừa xử lý hoặc truyện vừa bị gỡ.',
   reason_required: 'Nhập lý do từ chối để tác giả biết cần sửa gì.',
+  invalid_announcement:
+    'Thông báo chưa hợp lệ: cần tiêu đề (tối đa 120 ký tự), nội dung tối đa 300 ký tự và link là đường dẫn trong web (bắt đầu bằng /).',
 }
 
 export const isAdminErrorCode = (code: string): code is AdminErrorCode =>
@@ -433,6 +436,17 @@ export class AdminError extends Error {
 /** Lời báo cho thao tác admin thất bại */
 export const adminErrorMessage = (error: unknown) =>
   error instanceof AdminError ? error.message : 'Chưa lưu được. Kiểm tra mạng rồi thử lại.'
+
+// ── Thông báo chung (trang /admin/announcements) ────────────────────────
+
+export const ANNOUNCEMENT_TITLE_MAX = 120
+export const ANNOUNCEMENT_BODY_MAX = 300
+
+export type AnnouncementInput = { title: string; body: string; link: string }
+
+/** Link thông báo: để trống hoặc đường dẫn trong web (`/...`, không phải `//host`); DB kiểm lại */
+export const isInternalLink = (link: string) =>
+  link === '' || (link.startsWith('/') && !link.startsWith('//') && link.length <= 300)
 
 // ── Phiếu đề cử (trang /admin/votes) ────────────────────────────────────
 
@@ -566,6 +580,7 @@ export const AUDIT_GROUPS = [
   'curated',
   'message',
   'report',
+  'announcement',
 ] as const
 export type AdminAuditGroup = (typeof AUDIT_GROUPS)[number]
 
@@ -578,6 +593,7 @@ export const auditGroupLabels: Record<AdminAuditGroup, string> = {
   curated: 'Trang chủ',
   message: 'Hộp thư',
   report: 'Báo lỗi',
+  announcement: 'Thông báo chung',
 }
 
 /** Nhãn tiếng Việt của từng thao tác; thao tác lạ (phiên bản mới hơn) hiện nguyên mã */
@@ -598,6 +614,7 @@ export const auditActionLabels: Record<string, string> = {
   'message.handle': 'Đánh dấu tin nhắn đã xử lý',
   'message.unhandle': 'Đánh dấu tin nhắn chưa xử lý',
   'report.set_status': 'Đổi trạng thái báo lỗi',
+  'announcement.send': 'Gửi thông báo chung',
 }
 
 export type AdminAuditEntry = {
@@ -651,6 +668,8 @@ export function auditDetailText(entry: AdminAuditEntry): string {
       return `${d('stories')} truyện mất thể loại này`
     case 'genre.merge':
       return `Gộp vào "${d('into')}", chuyển ${d('moved')} truyện`
+    case 'announcement.send':
+      return `${d('recipients')} người nhận${d('body') ? ` · ${d('body')}` : ''}`
     case 'curated.set':
       return `${d('count')} truyện`
     case 'message.handle':

@@ -1,11 +1,15 @@
 # Plan: Hộp thông báo trên web và admin gửi thông báo
 
-Trạng thái: spec duyệt 30/10/2026. Phần 1 (hộp thông báo) xong trên nhánh `notifications`, migration chưa đẩy lên DB thật; phần 2 chưa làm.
+Trạng thái: spec duyệt 30/10/2026. Cả hai phần xong (30/10/2026): phần 1 (hộp thông báo) trên nhánh `notifications`, phần 2 (thông báo chung) trên nhánh `admin-announcements`; hai migration chưa đẩy lên DB thật. Nối tiếp `plan-theo-doi-loi.md`, `plan-nhat-ky-admin.md`; thông báo đẩy của app ở migration `20261002025309_push_notifications.sql`.
 
 Khác với plan (phần 1):
 - Không có RPC `notifications_unread_count` và `mark_all_notifications_read`: đếm và đánh dấu hết đọc bằng PostgREST ngay trên bảng (RLS đã lọc theo chủ).
 - Thêm cột `chapter_count` để gộp thông báo chương mới.
-- Bản giả không sinh thông báo chương mới (chỉ bình luận và duyệt / gỡ truyện). Nối tiếp `plan-theo-doi-loi.md`, `plan-nhat-ky-admin.md`; thông báo đẩy của app ở migration `20261002025309_push_notifications.sql`.
+- Bản giả không sinh thông báo chương mới (chỉ bình luận và duyệt / gỡ truyện).
+
+Khác với plan (phần 2):
+- Số người nhận ở hộp xác nhận lấy từ tổng số tài khoản của trang Người dùng (`getAdminUsers`), không thêm RPC.
+- Hộp xác nhận chỉ hiện sau khi form hợp lệ.
 
 ## Context
 
