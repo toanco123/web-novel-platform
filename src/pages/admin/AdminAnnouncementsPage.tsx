@@ -74,7 +74,7 @@ export default function AdminAnnouncementsPage() {
                 { max: ANNOUNCEMENT_TITLE_MAX, message: `Tối đa ${ANNOUNCEMENT_TITLE_MAX} ký tự.` },
               ]}
             >
-              <Input maxLength={ANNOUNCEMENT_TITLE_MAX + 20} showCount />
+              <Input count={{ show: true, max: ANNOUNCEMENT_TITLE_MAX }} />
             </Form.Item>
             <Form.Item
               name="body"
@@ -83,7 +83,7 @@ export default function AdminAnnouncementsPage() {
                 { max: ANNOUNCEMENT_BODY_MAX, message: `Tối đa ${ANNOUNCEMENT_BODY_MAX} ký tự.` },
               ]}
             >
-              <Input.TextArea rows={4} maxLength={ANNOUNCEMENT_BODY_MAX + 20} showCount />
+              <Input.TextArea rows={4} count={{ show: true, max: ANNOUNCEMENT_BODY_MAX }} />
             </Form.Item>
             <Form.Item
               name="link"

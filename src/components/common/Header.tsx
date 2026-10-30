@@ -52,11 +52,11 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
-      <Container className="flex h-16 items-center gap-3">
+      <Container className="flex h-16 items-center gap-2 sm:gap-3">
         <MobileNav />
         <SiteLogo />
         <SearchBox className="mx-auto hidden w-full max-w-md md:block" />
-        <div className="ml-auto flex items-center gap-1 md:ml-0">
+        <div className="ml-auto flex items-center gap-0.5 sm:gap-1 md:ml-0">
           <Button variant="ghost" size="icon-lg" className="md:hidden" asChild>
             <Link to={paths.search()} aria-label="Tìm kiếm">
               <Search />

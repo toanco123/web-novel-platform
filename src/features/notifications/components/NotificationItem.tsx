@@ -46,7 +46,7 @@ export function NotificationItem({ notification, onOpen, action }: Props) {
       >
         <Icon className="size-4.5" />
       </span>
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         <span className={cn('block text-sm leading-snug', !notification.read && 'font-semibold')}>
           {notification.title}
         </span>
