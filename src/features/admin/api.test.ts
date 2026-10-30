@@ -2,6 +2,7 @@ import { recordChapterView } from '@/features/chapters/api'
 import { addComment } from '@/features/comments/api'
 import { followStory } from '@/features/library/api'
 import * as studio from '@/features/studio/api'
+import { appendAudit } from '@/mocks/adminAudit'
 import {
   dayKey,
   loadViews,
@@ -695,4 +696,92 @@ test('điểm chấm: danh sách kèm thống kê của người chấm, lọc, 
     (await admin.getAdminRatings({ page: 1, userId: mai })).items.map((r) => r.storySlug),
   ).toEqual([b.slug])
   await expect(admin.deleteAdminRating(mai, a.id)).rejects.toMatchObject({ code: 'not_found' })
+})
+
+test('nhật ký thao tác: người thường nhận AdminError', async () => {
+  await registerUser()
+  await expect(admin.getAdminAuditLog({ page: 1 })).rejects.toBeInstanceOf(admin.AdminError)
+})
+
+test('nhật ký thao tác: ghi đúng dòng, mới nhất trước, kèm tên người làm và chi tiết', async () => {
+  const { createGenre } = await import('@/features/genres/api')
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const story = await publishStory('Mùa Hạ Năm Ấy', 2)
+  await createGenre({ name: 'Học đường' })
+
+  signInAs('demo')
+  await admin.setUserBanned(linh, true)
+  await admin.setStoryTakedown(story.id, 'Vi phạm bản quyền')
+  await admin.deleteGenre('hoc-duong')
+
+  const { items, total } = await admin.getAdminAuditLog({ page: 1 })
+  // Dòng cuối: publishStory của helper do admin duyệt truyện
+  expect(total).toBe(4)
+  expect(items.map((e) => e.action)).toEqual([
+    'genre.delete',
+    'story.takedown',
+    'user.ban',
+    'story.approve',
+  ])
+  expect(items.map((e) => e.group)).toEqual(['genre', 'story', 'user', 'story'])
+  expect(items.every((e) => e.actorName === 'Bạn đọc Demo' && e.actorId === 'demo')).toBe(true)
+  expect(items[0]).toMatchObject({
+    targetType: 'genre',
+    targetId: 'hoc-duong',
+    targetLabel: 'Học đường',
+    details: { stories: 0 },
+  })
+  expect(items[1]).toMatchObject({
+    targetType: 'story',
+    targetId: story.id,
+    targetLabel: 'Mùa Hạ Năm Ấy',
+    details: { reason: 'Vi phạm bản quyền' },
+  })
+  expect(items[2]).toMatchObject({ targetType: 'user', targetId: linh, targetLabel: 'Linh' })
+})
+
+test('nhật ký thao tác: thao tác lỗi không để lại dòng', async () => {
+  signInAs('demo')
+  await expect(admin.setUserBanned('demo', true)).rejects.toBeInstanceOf(admin.AdminError)
+  await expect(admin.deleteGenre('khong-co')).rejects.toBeInstanceOf(admin.AdminError)
+  expect((await admin.getAdminAuditLog({ page: 1 })).total).toBe(0)
+})
+
+test('nhật ký thao tác: lọc theo nhóm, người làm, từ khóa không dấu và phân trang', async () => {
+  const linh = await registerUser('Linh', 'linh@gmail.com')
+  const mai = await registerUser('Mai', 'mai@gmail.com')
+  signInAs('demo')
+  await admin.setUserBanned(linh, true)
+  await admin.setUserBanned(mai, true)
+  await admin.setUserBanned(linh, false)
+
+  const all = await admin.getAdminAuditLog({ page: 1 })
+  expect(all.items.map((e) => e.action)).toEqual(['user.unban', 'user.ban', 'user.ban'])
+  expect((await admin.getAdminAuditLog({ group: 'user', page: 1 })).total).toBe(3)
+  expect((await admin.getAdminAuditLog({ group: 'story', page: 1 })).total).toBe(0)
+  expect((await admin.getAdminAuditLog({ actorId: 'demo', page: 1 })).total).toBe(3)
+  expect((await admin.getAdminAuditLog({ actorId: linh, page: 1 })).total).toBe(0)
+  expect(
+    (await admin.getAdminAuditLog({ q: 'MAI', page: 1 })).items.map((e) => e.targetLabel),
+  ).toEqual(['Mai'])
+  expect((await admin.getAdminAuditLog({ q: 'ban doc demo', page: 1 })).total).toBe(3)
+
+  // Cỡ trang chỉ nhận 10/20/50/100: thêm dòng cho đủ hai trang
+  for (let n = 0; n < 8; n++) {
+    appendAudit({
+      actorId: 'demo',
+      actorName: 'Bạn đọc Demo',
+      action: 'genre.delete',
+      targetType: 'genre',
+      targetId: `the-loai-${n}`,
+      targetLabel: `Thể loại ${n}`,
+      details: {},
+    })
+  }
+  const first = await admin.getAdminAuditLog({ page: 1, pageSize: 10 })
+  const second = await admin.getAdminAuditLog({ page: 2, pageSize: 10 })
+  expect([first.total, first.items.length, second.items.length, first.pageCount]).toEqual([
+    11, 10, 1, 2,
+  ])
+  expect(second.items[0].id).toBe(all.items[2].id)
 })

@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   FileUp,
   Flag,
+  History,
   Home,
   Inbox,
   LayoutDashboard,
@@ -38,6 +39,7 @@ const menu = [
   { key: paths.adminRatings(), icon: Star, label: 'Điểm chấm' },
   { key: paths.adminGenres, icon: Tags, label: 'Thể loại' },
   { key: paths.adminImport, icon: FileUp, label: 'Nhập truyện' },
+  { key: paths.adminAudit(), icon: History, label: 'Nhật ký' },
 ]
 
 /** Khung trang quản trị: menu bên trái (màn rộng) hoặc trên đầu (màn hẹp), theo theme của web */

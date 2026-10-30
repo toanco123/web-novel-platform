@@ -1107,6 +1107,21 @@ export type Database = {
       }
     }
     Functions: {
+      admin_audit_log: {
+        Args: { p_query?: string }
+        Returns: {
+          action: string
+          action_group: string
+          actor_id: string
+          actor_name: string
+          created_at: string
+          details: Json
+          id: number
+          target_id: string
+          target_label: string
+          target_type: string
+        }[]
+      }
       admin_comments: {
         Args: { p_query?: string; p_reported?: boolean }
         Returns: {

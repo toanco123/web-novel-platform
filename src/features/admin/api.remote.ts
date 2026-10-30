@@ -15,6 +15,8 @@ import {
   isAdminErrorCode,
   type AdminComment,
   type AdminCommentQuery,
+  type AdminAuditEntry,
+  type AdminAuditQuery,
   type AdminContactMessage,
   type AdminLedgerEntry,
   type AdminMessageQuery,
@@ -585,4 +587,43 @@ export async function deleteAdminRating(userId: string, storyId: string) {
     await db().rpc('admin_delete_rating', { p_user_id: userId, p_story_id: storyId }),
     adminError,
   )
+}
+
+// ── Nhật ký thao tác ────────────────────────────────────────────────────
+
+export async function getAdminAuditLog({
+  q,
+  group,
+  actorId,
+  page,
+  pageSize,
+}: AdminAuditQuery): Promise<Page<AdminAuditEntry>> {
+  await requireUserId()
+  // Id người làm sai định dạng (link sửa tay) thì coi như không có dòng nào
+  if (actorId && !isUuid(actorId)) return { items: [], total: 0, page: 1, pageCount: 1 }
+  const result = await loadPage(page, adminPageSize(pageSize), (from, to) => {
+    let query = db().rpc('admin_audit_log', { p_query: q || undefined }, { count: 'exact' })
+    if (group) query = query.eq('action_group', group)
+    if (actorId) query = query.eq('actor_id', actorId)
+    // RPC đã sắp mới nhất trước; sắp lại ở đây để phân trang ổn định
+    return query
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, to)
+  }).catch(rethrow)
+  return {
+    ...result,
+    items: result.items.map((r) => ({
+      id: String(r.id),
+      actorId: r.actor_id ?? null,
+      actorName: r.actor_name,
+      action: r.action,
+      group: r.action_group,
+      targetType: r.target_type,
+      targetId: r.target_id,
+      targetLabel: r.target_label,
+      details: (r.details ?? {}) as Record<string, unknown>,
+      createdAt: r.created_at,
+    })),
+  }
 }

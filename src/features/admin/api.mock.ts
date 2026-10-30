@@ -23,6 +23,7 @@ import {
   saveRatings,
   saveReports,
 } from '@/mocks/activity'
+import { appendAudit, loadAuditLog } from '@/mocks/adminAudit'
 import { allGenres, toStory } from '@/mocks/catalog'
 import { mockChapters } from '@/mocks/chapters'
 import { loadCurated, saveCurated } from '@/mocks/curated'
@@ -46,6 +47,8 @@ import {
   adminPageSize,
   CURATED_LIMITS,
   isVoteConcentrated,
+  type AdminAuditEntry,
+  type AdminAuditQuery,
   type AdminComment,
   type AdminCommentQuery,
   type AdminContactMessage,
@@ -78,6 +81,28 @@ async function requireAdmin() {
   const user = await requireUser()
   if (!user.isAdmin) throw new AdminError()
   return user
+}
+
+type Actor = Awaited<ReturnType<typeof requireAdmin>>
+
+/** Ghi một dòng nhật ký (như private.admin_log), gọi sau khi thao tác đã thành công */
+function audit(
+  actor: Actor,
+  action: string,
+  targetType: string,
+  targetId: string,
+  targetLabel: string,
+  details: Record<string, unknown> = {},
+) {
+  appendAudit({
+    actorId: actor.id,
+    actorName: actor.displayName,
+    action,
+    targetType,
+    targetId,
+    targetLabel: targetLabel.slice(0, 200),
+    details,
+  })
 }
 
 const matches = (q: string, ...fields: string[]) => !q || fields.some((f) => slugify(f).includes(q))
@@ -460,13 +485,19 @@ export async function getAdminMessages({
 
 export async function setMessageHandled(id: string, handled: boolean) {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
+  const message = loadContactMessages().find((m) => m.id === id)
   const now = new Date().toISOString()
   saveContactMessages(
     loadContactMessages().map((m) =>
       m.id === id ? { ...m, handledAt: handled ? (m.handledAt ?? now) : null } : m,
     ),
   )
+  if (message) {
+    audit(admin, handled ? 'message.handle' : 'message.unhandle', 'message', id, message.name, {
+      topic: message.topic,
+    })
+  }
 }
 
 /** Tên truyện, trạng thái công khai và tên chương cho một báo lỗi */
@@ -530,8 +561,15 @@ export async function getAdminReports({
 
 export async function setAdminReportStatus(id: string, status: AdminReport['status']) {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
+  const report = loadReports().find((r) => r.id === id)
   saveReports(loadReports().map((r) => (r.id === id ? { ...r, status } : r)))
+  if (report) {
+    const title = reportTarget(report.storySlug, report.chapterNumber)?.title ?? report.storySlug
+    audit(admin, 'report.set_status', 'report', id, `${title} · chương ${report.chapterNumber}`, {
+      status,
+    })
+  }
 }
 
 // ── Bình luận ───────────────────────────────────────────────────────────
@@ -612,19 +650,44 @@ export async function getAdminComments({
 /** Xóa bình luận của bất kỳ ai, kèm trả lời và báo cáo của nó */
 export async function deleteAdminComment(id: string) {
   await delay()
-  await requireAdmin()
-  if (removeComments((c) => c.id === id) === 0) throw new AdminError('not_found')
+  const admin = await requireAdmin()
+  const stored = loadUserComments()
+  const comment = stored.find((c) => c.id === id)
+  const replies = stored.filter((r) => r.parentId === id).length
+  if (removeComments((c) => c.id === id) === 0 || !comment) throw new AdminError('not_found')
+  audit(admin, 'comment.delete', 'comment', id, comment.content.slice(0, 80), {
+    content: comment.content.slice(0, 500),
+    author:
+      loadUsers().find((u) => u.id === comment.user.id)?.displayName ?? comment.user.displayName,
+    story: commentStoryTitle(comment.storySlug),
+    replies,
+  })
+}
+
+function commentStoryTitle(slug: string) {
+  return (
+    seedStories.find((s) => s.slug === slug)?.title ??
+    loadUserStories().find((s) => s.slug === slug)?.title ??
+    slug
+  )
 }
 
 /** Đóng mọi báo cáo đang mở của một bình luận, bình luận giữ nguyên */
 export async function dismissCommentReports(commentId: string) {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
+  const open = loadCommentReports().filter((r) => r.commentId === commentId && r.status === 'open')
   saveCommentReports(
     loadCommentReports().map((r) =>
       r.commentId === commentId && r.status === 'open' ? { ...r, status: 'resolved' as const } : r,
     ),
   )
+  if (open.length > 0) {
+    const content = loadUserComments().find((c) => c.id === commentId)?.content ?? ''
+    audit(admin, 'comment.dismiss_reports', 'comment', commentId, content.slice(0, 80), {
+      reports: open.length,
+    })
+  }
 }
 
 // ── Khóa tài khoản, gỡ truyện ───────────────────────────────────────────
@@ -639,12 +702,13 @@ export async function setUserBanned(userId: string, banned: boolean) {
   if (banned && target.role === 'admin') throw new AdminError('cannot_ban_admin')
   const bannedAt = banned ? (target.bannedAt ?? new Date().toISOString()) : null
   saveUsers(users.map((u) => (u.id === userId ? { ...u, bannedAt } : u)))
+  audit(admin, banned ? 'user.ban' : 'user.unban', 'user', userId, target.displayName)
 }
 
 /** reason null/rỗng: khôi phục (truyện vẫn là nháp, tác giả tự xuất bản lại) */
 export async function setStoryTakedown(storyId: string, reason: string | null) {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
   const stories = loadUserStories()
   const story = stories.find((s) => s.id === storyId)
   // Truyện có sẵn của bản giả không gỡ được (không lưu trong localStorage)
@@ -666,12 +730,15 @@ export async function setStoryTakedown(storyId: string, reason: string | null) {
             { ...s, takedown: null, review: storyReview(s) },
     ),
   )
+  audit(admin, text ? 'story.takedown' : 'story.restore', 'story', storyId, story.title, {
+    reason: text || null,
+  })
 }
 
 /** Duyệt (công khai luôn) hoặc từ chối (kèm lý do) truyện đang chờ duyệt */
 export async function reviewStory({ storyId, approve, reason }: ReviewInput) {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
   const stories = loadUserStories()
   const story = stories.find((s) => s.id === storyId)
   if (!story) throw new AdminError('not_found')
@@ -699,6 +766,8 @@ export async function reviewStory({ storyId, approve, reason }: ReviewInput) {
             },
     ),
   )
+  if (approve) audit(admin, 'story.approve', 'story', storyId, story.title)
+  else audit(admin, 'story.reject', 'story', storyId, story.title, { reason: text.slice(0, 500) })
 }
 
 // ── Thể loại ────────────────────────────────────────────────────────────
@@ -732,7 +801,7 @@ export async function updateGenre(
   input: { name: string; description: string },
 ): Promise<Genre> {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
   const genre = userGenre(slug)
   const { name, slug: nextSlug } = normalizeGenreName(input.name)
   if (nextSlug !== slug && allGenres().some((g) => g.slug === nextSlug)) {
@@ -746,30 +815,42 @@ export async function updateGenre(
   }
   saveUserGenres(loadUserGenres().map((g) => (g.slug === slug ? updated : g)))
   if (nextSlug !== slug) replaceStoryGenre(slug, nextSlug)
+  audit(admin, 'genre.update', 'genre', updated.slug, updated.name, {
+    from_name: genre.name,
+    from_slug: slug,
+  })
   // Giống RPC admin_update_genre: chỉ trả tên, slug, mô tả
   return { slug: updated.slug, name: updated.name, description: updated.description }
 }
 
 export async function deleteGenre(slug: string) {
   await delay()
-  await requireAdmin()
-  userGenre(slug)
+  const admin = await requireAdmin()
+  const genre = userGenre(slug)
+  const stories = loadUserStories().filter((s) => s.genreSlugs.includes(slug)).length
   saveUserGenres(loadUserGenres().filter((g) => g.slug !== slug))
   replaceStoryGenre(slug, null)
+  audit(admin, 'genre.delete', 'genre', slug, genre.name, { stories })
 }
 
 /** Gộp `from` vào `into`; trả về số truyện được chuyển sang */
 export async function mergeGenres(from: string, into: string): Promise<number> {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
   if (from === into) throw new AdminError('same_genre')
-  userGenre(from)
-  if (!allGenres().some((g) => g.slug === into)) throw new AdminError('not_found')
+  const source = userGenre(from)
+  const target = allGenres().find((g) => g.slug === into)
+  if (!target) throw new AdminError('not_found')
   const moved = loadUserStories().filter(
     (s) => s.genreSlugs.includes(from) && !s.genreSlugs.includes(into),
   ).length
   saveUserGenres(loadUserGenres().filter((g) => g.slug !== from))
   replaceStoryGenre(from, into)
+  audit(admin, 'genre.merge', 'genre', from, source.name, {
+    into: target.name,
+    into_slug: into,
+    moved,
+  })
   return moved
 }
 
@@ -799,12 +880,23 @@ export async function getCuratedStories(list: CuratedList): Promise<CuratedStory
 /** Thay cả danh sách theo thứ tự đưa vào (id lặp lại chỉ giữ lần đầu); rỗng: trang chủ tự chọn */
 export async function setCuratedStories(list: CuratedList, storyIds: string[]) {
   await delay()
-  await requireAdmin()
+  const admin = await requireAdmin()
   const ids = [...new Set(storyIds)]
   if (ids.length > CURATED_LIMITS[list]) throw new AdminError('too_many_curated')
   const known = new Set(allStories().map((s) => s.id))
   if (ids.some((id) => !known.has(id))) throw new AdminError('not_found')
   saveCurated(list, ids)
+  audit(
+    admin,
+    'curated.set',
+    'list',
+    list,
+    list === 'featured' ? 'Banner nổi bật' : 'Truyện đề cử',
+    {
+      count: ids.length,
+      story_ids: ids,
+    },
+  )
 }
 
 // ── Phiếu đề cử ─────────────────────────────────────────────────────────
@@ -996,10 +1088,50 @@ export async function getAdminRatings({
 
 export async function deleteAdminRating(userId: string, storyId: string) {
   await delay()
-  await requireAdmin()
-  const slug = allStories().find((s) => s.id === storyId)?.slug
+  const admin = await requireAdmin()
+  const story = allStories().find((s) => s.id === storyId)
+  const slug = story?.slug
   const ratings = loadRatings()
   if (!slug || ratings[userId]?.[slug] === undefined) throw new AdminError('not_found')
   const { [slug]: _removed, ...rest } = ratings[userId]
   saveRatings({ ...ratings, [userId]: rest })
+  audit(admin, 'rating.delete', 'rating', `${userId}:${storyId}`, story.title, {
+    user: loadUsers().find((u) => u.id === userId)?.displayName ?? '',
+    score: ratings[userId][slug],
+  })
+}
+
+// ── Nhật ký thao tác ────────────────────────────────────────────────────
+
+export async function getAdminAuditLog({
+  q = '',
+  group,
+  actorId,
+  page,
+  pageSize,
+}: AdminAuditQuery): Promise<Page<AdminAuditEntry>> {
+  await delay()
+  await requireAdmin()
+  const query = slugify(q)
+  // Kho đã lưu mới nhất trước
+  const items = loadAuditLog()
+    .filter(
+      (e) =>
+        (!group || e.action.split('.')[0] === group) &&
+        (!actorId || e.actorId === actorId) &&
+        matches(query, e.actorName, e.targetLabel),
+    )
+    .map((e): AdminAuditEntry => ({
+      id: e.id,
+      actorId: e.actorId,
+      actorName: e.actorName,
+      action: e.action,
+      group: e.action.split('.')[0],
+      targetType: e.targetType,
+      targetId: e.targetId,
+      targetLabel: e.targetLabel,
+      details: e.details,
+      createdAt: e.createdAt,
+    }))
+  return paginate(items, page, adminPageSize(pageSize))
 }

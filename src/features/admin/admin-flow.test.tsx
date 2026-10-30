@@ -1,5 +1,6 @@
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { saveLedger, saveRatings, saveVotes } from '@/mocks/activity'
+import { appendAudit } from '@/mocks/adminAudit'
 import { pendingStory, publishStory, registerUser, signInAs } from '@/test/helpers'
 import { renderApp } from '@/test/renderApp'
 
@@ -634,4 +635,41 @@ test('điểm chấm: lọc theo điểm, xem điểm của một người, xóa
   expect(
     await screen.findByText('Không có điểm chấm nào khớp bộ lọc', {}, slow),
   ).toBeInTheDocument()
+}, 20_000)
+
+test('nhật ký: xem, lọc theo nhóm và theo người làm, tìm theo đối tượng', async () => {
+  const base = { actorId: 'a1', actorName: 'Quản trị Một', targetType: 'user', targetId: 'u1' }
+  appendAudit({ ...base, action: 'user.ban', targetLabel: 'Bạn Spam', details: {} })
+  appendAudit({
+    ...base,
+    actorId: 'a2',
+    actorName: 'Quản trị Hai',
+    action: 'story.takedown',
+    targetType: 'story',
+    targetLabel: 'Truyện Đạo Văn',
+    details: { reason: 'Sao chép nội dung' },
+  })
+  signInAs('demo')
+  const { router, user } = renderApp('/admin/audit')
+
+  // Mới nhất trước: gỡ truyện (kèm lý do) rồi tới khóa tài khoản
+  expect(await screen.findByText('Truyện Đạo Văn', {}, slow)).toBeInTheDocument()
+  expect(screen.getByText('Lý do: Sao chép nội dung')).toBeInTheDocument()
+  expect(screen.getByText('Khóa tài khoản')).toBeInTheDocument()
+  expect(screen.getByText('Gỡ truyện')).toBeInTheDocument()
+
+  // Lọc theo nhóm: chỉ còn thao tác với truyện
+  await user.click(screen.getByRole('combobox', { name: 'Nhóm thao tác' }))
+  await user.click(await screen.findByTitle('Truyện', {}, slow))
+  await expect.poll(() => router.state.location.search, slow).toBe('?group=story')
+  await expect.poll(() => screen.queryByText('Bạn Spam'), slow).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }))
+  expect(await screen.findByText('Bạn Spam', {}, slow)).toBeInTheDocument()
+
+  // Bấm tên người làm: chỉ thao tác của người đó
+  // antd đặt pointer-events: none lên bảng ở nhịp tải lại, user-event từ chối bấm: dùng fireEvent
+  fireEvent.click(screen.getByRole('link', { name: 'Quản trị Một' }))
+  await expect.poll(() => router.state.location.search, slow).toBe('?actor=a1')
+  await expect.poll(() => screen.queryByText('Truyện Đạo Văn'), slow).toBeNull()
+  expect(screen.getByText('Bạn Spam')).toBeInTheDocument()
 }, 20_000)

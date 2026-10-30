@@ -553,3 +553,112 @@ export type AdminRatingQuery = {
   page: number
   pageSize?: number
 }
+
+// ── Nhật ký thao tác admin (trang /admin/audit) ─────────────────────────
+
+/** Nhóm thao tác = phần trước dấu chấm của `action` */
+export const AUDIT_GROUPS = [
+  'user',
+  'story',
+  'comment',
+  'rating',
+  'genre',
+  'curated',
+  'message',
+  'report',
+] as const
+export type AdminAuditGroup = (typeof AUDIT_GROUPS)[number]
+
+export const auditGroupLabels: Record<AdminAuditGroup, string> = {
+  user: 'Người dùng',
+  story: 'Truyện',
+  comment: 'Bình luận',
+  rating: 'Điểm chấm',
+  genre: 'Thể loại',
+  curated: 'Trang chủ',
+  message: 'Hộp thư',
+  report: 'Báo lỗi',
+}
+
+/** Nhãn tiếng Việt của từng thao tác; thao tác lạ (phiên bản mới hơn) hiện nguyên mã */
+export const auditActionLabels: Record<string, string> = {
+  'user.ban': 'Khóa tài khoản',
+  'user.unban': 'Mở khóa tài khoản',
+  'story.takedown': 'Gỡ truyện',
+  'story.restore': 'Khôi phục truyện',
+  'story.approve': 'Duyệt truyện',
+  'story.reject': 'Từ chối truyện',
+  'comment.delete': 'Xóa bình luận',
+  'comment.dismiss_reports': 'Bỏ qua báo cáo bình luận',
+  'rating.delete': 'Xóa điểm chấm',
+  'genre.update': 'Sửa thể loại',
+  'genre.delete': 'Xóa thể loại',
+  'genre.merge': 'Gộp thể loại',
+  'curated.set': 'Sửa danh sách trang chủ',
+  'message.handle': 'Đánh dấu tin nhắn đã xử lý',
+  'message.unhandle': 'Đánh dấu tin nhắn chưa xử lý',
+  'report.set_status': 'Đổi trạng thái báo lỗi',
+}
+
+export type AdminAuditEntry = {
+  id: string
+  /** null: tài khoản người làm đã bị xóa (actorName còn tên lúc đó) */
+  actorId: string | null
+  actorName: string
+  /** Mã thao tác, vd 'user.ban' */
+  action: string
+  group: string
+  targetType: string
+  targetId: string
+  /** Tên đối tượng lúc thao tác */
+  targetLabel: string
+  /** Chi tiết tùy thao tác (lý do, nội dung bị xóa, tên cũ → mới...) */
+  details: Record<string, unknown>
+  createdAt: string
+}
+
+export type AdminAuditQuery = {
+  q?: string
+  group?: AdminAuditGroup
+  actorId?: string
+  page: number
+  pageSize?: number
+}
+
+const detail = (entry: AdminAuditEntry, key: string) => {
+  const value = entry.details[key]
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
+}
+
+/** Mô tả ngắn phần chi tiết của một dòng nhật ký (cột "Chi tiết") */
+export function auditDetailText(entry: AdminAuditEntry): string {
+  const d = (key: string) => detail(entry, key)
+  switch (entry.action) {
+    case 'story.takedown':
+    case 'story.reject':
+      return d('reason') ? `Lý do: ${d('reason')}` : ''
+    case 'comment.delete':
+      return `"${d('content')}" · ${d('author')} · truyện ${d('story')}${
+        Number(d('replies')) > 0 ? ` · kèm ${d('replies')} trả lời` : ''
+      }`
+    case 'comment.dismiss_reports':
+      return `${d('reports')} báo cáo`
+    case 'rating.delete':
+      return `${d('user')} chấm ${d('score')} sao`
+    case 'genre.update':
+      return `Tên cũ: ${d('from_name')}`
+    case 'genre.delete':
+      return `${d('stories')} truyện mất thể loại này`
+    case 'genre.merge':
+      return `Gộp vào "${d('into')}", chuyển ${d('moved')} truyện`
+    case 'curated.set':
+      return `${d('count')} truyện`
+    case 'message.handle':
+    case 'message.unhandle':
+      return d('topic') ? `Chủ đề: ${d('topic')}` : ''
+    case 'report.set_status':
+      return d('status') ? `Trạng thái mới: ${d('status')}` : ''
+    default:
+      return Object.keys(entry.details).length > 0 ? JSON.stringify(entry.details) : ''
+  }
+}
