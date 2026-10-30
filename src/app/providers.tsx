@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthSync } from '@/features/auth/components/AuthSync'
+import { NotificationBadge } from '@/features/notifications/components/NotificationBadge'
 import { OfflineSync } from '@/features/library/components/OfflineSync'
 import { queryClient } from './queryClient'
 
@@ -22,6 +23,7 @@ export function Providers({
     <QueryClientProvider client={client}>
       <AuthSync />
       <OfflineSync />
+      <NotificationBadge />
       <TooltipProvider>{children}</TooltipProvider>
       <Toaster
         position="bottom-center"

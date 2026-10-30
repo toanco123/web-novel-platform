@@ -88,3 +88,16 @@ test('trang thông báo: đọc hết, xóa từng dòng, trạng thái trống'
   }
   expect(await within(section).findByText('Chưa có thông báo nào.', {}, slow)).toBeInTheDocument()
 })
+
+test('tiêu đề tab có số chưa đọc và mất đi khi đọc hết', async () => {
+  await ownerWithNotifications()
+  const { user, router } = renderApp('/notifications')
+  await expect.poll(() => document.title, slow).toMatch(/^\(2\) Thông báo/)
+
+  await user.click(await screen.findByRole('button', { name: 'Đánh dấu tất cả đã đọc' }, slow))
+  await expect.poll(() => document.title, slow).toMatch(/^Thông báo/)
+
+  // Trang khác đặt lại tiêu đề: không còn tiền tố vì đã đọc hết
+  await router.navigate('/about')
+  await expect.poll(() => document.title, slow).not.toMatch(/^\(/)
+})
