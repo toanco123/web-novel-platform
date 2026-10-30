@@ -511,6 +511,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notifications_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "story_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "studio_stories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notifications_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
